@@ -120,6 +120,8 @@ export class FirestoreRepo implements Repo {
     if (delta.verdict !== undefined) update.verdict = delta.verdict;
     if (delta.score !== undefined) update.score = delta.score;
     if (delta.reason !== undefined) update.reason = delta.reason;
+    if (delta.evidence !== undefined) update.evidence = delta.evidence;
+    if (delta.scoredBy !== undefined) update.scoredBy = delta.scoredBy;
     await this.jobs(runId).doc(jobKey).update(update);
   }
 

@@ -15,14 +15,19 @@
  * Once every slot is taken the pool stops pulling, and Postings never pulled
  * are not persisted. Seen-skips and screening outcomes take no slot.
  *
- * Scoring the evaluator's judgements into a Verdict is ticket 08: until then
- * an evaluated Posting ends `skipped` with {@link AWAITING_SCORING_REASON}.
+ *   4. Scoring in code (D7, D8): the title tier is judged in code, the rest
+ *      by the evaluator; `score.ts` sums the weights into a fit score and a
+ *      Verdict, stored with every criterion's evidence. The Verdict drives
+ *      the outcome: APPLY → `held: below_auto_threshold`; STRETCH →
+ *      `skipped: stretch`; APPLY NOW → fill and submit, which tickets 10/11
+ *      build — until then it is `held` with {@link AWAITING_SUBMIT_REASON}.
  *
  * Every status change goes through the transition table (`transitions.ts`).
  */
 import {
   MAX_AI_EVALS,
   MAX_IN_FLIGHT,
+  HELD_REASONS,
   SKIP_REASONS,
   emptyFunnel,
   jobKey,
@@ -35,6 +40,8 @@ import {
   type RunStatus,
   type User,
 } from "@auto-apply/shared";
+import { aiCriteria, buildRubric, judgeInCode } from "../evaluation/rubric.js";
+import { scoreJudgements } from "../evaluation/score.js";
 import { screenPosting, type ScreeningOptions } from "../evaluation/screen.js";
 import { logger } from "../logger.js";
 import type { Discovery, JobEvaluator } from "./ports.js";
@@ -80,8 +87,11 @@ export interface Pipeline {
 /** Pause per stage and per Posting, so a demo can watch the statuses move. */
 const STEP_MS = 500;
 
-/** Interim outcome of an evaluated Posting until scoring lands (ticket 08). */
-export const AWAITING_SCORING_REASON = "Passed screening; scoring is not built yet";
+/**
+ * Interim outcome of an APPLY NOW Posting until form fill (ticket 10) and the
+ * simulated submit (ticket 11) land: held, so nothing looks submitted.
+ */
+export const AWAITING_SUBMIT_REASON = "APPLY NOW; form fill and simulated submit are not built yet";
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -175,8 +185,9 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
       reason: string,
       counted: keyof RunFunnel,
       options: { markSeen: boolean; evaluated?: boolean },
+      outcome: EvaluationDelta = {},
     ) {
-      await move(to, { reason });
+      await move(to, { ...outcome, reason });
       if (options.markSeen) await repo.markSeen(key);
       await repo.patchRun(runId, {
         funnelIncrements: { [counted]: 1, ...(options.evaluated ? { evaluated: 1 } : {}) },
@@ -194,7 +205,13 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
 
       const screened = screenPosting(posting, user.preferences, screening);
       if (screened.outcome === "blocked") {
-        return await finish("blocked", screened.reason, "blocked", { markSeen: true });
+        return await finish(
+          "blocked",
+          screened.reason,
+          "blocked",
+          { markSeen: true },
+          { verdict: "BLOCKED" },
+        );
       }
       if (screened.outcome === "skipped") {
         return await finish("skipped", screened.reason, "skipped", { markSeen: true });
@@ -204,12 +221,36 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
         // Not marked Seen: it was never evaluated, so a later Run considers it.
         return await finish("skipped", SKIP_REASONS.limit, "skipped", { markSeen: false });
       }
-      const judgements = await evaluator.evaluate(posting, user.preferences.fitCriteria);
-      logger.info("posting_evaluated", { runId, jobKey: key, judgements: judgements.length });
-      await finish("skipped", AWAITING_SCORING_REASON, "skipped", {
-        markSeen: true,
-        evaluated: true,
+      const rubric = buildRubric(user.preferences);
+      const toJudge = aiCriteria(rubric);
+      const { scoredBy, judgements } = await evaluator.evaluate(posting, toJudge);
+      // Only answers to what was asked count; code owns the title tier.
+      const asked = new Set(toJudge.map((c) => c.id));
+      const scored = scoreJudgements(rubric, [
+        ...judgeInCode(rubric, posting.title),
+        ...judgements.filter((j) => asked.has(j.criterionId)),
+      ]);
+      logger.info("posting_scored", {
+        runId,
+        jobKey: key,
+        scoredBy,
+        score: scored.score,
+        verdict: scored.verdict,
       });
+      const outcome = {
+        verdict: scored.verdict,
+        score: scored.score,
+        evidence: scored.evidence,
+        scoredBy,
+      };
+      const scoredOptions = { markSeen: true, evaluated: true };
+      if (scored.verdict === "APPLY_NOW") {
+        await finish("held", AWAITING_SUBMIT_REASON, "held", scoredOptions, outcome);
+      } else if (scored.verdict === "APPLY") {
+        await finish("held", HELD_REASONS.belowAutoThreshold, "held", scoredOptions, outcome);
+      } else {
+        await finish("skipped", SKIP_REASONS.stretch, "skipped", scoredOptions, outcome);
+      }
     } catch (err) {
       // One Posting's failure never fails the Run (CODING_STANDARDS: never
       // swallow errors — it becomes a `failed` Evaluation with its reason).
@@ -231,6 +272,8 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
       verdict: null,
       score: null,
       reason: null,
+      evidence: [],
+      scoredBy: null,
       createdAt: now,
       updatedAt: now,
     });

@@ -19,6 +19,7 @@ import {
   ActiveRunExistsError,
   emptyFunnel,
   jobKey,
+  type CriterionEvidence,
   type Evaluation,
   type EvaluationChange,
   type Posting,
@@ -96,6 +97,16 @@ function aPosting(jobId = "1"): Posting {
   };
 }
 
+const evidenceItem: CriterionEvidence = {
+  criterionId: "startup",
+  label: "Startup or scale-up",
+  weight: 1,
+  judgedBy: "ai",
+  met: true,
+  evidence: "a fast-growing scale-up",
+  points: 1,
+};
+
 function anEvaluation(posting: Posting, overrides: Partial<Evaluation> = {}): Evaluation {
   const now = new Date().toISOString();
   return {
@@ -106,6 +117,8 @@ function anEvaluation(posting: Posting, overrides: Partial<Evaluation> = {}): Ev
     verdict: null,
     score: null,
     reason: null,
+    evidence: [],
+    scoredBy: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -381,6 +394,8 @@ export function describeRepoContract(
           status: "submitted",
           verdict: "APPLY_NOW",
           score: 42,
+          evidence: [evidenceItem],
+          scoredBy: "fallback",
         });
         await eventually(() => expect(changes.at(-1)?.evaluation.status).toBe("submitted"));
         // The first delivery introduces the document; every later one modifies it.
@@ -392,6 +407,8 @@ export function describeRepoContract(
         );
         expect(changes.at(-1)?.evaluation.verdict).toBe("APPLY_NOW");
         expect(changes.at(-1)?.evaluation.score).toBe(42);
+        expect(changes.at(-1)?.evaluation.evidence).toEqual([evidenceItem]);
+        expect(changes.at(-1)?.evaluation.scoredBy).toBe("fallback");
         unsub();
       });
 
