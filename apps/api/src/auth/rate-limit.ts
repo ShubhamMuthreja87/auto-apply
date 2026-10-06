@@ -5,7 +5,7 @@
  */
 import { rateLimit } from "express-rate-limit";
 import type { RequestHandler } from "express";
-import { errorResponseSchema } from "@auto-apply/shared";
+import { sendError } from "../send-error.js";
 
 export interface RateLimits {
   /** Failed logins per client per 15 minutes. */
@@ -24,11 +24,7 @@ function limiter(limit: number, windowMs: number, skipSuccessfulRequests: boolea
     standardHeaders: "draft-8",
     legacyHeaders: false,
     handler: (_req, res) => {
-      res.status(429).json(
-        errorResponseSchema.parse({
-          error: { code: "rate_limited", message: "Too many requests; try again later" },
-        }),
-      );
+      sendError(res, 429, "rate_limited", "Too many requests; try again later");
     },
   });
 }

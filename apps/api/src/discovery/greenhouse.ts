@@ -8,6 +8,7 @@ import type { Posting, PostingSource } from "@auto-apply/shared";
 import type { JobSource } from "../pipeline/ports.js";
 import { logger } from "../logger.js";
 import { htmlToText, isRemote } from "./normalise.js";
+import { atsGetJson } from "../ats-get.js";
 
 export const GREENHOUSE_API = "https://boards-api.greenhouse.io/v1/boards";
 
@@ -99,24 +100,9 @@ export function greenhouseJobSource({ fetch, timeoutMs }: GreenhouseOptions): Jo
   return {
     ats: "greenhouse",
     async discover(board) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const res = await fetch(greenhouseBoardUrl(board), {
-          method: "GET",
-          headers: { accept: "application/json" },
-          signal: controller.signal,
-        });
-        if (!res.ok) throw new Error(`Greenhouse board ${board} answered HTTP ${res.status}`);
-        return parseGreenhouseBoard(board, await res.json(), "live");
-      } catch (err) {
-        if (controller.signal.aborted) {
-          throw new Error(`Greenhouse board ${board} timed out after ${timeoutMs} ms`);
-        }
-        throw err;
-      } finally {
-        clearTimeout(timer);
-      }
+      const what = `Greenhouse board ${board}`;
+      const body = await atsGetJson(fetch, greenhouseBoardUrl(board), timeoutMs, what);
+      return parseGreenhouseBoard(board, body, "live");
     },
   };
 }

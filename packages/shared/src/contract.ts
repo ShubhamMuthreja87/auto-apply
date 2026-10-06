@@ -2,15 +2,15 @@ import { z } from "zod";
 
 /**
  * The contract between `apps/web` and `apps/api`: shared zod schemas and the
- * types inferred from them. This skeleton (ticket 01) holds the status state
- * machines (D16), the pipeline limits (D17), a shared error-response shape, and
- * the health-check payload used by the walking skeleton. Later tickets extend
- * it with the run, evaluation, posting and SSE event shapes.
+ * types inferred from them. It holds the status state machines (D16), the
+ * pipeline limits (D17), the shared error-response shape, the health and auth
+ * payloads, the Firestore document shapes (user, Run, Evaluation, Posting),
+ * the Run API payloads and the SSE event shapes.
  */
 
 /**
  * Run status machine (D16): discovering → evaluating → applying → completed | failed.
- * Transitions only move forward; one function will own transitions in a later ticket.
+ * Transitions only move forward; `apps/api/src/pipeline/transitions.ts` owns them.
  */
 export const runStatusSchema = z.enum([
   "discovering",
@@ -102,10 +102,9 @@ export type SessionResponse = z.infer<typeof sessionResponseSchema>;
  * Firestore documents (D14) and the identities built from them.
  *
  * These shapes travel to the browser over SSE as run and evaluation snapshots
- * (D21), so they live in the contract. Product-rich fields — the rubric inside
- * preferences (D6), the per-criterion evidence and built Greenhouse payload on
- * an Evaluation (D7, D18) — are owned by later tickets; this ticket fixes
- * identity, status and funnel, enough for the persistence port and its tests.
+ * (D21), so they live in the contract: identity, status and funnel here, the
+ * detailed user document (D6, D9) and the Evaluation's evidence and simulated
+ * submission (D7, D18) further down.
  * -------------------------------------------------------------------------- */
 
 /** The ATS boards discovery reads from (D2). */
@@ -153,9 +152,9 @@ export function jobKey(posting: Pick<Posting, "ats" | "board" | "jobId">): strin
 
 /**
  * The single user document (D13): profile, the preferences rubric (D6) and
- * settings. The detailed shapes of these three are owned by later tickets, so
- * here they are open records — the persistence port and its tests do not pin
- * down product fields yet.
+ * settings, as the storage-level shape the `Repo` moves: open records, so the
+ * persistence port does not pin down product fields. The API validates them
+ * against {@link userSchema} on read.
  */
 export const userDocSchema = z.object({
   uid: z.string(),

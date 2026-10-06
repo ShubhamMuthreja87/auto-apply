@@ -9,6 +9,7 @@ import type { Ats, Posting, PostingSource } from "@auto-apply/shared";
 import { logger } from "../logger.js";
 import type { BoardRef, Discovery, JobSource } from "../pipeline/ports.js";
 import type { FixtureReader } from "./fixtures.js";
+import { messageOf } from "../errors.js";
 
 export type DiscoveryMode = "live" | "fixtures";
 
@@ -35,10 +36,6 @@ export interface BoardDiscovery {
   ref: BoardRef;
   source: PostingSource;
   postings: Posting[];
-}
-
-function messageOf(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
 
 export function createDiscovery(

@@ -4,7 +4,7 @@
  * the fixed demo uid, never the username.
  */
 import { Router, type RequestHandler } from "express";
-import { errorResponseSchema, loginRequestSchema, sessionResponseSchema } from "@auto-apply/shared";
+import { loginRequestSchema, sessionResponseSchema } from "@auto-apply/shared";
 import { logger } from "../logger.js";
 import { DEMO_UID } from "../user.js";
 import {
@@ -15,6 +15,7 @@ import {
   signSession,
   type Credentials,
 } from "../auth/session.js";
+import { sendError } from "../send-error.js";
 
 export interface AuthRouterOptions extends Credentials {
   jwtSecret: string;
@@ -27,22 +28,14 @@ export function authRouter(options: AuthRouterOptions): Router {
   router.post("/api/login", options.loginLimiter, async (req, res, next) => {
     const body = loginRequestSchema.safeParse(req.body);
     if (!body.success) {
-      res.status(400).json(
-        errorResponseSchema.parse({
-          error: { code: "invalid_request", message: "Username and password are required" },
-        }),
-      );
+      sendError(res, 400, "invalid_request", "Username and password are required");
       return;
     }
     try {
       if (!(await checkCredentials(options, body.data))) {
         // The attempted username is never logged.
         logger.warn("login_failed", { ip: req.ip });
-        res.status(401).json(
-          errorResponseSchema.parse({
-            error: { code: "invalid_credentials", message: "Wrong username or password" },
-          }),
-        );
+        sendError(res, 401, "invalid_credentials", "Wrong username or password");
         return;
       }
       res.cookie(AUTH_COOKIE, signSession(options.jwtSecret, DEMO_UID), sessionCookieOptions);

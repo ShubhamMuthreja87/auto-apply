@@ -29,6 +29,7 @@ import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import type { CriterionEvidence, Evaluation, Run, ScoredBy } from "@auto-apply/shared";
 import { listEvaluations, listRuns } from "../api";
 import { useLoad, type LoadState } from "../useLoad";
+import { formatDate } from "../ui/formatDate";
 import { StatusChip, VerdictChip } from "../ui/StatusChip";
 import {
   FallbackLabel,
@@ -40,18 +41,6 @@ import {
 
 const ALL_RUNS = "all";
 const COLUMNS = 8;
-
-const dateFormat = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-function formatDate(iso: string): string {
-  return dateFormat.format(new Date(iso));
-}
 
 export function ScannedJobsPage() {
   const [selected, setSelected] = useState<string>(ALL_RUNS);

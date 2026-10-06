@@ -11,9 +11,10 @@
  * (D24). A rejected request (any other 4xx, e.g. a bad key) is not retried.
  *
  * Callers own their prompts. Two use this: Posting evaluation
- * (`ai-evaluator.ts`) and, later, free-text form answers.
+ * (`ai-evaluator.ts`) and free-text form answers (`free-text-answerer.ts`).
  */
 import { z } from "zod";
+import { messageOf } from "../errors.js";
 
 export interface ChatClientOptions {
   fetch: typeof fetch;
@@ -92,7 +93,7 @@ export function createChatClient(options: ChatClientOptions): ChatClient {
       if (controller.signal.aborted) {
         throw new AiCallError("timeout", `AI call timed out after ${options.timeoutMs} ms`, true);
       }
-      const reason = err instanceof Error ? err.message : String(err);
+      const reason = messageOf(err);
       throw new AiCallError("network", `AI call failed: ${reason}`, true);
     } finally {
       clearTimeout(timer);
