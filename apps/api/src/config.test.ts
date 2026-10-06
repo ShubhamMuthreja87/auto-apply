@@ -76,4 +76,20 @@ describe("loadConfig", () => {
   it("rejects an unknown REPO value", () => {
     expect(() => loadConfig({ REPO: "postgres" })).toThrow();
   });
+
+  it.each([undefined, ""])(
+    "leaves the salary floor unset (salary hard block inactive) when SALARY_FLOOR_LPA=%j",
+    (value) => {
+      expect(loadConfig({ SALARY_FLOOR_LPA: value }).SALARY_FLOOR_LPA).toBeUndefined();
+    },
+  );
+
+  it("reads the salary floor in lakhs per annum", () => {
+    expect(loadConfig({ SALARY_FLOOR_LPA: "45" }).SALARY_FLOOR_LPA).toBe(45);
+    expect(loadConfig({ SALARY_FLOOR_LPA: "37.5" }).SALARY_FLOOR_LPA).toBe(37.5);
+  });
+
+  it.each(["abc", "0", "-5"])("fails fast on an invalid SALARY_FLOOR_LPA=%j", (value) => {
+    expect(() => loadConfig({ SALARY_FLOOR_LPA: value })).toThrow();
+  });
 });

@@ -146,6 +146,208 @@ export const userDocSchema = z.object({
 });
 export type UserDoc = z.infer<typeof userDocSchema>;
 
+/* -------------------------------------------------------------------------- *
+ * The user document's detailed shapes (D6, D9, D13, ticket 04).
+ *
+ * `userDocSchema` above stays the open, storage-level shape the `Repo` moves;
+ * `userSchema` below is what the API validates it against on read and what the
+ * Settings page renders. Every field is filled only from the author's sources
+ * (`seed/source/*.md`); anything they do not state is `null` and resolves to
+ * user-only (D9, D11). Compensation is never stored: it is always user-only,
+ * and the salary floor comes from the API's environment, not this document.
+ * -------------------------------------------------------------------------- */
+
+/** A verbatim quote from the job-search prompt, so every rule traces to its wording (D6). */
+const sourceQuoteSchema = z.string().min(1);
+
+export const experienceEntrySchema = z.object({
+  company: z.string(),
+  title: z.string(),
+  /** As written in the resume, e.g. "Feb 2023". */
+  start: z.string(),
+  /** `null` while the role is current. */
+  end: z.string().nullable(),
+  highlights: z.array(z.string()),
+});
+export type ExperienceEntry = z.infer<typeof experienceEntrySchema>;
+
+/**
+ * Who the user is (resume + contact details). Name, contact details and
+ * address are filled into forms in code and never sent to the model (D23).
+ */
+export const userProfileSchema = z.object({
+  fullName: z.string(),
+  firstName: z.string(),
+  lastName: z.string(),
+  email: z.string(),
+  phone: z.string(),
+  location: z.string(),
+  links: z.object({
+    linkedin: z.string().nullable(),
+    github: z.string().nullable(),
+    website: z.string().nullable(),
+  }),
+  headline: z.string(),
+  summary: z.string(),
+  experience: z.array(experienceEntrySchema),
+  skills: z.array(z.object({ category: z.string(), items: z.array(z.string()) })),
+  leadership: z.array(z.string()),
+  education: z.array(
+    z.object({
+      degree: z.string(),
+      school: z.string(),
+      startYear: z.number().int().nullable(),
+      endYear: z.number().int().nullable(),
+    }),
+  ),
+});
+export type UserProfile = z.infer<typeof userProfileSchema>;
+
+/**
+ * One additive fit criterion (D6, D7). Criteria sharing a `group` are
+ * exclusive: only the highest-weighted met one counts ("highest only", "else").
+ * Negative weights are penalties.
+ */
+export const fitCriterionSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  weight: z.number().int(),
+  group: z.string().nullable(),
+  /** Terms a keyword matcher can look for; the AI judges against `label` and `source`. */
+  terms: z.array(z.string()),
+  source: sourceQuoteSchema,
+});
+export type FitCriterion = z.infer<typeof fitCriterionSchema>;
+
+/**
+ * A disqualifying rule checked in code before any AI call (D7). `terms` and
+ * `threshold` are its parameters; which ones a rule uses is fixed by its `id`.
+ */
+export const hardBlockRuleSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  terms: z.array(z.string()),
+  threshold: z.number().nullable(),
+  source: sourceQuoteSchema,
+});
+export type HardBlockRule = z.infer<typeof hardBlockRuleSchema>;
+
+/** A cap on the Verdict for IC titles in a given stack (the language gate). */
+export const languageGateRuleSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  terms: z.array(z.string()),
+  cap: z.enum(["APPLY", "STRETCH"]),
+  source: sourceQuoteSchema,
+});
+export type LanguageGateRule = z.infer<typeof languageGateRuleSchema>;
+
+/** The rubric and hard-block inputs, from the author's job-search prompt (D6). */
+export const userPreferencesSchema = z.object({
+  region: z.string(),
+  goal: z.object({ text: z.string(), source: sourceQuoteSchema }),
+  location: z.object({
+    accepted: z.array(z.string()),
+    remoteOpenTo: z.array(z.string()),
+    source: sourceQuoteSchema,
+  }),
+  stack: z.object({
+    strong: z.array(z.string()),
+    workingKnowledge: z.array(z.string()),
+    not: z.array(z.string()),
+  }),
+  /** Titles that are skipped outright (not blocked). */
+  excludedTitles: z.object({ terms: z.array(z.string()), source: sourceQuoteSchema }),
+  companyBlocks: z.object({
+    categories: z.array(
+      z.object({
+        id: z.string(),
+        label: z.string(),
+        companies: z.array(z.string()),
+        source: sourceQuoteSchema,
+      }),
+    ),
+    /** Large companies that are not blocked by size. */
+    allowedExceptions: z.object({ companies: z.array(z.string()), source: sourceQuoteSchema }),
+  }),
+  hardBlocks: z.array(hardBlockRuleSchema),
+  languageGate: z.array(languageGateRuleSchema),
+  fitCriteria: z.array(fitCriterionSchema),
+  fitCap: z.number().int().positive(),
+  verdictBands: z.object({
+    applyNowMinFit: z.number().int(),
+    applyMinFit: z.number().int(),
+    source: sourceQuoteSchema,
+  }),
+  /** Manager titles get EM framing, IC titles Staff framing in AI answers (D12). */
+  tierFraming: z.object({
+    manager: z.literal("EM"),
+    ic: z.literal("Staff"),
+    source: sourceQuoteSchema,
+  }),
+});
+export type UserPreferences = z.infer<typeof userPreferencesSchema>;
+
+/**
+ * The author's answers to common application-form questions (D9). `null`
+ * means the sources do not say, so the field resolves to user-only.
+ */
+export const applicationSettingsSchema = z.object({
+  location: z.object({
+    current: z.string().nullable(),
+    postalAddress: z.string().nullable(),
+    willingToRelocate: z.boolean().nullable(),
+    relocationScope: z.string().nullable(),
+    workArrangement: z.string().nullable(),
+    workAuthorizationCountries: z.array(z.string()),
+    requiresVisaSponsorship: z.boolean().nullable(),
+    citizenship: z.string().nullable(),
+  }),
+  availability: z.object({
+    noticePeriodDays: z.number().int().nonnegative().nullable(),
+    /** ISO date (YYYY-MM-DD). */
+    earliestStartDate: z.string().nullable(),
+  }),
+  education: z.object({
+    highestDegree: z.string().nullable(),
+    school: z.string().nullable(),
+    graduationYear: z.number().int().nullable(),
+  }),
+  experience: z.object({
+    totalYears: z.number().nonnegative().nullable(),
+    peopleManagementYears: z.number().nonnegative().nullable(),
+    largestTeamManaged: z.number().int().nonnegative().nullable(),
+  }),
+  documents: z.object({
+    resumeUrl: z.string().nullable(),
+    coverLetter: z.string().nullable(),
+  }),
+  other: z.object({
+    howDidYouHear: z.string().nullable(),
+    pronouns: z.string().nullable(),
+  }),
+  /** Question categories that are never auto-answered (D10) or seeded (compensation). */
+  alwaysUserOnly: z.array(z.string()),
+});
+export type ApplicationSettings = z.infer<typeof applicationSettingsSchema>;
+
+/**
+ * The user document with its parts validated: what the API reads, the
+ * pipeline consumes and `GET /api/me` returns. Every `User` is also a valid
+ * {@link UserDoc}.
+ */
+export const userSchema = z.object({
+  uid: z.string(),
+  profile: userProfileSchema,
+  preferences: userPreferencesSchema,
+  settings: applicationSettingsSchema,
+});
+export type User = z.infer<typeof userSchema>;
+
+/** `GET /api/me`: the signed-in user's document. */
+export const meResponseSchema = userSchema;
+export type MeResponse = z.infer<typeof meResponseSchema>;
+
 /**
  * Per-run funnel counts (D16). They are only ever incremented, never
  * read-modify-written (CODING_STANDARDS landmine: lost updates); the Firestore

@@ -10,7 +10,14 @@
  * marking every Posting `skipped` because there is no evaluator yet. Later
  * tickets replace the evaluating and applying stages with real work.
  */
-import { emptyFunnel, jobKey, type Posting, type Repo, type Run } from "@auto-apply/shared";
+import {
+  emptyFunnel,
+  jobKey,
+  type Posting,
+  type Repo,
+  type Run,
+  type User,
+} from "@auto-apply/shared";
 import { logger } from "../logger.js";
 import type { Discovery } from "./ports.js";
 
@@ -21,6 +28,13 @@ export interface PipelineDeps {
   /** Paces the stages so the live view is watchable; instant in tests. */
   delay: (ms: number) => Promise<void>;
   newRunId: () => string;
+  /**
+   * Loads and validates the Run's user document (profile, preferences,
+   * settings). Bound to the `Repo` in the composition root, so the pipeline
+   * never reads storage for it itself; it is read per Run, so Settings edits
+   * apply to the next Run.
+   */
+  loadUser: (uid: string) => Promise<User>;
 }
 
 export interface StartedRun {
@@ -51,9 +65,17 @@ function messageOf(err: unknown): string {
 }
 
 export function buildPipeline(deps: PipelineDeps): Pipeline {
-  const { repo, discovery, clock, delay, newRunId } = deps;
+  const { repo, discovery, clock, delay, newRunId, loadUser } = deps;
 
-  async function runStages(runId: string): Promise<void> {
+  async function runStages(runId: string, uid: string): Promise<void> {
+    // A missing or invalid user document fails the Run before any discovery.
+    // Hard blocks and the rubric (tickets 07, 08) will read from it.
+    const user = await loadUser(uid);
+    logger.info("run_user_loaded", {
+      runId,
+      fitCriteria: user.preferences.fitCriteria.length,
+      hardBlocks: user.preferences.hardBlocks.length,
+    });
     await delay(STEP_MS);
     const postings = await discovery.discover();
     for (const posting of postings) await recordQueued(runId, posting);
@@ -116,7 +138,7 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
         updatedAt: now,
       };
       await repo.createRun(run);
-      const finished = runStages(run.runId).catch((err: unknown) => fail(run.runId, err));
+      const finished = runStages(run.runId, uid).catch((err: unknown) => fail(run.runId, err));
       return { runId: run.runId, finished };
     },
   };

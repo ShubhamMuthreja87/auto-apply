@@ -33,6 +33,9 @@ const envSchema = z.object({
   // (D3); `fixtures` reads only the recorded boards, never the network, for
   // deterministic end-to-end runs (spec, Testing seam 6).
   JOB_SOURCE: z.enum(["live", "fixtures"]).default("live"),
+  // The salary hard block's floor, in lakhs per annum. Kept out of the user
+  // document (compensation is never seeded); unset means the block is inactive.
+  SALARY_FLOOR_LPA: optionalString.pipe(z.coerce.number().positive().optional()),
 });
 
 export type Config = z.infer<typeof envSchema>;
@@ -47,6 +50,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     FIREBASE_SERVICE_ACCOUNT_JSON: env.FIREBASE_SERVICE_ACCOUNT_JSON,
     GOOGLE_APPLICATION_CREDENTIALS: env.GOOGLE_APPLICATION_CREDENTIALS,
     JOB_SOURCE: env.JOB_SOURCE,
+    SALARY_FLOOR_LPA: env.SALARY_FLOOR_LPA,
   });
 
   // The `prod` namespace is only ever used on the server (CODING_STANDARDS,

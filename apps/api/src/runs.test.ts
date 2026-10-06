@@ -26,6 +26,7 @@ import type { Config } from "./config.js";
 import { InMemoryRepo } from "./repo/in-memory-repo.js";
 import { buildPipeline } from "./pipeline/pipeline.js";
 import type { Discovery } from "./pipeline/ports.js";
+import { SEED_USER } from "./seed-user.js";
 
 const testConfig: Config = {
   NODE_ENV: "test",
@@ -111,6 +112,7 @@ function harness(heartbeatMs = 15_000) {
     clock: () => new Date(),
     delay: () => gate,
     newRunId: () => `run-${++n}`,
+    loadUser: async (uid) => ({ uid, ...SEED_USER }),
   });
   const app = createApp(testConfig, { repo, kind: "memory", close: async () => {} }, pipeline, {
     heartbeatMs,

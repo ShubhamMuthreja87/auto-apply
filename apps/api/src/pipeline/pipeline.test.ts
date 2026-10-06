@@ -5,6 +5,7 @@ import {
   type Posting,
   type Run,
   type RunStatus,
+  type User,
 } from "@auto-apply/shared";
 import { createDiscovery } from "../discovery/discovery.js";
 import { readBoardFixture } from "../discovery/fixtures.js";
@@ -13,6 +14,10 @@ import { recordedFetch } from "../discovery/recorded-fetch.js";
 import { InMemoryRepo } from "../repo/in-memory-repo.js";
 import { buildPipeline, type PipelineDeps } from "./pipeline.js";
 import type { Discovery } from "./ports.js";
+import { SEED_USER } from "../seed-user.js";
+import { UserNotFoundError } from "../user.js";
+
+const theUser: User = { uid: "user-1", ...SEED_USER };
 
 function aPosting(jobId: string): Posting {
   return {
@@ -52,6 +57,7 @@ function deps(overrides: Partial<PipelineDeps> = {}): PipelineDeps {
     clock: () => new Date("2026-10-06T12:00:00.000Z"),
     delay: async () => {},
     newRunId: () => `run-${++n}`,
+    loadUser: async () => theUser,
     ...overrides,
   };
 }
@@ -159,6 +165,43 @@ describe("pipeline skeleton", () => {
     const run = await repo.getRun(runId);
     expect(run?.status).toBe("failed");
     expect(run?.reason).toBe("board unreachable");
+  });
+
+  it("loads the Run's user through the injected loader, by the Run's uid", async () => {
+    const asked: string[] = [];
+    const pipeline = buildPipeline(
+      deps({
+        loadUser: async (uid) => {
+          asked.push(uid);
+          return theUser;
+        },
+      }),
+    );
+
+    const { finished } = await pipeline.startRun("user-1");
+    await finished;
+
+    expect(asked).toEqual(["user-1"]);
+  });
+
+  it("fails the Run with a reason when the user document cannot be loaded", async () => {
+    const repo = new InMemoryRepo();
+    const pipeline = buildPipeline(
+      deps({
+        repo,
+        loadUser: async (uid) => {
+          throw new UserNotFoundError(uid);
+        },
+      }),
+    );
+
+    const { runId, finished } = await pipeline.startRun("user-1");
+    await finished;
+
+    const run = await repo.getRun(runId);
+    expect(run?.status).toBe("failed");
+    expect(run?.reason).toBe("no user document for user-1");
+    expect(run?.funnel.discovered).toBe(0);
   });
 });
 
