@@ -1,0 +1,714 @@
+{
+  "jobs": [
+    {
+      "absolute_url": "https://jobs.dropbox.com/listing/6333181?gh_jid=6333181",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": false,
+          "requires_processing_consent": false,
+          "requires_retention_consent": false,
+          "retention_period": null,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "education": "education_required",
+      "employment": "employment_required",
+      "internal_job_id": 2225690,
+      "location": {
+        "name": "Remote - Poland"
+      },
+      "metadata": [
+        {
+          "id": 397108,
+          "name": "Recruiting Team Responsible",
+          "value": "International EPD",
+          "value_type": "single_select"
+        },
+        {
+          "id": 1993612,
+          "name": "Weighted Value",
+          "value": null,
+          "value_type": "single_select"
+        },
+        {
+          "id": 397072,
+          "name": "Parent Job ID",
+          "value": null,
+          "value_type": "single_select"
+        },
+        {
+          "id": 397073,
+          "name": "Active Until Date",
+          "value": "",
+          "value_type": "date"
+        },
+        {
+          "id": 31703,
+          "name": "Employment Type",
+          "value": "Regular",
+          "value_type": "single_select"
+        },
+        {
+          "id": 29942941,
+          "name": "Time Type",
+          "value": null,
+          "value_type": "single_select"
+        },
+        {
+          "id": 3465818,
+          "name": "Location Cost Tier",
+          "value": null,
+          "value_type": "single_select"
+        },
+        {
+          "id": 696737,
+          "name": "Skillset",
+          "value": "Infra SWE",
+          "value_type": "single_select"
+        },
+        {
+          "id": 113830,
+          "name": "Dropboxer Level",
+          "value": "IC4",
+          "value_type": "single_select"
+        },
+        {
+          "id": 54678,
+          "name": "Career Page Allocation",
+          "value": "Engineering",
+          "value_type": "single_select"
+        }
+      ],
+      "id": 6333181,
+      "updated_at": "2026-09-03T09:40:01-04:00",
+      "requisition_id": "PARENT",
+      "title": "Senior Infrastructure Software Engineer",
+      "company_name": "Dropbox",
+      "first_published": "2025-07-16T10:24:34-04:00",
+      "language": "en",
+      "application_deadline": null,
+      "content": "&lt;div&gt;\n&lt;h2&gt;Role Description&lt;/h2&gt;\n&lt;/div&gt;\n&lt;div&gt;\n&lt;p&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;As an Infrastructure Engineer, your role will be crucial in shaping and constructing the robust systems that not only support our current flagship products but also lay the groundwork for the next wave of engineering innovations. From optimizing user experiences across various projects to ensuring seamless scalability and data integrity, you&#39;ll be at the forefront of shaping the technological backbone of our platform.&lt;/span&gt;&lt;/p&gt;\n&lt;p&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;Collaborating closely with cross-functional teams, you&#39;ll leverage your expertise to tackle audacious challenges and push the boundaries of what&#39;s possible. Your contributions will directly impact millions of users, as every line of code you write furthers our mission to revolutionize the way people work and collaborate.&lt;/span&gt;&lt;/p&gt;\n&lt;p&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;Join us in redefining the future, where your passion for building scalable, reliable systems will drive meaningful change on a global scale.&lt;/span&gt;&lt;/p&gt;\n&lt;p&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt;&lt;span class=&quot; author-d-16z86ztz122z98z81zz82zz85zunv3z82zpqfnlamz84zz82z1lz85zz72zz76zwmz68zz71z5r6ijz83zqxz67zz74zz83zpkbz72z&quot;&gt;&lt;span class=&quot;highlight author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z9z84zoz89zz88ziz77zqiz88z0o9xz69zz84zz82zqz67z5v4l57ljb2r3&quot; data-highlight-color=&quot;#B5DCAF&quot;&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z95lz89zy6z71zz79zz84zz68zyz69zupz72zz79zcz69zz76zkz79zp1z66ztz67zxz71zz89zz86zz71z&quot;&gt;Our Engineering Career Framework is &lt;/span&gt;&lt;span class=&quot;attrlink url author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z95lz89zy6z71zz79zz84zz68zyz69zupz72zz79zcz69zz76zkz79zp1z66ztz67zxz71zz89zz86zz71z&quot;&gt;&lt;a class=&quot;attrlink&quot; href=&quot;https://dropbox.github.io/dbx-career-framework/&quot; target=&quot;_blank&quot; data-target-href=&quot;https://dropbox.github.io/dbx-career-framework/&quot;&gt;&lt;u&gt;viewable by anyone outside the company&lt;/u&gt;&lt;/a&gt;&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z95lz89zy6z71zz79zz84zz68zyz69zupz72zz79zcz69zz76zkz79zp1z66ztz67zxz71zz89zz86zz71z&quot;&gt; and describes what’s expected for our engineers at each of our career levels. Check out our blog post on this topic and more &lt;/span&gt;&lt;span class=&quot;attrlink url author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z95lz89zy6z71zz79zz84zz68zyz69zupz72zz79zcz69zz76zkz79zp1z66ztz67zxz71zz89zz86zz71z&quot;&gt;&lt;a class=&quot;attrlink&quot; href=&quot;https://dropbox.tech/culture/sharing-our-engineering-career-framework-with-the-world&quot; target=&quot;_blank&quot; data-target-href=&quot;https://dropbox.tech/culture/sharing-our-engineering-career-framework-with-the-world&quot;&gt;here&lt;/a&gt;&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z95lz89zy6z71zz79zz84zz68zyz69zupz72zz79zcz69zz76zkz79zp1z66ztz67zxz71zz89zz86zz71z&quot;&gt;.&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/p&gt;\n&lt;/div&gt;\n&lt;div&gt;\n&lt;h2&gt;Responsibilities&lt;/h2&gt;\n&lt;/div&gt;\n&lt;ul&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz82zfwz66zwgz76zz77zz88zoz67zz83z1z87zpoz80zz84zsz83zx8z67zz66zz84zz76zz74z7z83zz72zz86z&quot;&gt;Build &lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt;infrastructure capable of managing metadata for hundreds of billions of files, handling hundreds of petabytes of user data, and facilitating millions of concurrent connections.&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt;Lead the expansion of Dropbox&#39;s function as the data-fabric, connecting hundreds of millions of applications, devices, and services globally, while also driving initiatives to enhance interoperability and adaptability across diverse ecosystems.&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;M&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt;easur&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz82zfwz66zwgz76zz77zz88zoz67zz83z1z87zpoz80zz84zsz83zx8z67zz66zz84zz76zz74z7z83zz72zz86z&quot;&gt;e&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt; and optimiz&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;e&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt; Dropbox&#39;s analytics platform&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt; to&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt; maintain its status as one of the most advanced in the industry for extracting meaningful insights from vast data volumes.&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt;Collaborat&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;e&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt; with cross-functional teams to innovate and implement solutions that enhance the performance, reliability, and security of Dropbox&#39;s infrastructure, ensuring a seamless experience for users worldwide.&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;Proactively identify new opportunities and drive improvements in current project states, advocating for and implementing changes that potentially impact broader business initiatives across teams or products.&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;Proficiency in effectively navigating through ambiguous situations and uncertainties, demonstrating adaptability and strategic thinking to steer projects towards successful outcomes.&lt;/span&gt;&lt;/li&gt;\n&lt;/ul&gt;\n&lt;p&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;On-call work may be necessary occasionally to help address bugs, outages, or other operational issues, with the goal of maintaining a stable and high-quality experience for our customers.&lt;/span&gt;&lt;/p&gt;\n&lt;div&gt;\n&lt;h2&gt;Requirements&lt;/h2&gt;\n&lt;/div&gt;\n&lt;ul&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt;BS, MS, or PhD in Computer Science or related technical field involving coding&lt;/span&gt; &lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z h-lparen&quot;&gt;(e.g.,&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt; physics or mathematics), or equivalent technical experience&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;9&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt;+ years of professional software development experience&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt;Proven track record constructing and managing expansive, multi-threaded, geographically dispersed backend systems&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt;Proficient in programming and debugging across a range of languages such as Python, Go, C/C++, or Java&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;Extensive experience working&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt; with operating system internals, filesystems, databases, networks, and compilers considered advantageous&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;Ability to navigate and thrive in ambiguous situations, showcasing adaptability and &lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z9pjcx6z72zz84zz122zdz69zz69zz76zz80zz75z8z65zz65zwz77zm9jz79z6t1y8z66zu&quot;&gt;open-ended problem&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt; solving.&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;Capable of taking ownership of long-term projects and seeing them through to completion.&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz82zfwz66zwgz76zz77zz88zoz67zz83z1z87zpoz80zz84zsz83zx8z67zz66zz84zz76zz74z7z83zz72zz86z&quot;&gt;Ability to set&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph763z70zkxz79zz89ztyz87zz66zjm6pez70zz84zz68zexo&quot;&gt; medium-to-long term strategy for business-impacting projects.&lt;/span&gt;&lt;/li&gt;\n&lt;/ul&gt;\n&lt;div&gt;\n&lt;h2 data-usually-unique-id=&quot;678846027535458620785390&quot;&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph763z70zkxz79zz89ztyz87zz66zjm6pez70zz84zz68zexo&quot;&gt;Preferred Qualifications&lt;/span&gt;&lt;/h2&gt;\n&lt;/div&gt;\n&lt;ul class=&quot;listtype-bullet listindent1 list-bullet1&quot;&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz82zfwz66zwgz76zz77zz88zoz67zz83z1z87zpoz80zz84zsz83zx8z67zz66zz84zz76zz74z7z83zz72zz86z&quot;&gt;Proven track record of defining technical roadmaps for the team&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qoxuz87z1z75zz66z3bz71zz84zz67z7r8z79z44rz77zz71z6z79zz76zsz73z0ivdz78zz77zq&quot;&gt;.&lt;/span&gt;&lt;/li&gt;\n&lt;/ul&gt;\n&lt;h2&gt;&lt;span class=&quot;highlight author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z9z84zoz89zz88ziz77zqiz88z0o9xz69zz84zz82zqz67z5v4l57ljb2r3&quot; data-highlight-color=&quot;#B5DCAF&quot;&gt;Compensation&lt;/span&gt;&lt;/h2&gt;\n&lt;div id=&quot;te-floating-button-container&quot;&gt;&lt;/div&gt;&lt;div class=&quot;content-pay-transparency&quot;&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;title&quot;&gt;Poland Pay Range&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;333 200 zł&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;450 800 zł PLN&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;",
+      "departments": [
+        {
+          "id": 61021,
+          "name": "EPD",
+          "child_ids": [
+            71459,
+            83217,
+            68343,
+            303026,
+            312997,
+            370699,
+            370700,
+            370701,
+            370702,
+            370703,
+            370704,
+            370705,
+            80053,
+            81549,
+            68971,
+            85728,
+            40891,
+            40862,
+            81552,
+            338922,
+            264223,
+            338923,
+            243123,
+            312993,
+            364824,
+            364825,
+            364834,
+            364826,
+            364828,
+            364827,
+            364829,
+            364830,
+            364831,
+            364832,
+            89574,
+            364833,
+            60174,
+            371032,
+            78106,
+            238755,
+            287013,
+            83220,
+            83218,
+            89575,
+            85737,
+            85755,
+            347809,
+            347859,
+            146800,
+            226275,
+            372574,
+            40856,
+            246926,
+            347810,
+            284920,
+            238759,
+            285855,
+            364836,
+            81396,
+            284918,
+            40844,
+            238780,
+            285856,
+            285857,
+            85726,
+            238781,
+            285858,
+            284916,
+            364835,
+            364839,
+            364844,
+            364846,
+            81392,
+            150320,
+            364845,
+            78109,
+            284921,
+            238762,
+            87756,
+            284917,
+            238764,
+            89573,
+            63446,
+            89582,
+            316130,
+            85777,
+            316131,
+            284923,
+            364838,
+            89572,
+            327490,
+            316132,
+            364837,
+            284924,
+            388832,
+            364842,
+            388833,
+            284925,
+            388834,
+            57456,
+            238754,
+            388835,
+            57577,
+            87755,
+            85778,
+            364840,
+            289301,
+            327489,
+            388836,
+            284922,
+            284919,
+            388837,
+            40842,
+            150318,
+            62473,
+            364843,
+            364841,
+            89579,
+            364847,
+            87757,
+            89580,
+            238778,
+            40940,
+            303027,
+            228798
+          ],
+          "parent_id": null
+        }
+      ],
+      "offices": [
+        {
+          "id": 86219,
+          "name": "Poland",
+          "location": null,
+          "child_ids": [],
+          "parent_id": 43643
+        }
+      ],
+      "ai_disclaimer": null,
+      "include_ai_disclaimer": null,
+      "ai_opt_out_request_url": null
+    },
+    {
+      "absolute_url": "https://jobs.dropbox.com/listing/8090062?gh_jid=8090062",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": false,
+          "requires_processing_consent": false,
+          "requires_retention_consent": false,
+          "retention_period": null,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "education": "education_required",
+      "employment": "employment_required",
+      "internal_job_id": 3504944,
+      "location": {
+        "name": "Remote - US: Select locations"
+      },
+      "metadata": [
+        {
+          "id": 397108,
+          "name": "Recruiting Team Responsible",
+          "value": "Product Recruiting",
+          "value_type": "single_select"
+        },
+        {
+          "id": 1993612,
+          "name": "Weighted Value",
+          "value": null,
+          "value_type": "single_select"
+        },
+        {
+          "id": 397072,
+          "name": "Parent Job ID",
+          "value": null,
+          "value_type": "single_select"
+        },
+        {
+          "id": 397073,
+          "name": "Active Until Date",
+          "value": "",
+          "value_type": "date"
+        },
+        {
+          "id": 31703,
+          "name": "Employment Type",
+          "value": "Regular",
+          "value_type": "single_select"
+        },
+        {
+          "id": 29942941,
+          "name": "Time Type",
+          "value": "Full Time",
+          "value_type": "single_select"
+        },
+        {
+          "id": 3465818,
+          "name": "Location Cost Tier",
+          "value": "Mid",
+          "value_type": "single_select"
+        },
+        {
+          "id": 696737,
+          "name": "Skillset",
+          "value": "Data Engineer",
+          "value_type": "single_select"
+        },
+        {
+          "id": 113830,
+          "name": "Dropboxer Level",
+          "value": "MGR5",
+          "value_type": "single_select"
+        },
+        {
+          "id": 54678,
+          "name": "Career Page Allocation",
+          "value": "Engineering",
+          "value_type": "single_select"
+        }
+      ],
+      "id": 8090062,
+      "updated_at": "2026-10-06T12:17:02-04:00",
+      "requisition_id": "R11655",
+      "title": "Senior Manager, Data Engineering",
+      "company_name": "Dropbox",
+      "first_published": "2026-07-29T17:04:04-04:00",
+      "language": "en",
+      "application_deadline": null,
+      "content": "&lt;h2&gt;Role Description&lt;/h2&gt;\n&lt;div&gt;\n&lt;div&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;We are seeking a Senior Manager, Data Engineering to lead the team responsible for Dropbox’s underlying data foundations that power our business as a whole. This is a hands-on engineering leader who owns the pipelines and data products that Product, GTM, Finance, and the CTO organization depend on to make decisions.&lt;/span&gt;&lt;/div&gt;\n&lt;/div&gt;\n&lt;div&gt;&amp;nbsp;&lt;/div&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;In this role, you will lead and grow a team of data engineers building and operating our ingestion, transformation, orchestration, and serving layers, as well as the self-serve analytics substrate that lets partner teams answer their own questions without bespoke engineering work.&lt;/span&gt;&lt;/div&gt;\n&lt;div&gt;&amp;nbsp;&lt;/div&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;The ideal candidate is a deeply technical, product-minded engineering leader who can hold a high bar on system reliability and data quality while partnering closely with Data Science, Business Intelligence Engineering, Analytics, and Product to turn fragmented, ticket-driven data work into durable, reusable data products.&lt;/span&gt;&lt;/div&gt;\n&lt;/div&gt;\n&lt;h2&gt;Responsibilities&lt;/h2&gt;\n&lt;ul class=&quot;listtype-bullet listindent1 list-bullet1&quot; data-testid=&quot;bullet-list&quot; data-test-indentation=&quot;1&quot;&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Data Quality &amp;amp; Observability: Establish and enforce a rigorous data quality culture: lineage, freshness monitoring, anomaly detection, and outcome-oriented, gaming-resistant quality metrics.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Self-Serve Platform: Lead the engineering of the self-serve analytics substrate, reducing bespoke request volume and increasing partner-team autonomy.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Cost &amp;amp; Efficiency: Own the unit economics of the data platform — compute and storage efficiency — and drive measurable improvements without sacrificing reliability.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Cross-Functional Partnership: Partner deeply with Data Science, BIE, Analytics, Product, Data Platform, and the CTO org to define the semantic layer, modeling standards, and data contracts that make downstream work trustworthy and fast.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Engineering Culture: Establish rigorous engineering practices — code review, testing, CI/CD for data, incident response, and postmortems — and champion the effective, measured use of AI coding tools to improve engineering productivity.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Team Leadership: Lead, mentor, and grow a high-talent-density team of data engineers, fostering a culture of ownership, technical excellence, psychological safety, and continuous learning.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;/ul&gt;\n&lt;h2&gt;Requirements&lt;/h2&gt;\n&lt;ul class=&quot;listtype-bullet listindent1 list-bullet1&quot; data-testid=&quot;bullet-list&quot; data-test-indentation=&quot;1&quot;&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;8+ years of data engineering or backend/data infrastructure experience with increasing scope, ideally in high-scale environments.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;3+ years of experience directly managing and growing engineering teams, including hiring, coaching, performance management, and team design.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Deep Technical Expertise: Proven track record building and operating large-scale batch and streaming pipelines&lt;/span&gt; &lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze h-lparen&quot;&gt;(e.g.,&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt; Spark, dbt, Airflow/orchestration) on a modern lakehouse or warehouse stack&lt;/span&gt; &lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze h-lparen&quot;&gt;(e.g.,&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt; Databricks, Snowflake, BigQuery).&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Reliability &amp;amp; Quality: Demonstrated ownership of data SLAs, observability, lineage, and incident response for business-critical pipelines.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Systems &amp;amp; Modeling: Strong data modeling fundamentals and the ability to design a semantic layer and data contracts that serve many downstream consumers.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Stakeholder Management: Excellent communication and the ability to align engineering, data science, analytics, and business partners around shared reliability and quality goals.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;/ul&gt;\n&lt;h2&gt;Preferred Qualifications&lt;/h2&gt;\n&lt;ul&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Platform / Self-Serve Experience: Track record building self-serve data or analytics platforms that reduced bespoke request volume and increased partner autonomy.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;AI-Forward Engineering: Experience integrating AI coding tools and LLM-based tooling into the engineering workflow, with a measured approach to impact and guardrails.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Cost Discipline: Demonstrated success improving compute/storage unit economics without regressing reliability.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Familiarity with modern data governance, privacy, and access-control practices.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Experience operating in a pod or embedded model serving multiple business partners.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;/ul&gt;\n&lt;div&gt;\n&lt;h2&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86z7z65z9wz73z7z75z6emz81zz70z4oz65zrz86z4dnz72ztz67zvoz67zl91&quot;&gt;Durable Skills&lt;/span&gt;&lt;/h2&gt;\n&lt;/div&gt;\n&lt;p&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;AI fluency means using these tools to &lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;&lt;em&gt;amplify&lt;/em&gt;&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt; human judgment, not replace it. We believe people with these skills will thrive as work and technology&lt;/span&gt; &lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;continue to evolve:&lt;/span&gt;&lt;/p&gt;\n&lt;ul class=&quot;listtype-bullet listindent1 list-bullet1&quot; data-testid=&quot;bullet-list&quot; data-test-indentation=&quot;1&quot;&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;&lt;strong&gt;Awareness:&lt;/strong&gt;&lt;/span&gt; &lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;U&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;nderstand &lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;yourself&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt; and others&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;.&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;&lt;strong&gt;Judgment:&lt;/strong&gt;&lt;/span&gt; &lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;E&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;valuat&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;e&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt; information and mak&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;e &lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;decisions in complex situations&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;.&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;&lt;strong&gt;Adaptability:&lt;/strong&gt;&lt;/span&gt; &lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;L&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;earn, adjust, and stay effective through change&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;.&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;&lt;strong&gt;Connection:&lt;/strong&gt;&lt;/span&gt; &lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;C&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;ommunicat&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;e&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;, collaborat&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;e&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;, and build trust&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;.&lt;/span&gt;&lt;/li&gt;\n&lt;/ul&gt;\n&lt;p&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z9z84z5u1z69zz90zlz73z3ly1nz76zw1r5kz89zz66z4z65zz65zjz122zf092&quot;&gt;To learn more about why these skills matter and what the data shows about thriving through change, read this &lt;/span&gt;&lt;span class=&quot;attrlink url author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z9z84z5u1z69zz90zlz73z3ly1nz76zw1r5kz89zz66z4z65zz65zjz122zf092&quot;&gt;&lt;a class=&quot;attrlink&quot; href=&quot;https://www.dropbox.jobs/en/our-blog/employee-stories/the-era-of-durable-skills-what-the-data-tells-us-about-thriving-in-change/&quot; target=&quot;_blank&quot; data-target-href=&quot;https://www.dropbox.jobs/en/our-blog/employee-stories/the-era-of-durable-skills-what-the-data-tells-us-about-thriving-in-change/&quot;&gt;blog post&lt;/a&gt;&lt;/span&gt; &lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;from&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z9z84z5u1z69zz90zlz73z3ly1nz76zw1r5kz89zz66z4z65zz65zjz122zf092&quot;&gt; our Chief People Officer, Melanie Rosenwasser.&lt;/span&gt;&lt;/p&gt;\n&lt;h2 data-usually-unique-id=&quot;044234883370604133046166&quot;&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zqz90zkz74zz76zeez80zz68zz89zz88zvqz86zuxlz73zexxz80zz73z6d6z72zz79zsz77z&quot;&gt;Compensation&lt;/span&gt;&lt;/h2&gt;&lt;div class=&quot;content-pay-transparency&quot;&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;description&quot;&gt;&lt;p&gt;&lt;span style=&quot;font-size: 16px;&quot;&gt;US Zone 1&lt;/span&gt;&lt;/p&gt;\n&lt;p&gt;&lt;span style=&quot;font-size: 16px;&quot;&gt;This role is not available in Zone 1&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;title&quot;&gt;US Zone 2&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$202,700&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$274,300 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;title&quot;&gt;US Zone 3&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$180,200&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$243,800 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;",
+      "departments": [
+        {
+          "id": 338922,
+          "name": "CTO-Data Science, AI Platform & Eng (Sub Team)",
+          "child_ids": [],
+          "parent_id": 71459
+        }
+      ],
+      "offices": [
+        {
+          "id": 84598,
+          "name": "Canada",
+          "location": null,
+          "child_ids": [],
+          "parent_id": 43633
+        },
+        {
+          "id": 74046,
+          "name": "US",
+          "location": null,
+          "child_ids": [],
+          "parent_id": 43633
+        }
+      ],
+      "ai_disclaimer": null,
+      "include_ai_disclaimer": null,
+      "ai_opt_out_request_url": null
+    },
+    {
+      "absolute_url": "https://jobs.dropbox.com/listing/8090065?gh_jid=8090065",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": false,
+          "requires_processing_consent": false,
+          "requires_retention_consent": false,
+          "retention_period": null,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "education": "education_required",
+      "employment": "employment_required",
+      "internal_job_id": 3504944,
+      "location": {
+        "name": "Remote - Canada: Select locations"
+      },
+      "metadata": [
+        {
+          "id": 397108,
+          "name": "Recruiting Team Responsible",
+          "value": "Product Recruiting",
+          "value_type": "single_select"
+        },
+        {
+          "id": 1993612,
+          "name": "Weighted Value",
+          "value": null,
+          "value_type": "single_select"
+        },
+        {
+          "id": 397072,
+          "name": "Parent Job ID",
+          "value": null,
+          "value_type": "single_select"
+        },
+        {
+          "id": 397073,
+          "name": "Active Until Date",
+          "value": "",
+          "value_type": "date"
+        },
+        {
+          "id": 31703,
+          "name": "Employment Type",
+          "value": "Regular",
+          "value_type": "single_select"
+        },
+        {
+          "id": 29942941,
+          "name": "Time Type",
+          "value": "Full Time",
+          "value_type": "single_select"
+        },
+        {
+          "id": 3465818,
+          "name": "Location Cost Tier",
+          "value": "Mid",
+          "value_type": "single_select"
+        },
+        {
+          "id": 696737,
+          "name": "Skillset",
+          "value": "Data Engineer",
+          "value_type": "single_select"
+        },
+        {
+          "id": 113830,
+          "name": "Dropboxer Level",
+          "value": "MGR5",
+          "value_type": "single_select"
+        },
+        {
+          "id": 54678,
+          "name": "Career Page Allocation",
+          "value": "Engineering",
+          "value_type": "single_select"
+        }
+      ],
+      "id": 8090065,
+      "updated_at": "2026-10-06T12:17:02-04:00",
+      "requisition_id": "R11655",
+      "title": "Senior Manager, Data Engineering",
+      "company_name": "Dropbox",
+      "first_published": "2026-08-04T13:49:51-04:00",
+      "language": "en",
+      "application_deadline": null,
+      "content": "&lt;h2&gt;Role Description&lt;/h2&gt;\n&lt;div&gt;\n&lt;div&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;We are seeking a Senior Manager, Data Engineering to lead the team responsible for Dropbox’s underlying data foundations that power our business as a whole. This is a hands-on engineering leader who owns the pipelines and data products that Product, GTM, Finance, and the CTO organization depend on to make decisions.&lt;/span&gt;&lt;/div&gt;\n&lt;/div&gt;\n&lt;div&gt;&amp;nbsp;&lt;/div&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;In this role, you will lead and grow a team of data engineers building and operating our ingestion, transformation, orchestration, and serving layers, as well as the self-serve analytics substrate that lets partner teams answer their own questions without bespoke engineering work.&lt;/span&gt;&lt;/div&gt;\n&lt;div&gt;&amp;nbsp;&lt;/div&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;The ideal candidate is a deeply technical, product-minded engineering leader who can hold a high bar on system reliability and data quality while partnering closely with Data Science, Business Intelligence Engineering, Analytics, and Product to turn fragmented, ticket-driven data work into durable, reusable data products.&lt;/span&gt;&lt;/div&gt;\n&lt;div&gt;&amp;nbsp;&lt;/div&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z95lz89zy6z71zz79zz84zz68zyz69zupz72zz79zcz69zz76zkz79zp1z66ztz67zxz71zz89zz86zz71z&quot;&gt;Our Engineering Career Framework is &lt;/span&gt;&lt;span class=&quot;attrlink url author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z95lz89zy6z71zz79zz84zz68zyz69zupz72zz79zcz69zz76zkz79zp1z66ztz67zxz71zz89zz86zz71z&quot;&gt;&lt;a class=&quot;attrlink&quot; href=&quot;https://dropbox.github.io/dbx-career-framework/&quot; target=&quot;_blank&quot; data-target-href=&quot;https://dropbox.github.io/dbx-career-framework/&quot;&gt;&lt;u&gt;viewable by anyone outside the company&lt;/u&gt;&lt;/a&gt;&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z95lz89zy6z71zz79zz84zz68zyz69zupz72zz79zcz69zz76zkz79zp1z66ztz67zxz71zz89zz86zz71z&quot;&gt; and describes what’s expected for our engineers at each of our career levels. Check out our blog post on this topic and more &lt;/span&gt;&lt;span class=&quot;attrlink url author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z95lz89zy6z71zz79zz84zz68zyz69zupz72zz79zcz69zz76zkz79zp1z66ztz67zxz71zz89zz86zz71z&quot;&gt;&lt;a class=&quot;attrlink&quot; href=&quot;https://dropbox.tech/culture/sharing-our-engineering-career-framework-with-the-world&quot; target=&quot;_blank&quot; data-target-href=&quot;https://dropbox.tech/culture/sharing-our-engineering-career-framework-with-the-world&quot;&gt;here&lt;/a&gt;&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z95lz89zy6z71zz79zz84zz68zyz69zupz72zz79zcz69zz76zkz79zp1z66ztz67zxz71zz89zz86zz71z&quot;&gt;.&lt;/span&gt;&lt;/span&gt;&lt;/div&gt;\n&lt;/div&gt;\n&lt;h2&gt;Responsibilities&lt;/h2&gt;\n&lt;ul class=&quot;listtype-bullet listindent1 list-bullet1&quot; data-testid=&quot;bullet-list&quot; data-test-indentation=&quot;1&quot;&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Data Quality &amp;amp; Observability: Establish and enforce a rigorous data quality culture: lineage, freshness monitoring, anomaly detection, and outcome-oriented, gaming-resistant quality metrics.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Self-Serve Platform: Lead the engineering of the self-serve analytics substrate, reducing bespoke request volume and increasing partner-team autonomy.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Cost &amp;amp; Efficiency: Own the unit economics of the data platform — compute and storage efficiency — and drive measurable improvements without sacrificing reliability.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Cross-Functional Partnership: Partner deeply with Data Science, BIE, Analytics, Product, Data Platform, and the CTO org to define the semantic layer, modeling standards, and data contracts that make downstream work trustworthy and fast.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Engineering Culture: Establish rigorous engineering practices — code review, testing, CI/CD for data, incident response, and postmortems — and champion the effective, measured use of AI coding tools to improve engineering productivity.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Team Leadership: Lead, mentor, and grow a high-talent-density team of data engineers, fostering a culture of ownership, technical excellence, psychological safety, and continuous learning.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;/ul&gt;\n&lt;h2&gt;Requirements&lt;/h2&gt;\n&lt;ul class=&quot;listtype-bullet listindent1 list-bullet1&quot; data-testid=&quot;bullet-list&quot; data-test-indentation=&quot;1&quot;&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;8+ years of data engineering or backend/data infrastructure experience with increasing scope, ideally in high-scale environments.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;3+ years of experience directly managing and growing engineering teams, including hiring, coaching, performance management, and team design.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Deep Technical Expertise: Proven track record building and operating large-scale batch and streaming pipelines&lt;/span&gt; &lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze h-lparen&quot;&gt;(e.g.,&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt; Spark, dbt, Airflow/orchestration) on a modern lakehouse or warehouse stack&lt;/span&gt; &lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze h-lparen&quot;&gt;(e.g.,&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt; Databricks, Snowflake, BigQuery).&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Reliability &amp;amp; Quality: Demonstrated ownership of data SLAs, observability, lineage, and incident response for business-critical pipelines.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Systems &amp;amp; Modeling: Strong data modeling fundamentals and the ability to design a semantic layer and data contracts that serve many downstream consumers.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Stakeholder Management: Excellent communication and the ability to align engineering, data science, analytics, and business partners around shared reliability and quality goals.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;/ul&gt;\n&lt;h2&gt;Preferred Qualifications&lt;/h2&gt;\n&lt;ul&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Platform / Self-Serve Experience: Track record building self-serve data or analytics platforms that reduced bespoke request volume and increased partner autonomy.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;AI-Forward Engineering: Experience integrating AI coding tools and LLM-based tooling into the engineering workflow, with a measured approach to impact and guardrails.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Cost Discipline: Demonstrated success improving compute/storage unit economics without regressing reliability.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Familiarity with modern data governance, privacy, and access-control practices.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;li&gt;\n&lt;div&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zgnz90zacz87zz122zgvz72zz86z85z67z5pz70zloy4qz74zz67zz73zz66znz70ze&quot;&gt;Experience operating in a pod or embedded model serving multiple business partners.&lt;/span&gt;&lt;/div&gt;\n&lt;/li&gt;\n&lt;/ul&gt;\n&lt;div&gt;\n&lt;h2&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86z7z65z9wz73z7z75z6emz81zz70z4oz65zrz86z4dnz72ztz67zvoz67zl91&quot;&gt;Durable Skills&lt;/span&gt;&lt;/h2&gt;\n&lt;/div&gt;\n&lt;p&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;AI fluency means using these tools to &lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;&lt;em&gt;amplify&lt;/em&gt;&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt; human judgment, not replace it. We believe people with these skills will thrive as work and technology&lt;/span&gt; &lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;continue to evolve:&lt;/span&gt;&lt;/p&gt;\n&lt;ul class=&quot;listtype-bullet listindent1 list-bullet1&quot; data-testid=&quot;bullet-list&quot; data-test-indentation=&quot;1&quot;&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;&lt;strong&gt;Awareness:&lt;/strong&gt;&lt;/span&gt; &lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;U&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;nderstand &lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;yourself&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt; and others&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;.&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;&lt;strong&gt;Judgment:&lt;/strong&gt;&lt;/span&gt; &lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;E&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;valuat&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;e&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt; information and mak&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;e &lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;decisions in complex situations&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;.&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;&lt;strong&gt;Adaptability:&lt;/strong&gt;&lt;/span&gt; &lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;L&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;earn, adjust, and stay effective through change&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;.&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;&lt;strong&gt;Connection:&lt;/strong&gt;&lt;/span&gt; &lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;C&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;ommunicat&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;e&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;, collaborat&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;e&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;, and build trust&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotv4sz81zsz68zwz85z3z78zbz88z2z76zpz74z2v1z75zz67zz85zjlvz122zz122z6oaz84z&quot;&gt;.&lt;/span&gt;&lt;/li&gt;\n&lt;/ul&gt;\n&lt;p&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z9z84z5u1z69zz90zlz73z3ly1nz76zw1r5kz89zz66z4z65zz65zjz122zf092&quot;&gt;To learn more about why these skills matter and what the data shows about thriving through change, read this &lt;/span&gt;&lt;span class=&quot;attrlink url author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z9z84z5u1z69zz90zlz73z3ly1nz76zw1r5kz89zz66z4z65zz65zjz122zf092&quot;&gt;&lt;a class=&quot;attrlink&quot; href=&quot;https://www.dropbox.jobs/en/our-blog/employee-stories/the-era-of-durable-skills-what-the-data-tells-us-about-thriving-in-change/&quot; target=&quot;_blank&quot; data-target-href=&quot;https://www.dropbox.jobs/en/our-blog/employee-stories/the-era-of-durable-skills-what-the-data-tells-us-about-thriving-in-change/&quot;&gt;blog post&lt;/a&gt;&lt;/span&gt; &lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qotuz85zdz87z113tz83zz67z5n8qpz80zpz89zoz69zcz76zz87zz88zz88z5gsnz85zu&quot;&gt;from&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z9z84z5u1z69zz90zlz73z3ly1nz76zw1r5kz89zz66z4z65zz65zjz122zf092&quot;&gt; our Chief People Officer, Melanie Rosenwasser.&lt;/span&gt;&lt;/p&gt;\n&lt;h2 data-usually-unique-id=&quot;044234883370604133046166&quot;&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zqz90zkz74zz76zeez80zz68zz89zz88zvqz86zuxlz73zexxz80zz73z6d6z72zz79zsz77z&quot;&gt;Compensation&lt;/span&gt;&lt;/h2&gt;&lt;div class=&quot;content-pay-transparency&quot;&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;title&quot;&gt;Canada Pay Range&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$209,100&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$282,900 CAD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;",
+      "departments": [
+        {
+          "id": 338922,
+          "name": "CTO-Data Science, AI Platform & Eng (Sub Team)",
+          "child_ids": [],
+          "parent_id": 71459
+        }
+      ],
+      "offices": [
+        {
+          "id": 84598,
+          "name": "Canada",
+          "location": null,
+          "child_ids": [],
+          "parent_id": 43633
+        },
+        {
+          "id": 74046,
+          "name": "US",
+          "location": null,
+          "child_ids": [],
+          "parent_id": 43633
+        }
+      ],
+      "ai_disclaimer": null,
+      "include_ai_disclaimer": null,
+      "ai_opt_out_request_url": null
+    },
+    {
+      "absolute_url": "https://jobs.dropbox.com/listing/6330377?gh_jid=6330377",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": false,
+          "requires_processing_consent": false,
+          "requires_retention_consent": false,
+          "retention_period": null,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "education": "education_required",
+      "employment": "employment_required",
+      "internal_job_id": 2225683,
+      "location": {
+        "name": "Remote - Poland"
+      },
+      "metadata": [
+        {
+          "id": 397108,
+          "name": "Recruiting Team Responsible",
+          "value": "International EPD",
+          "value_type": "single_select"
+        },
+        {
+          "id": 1993612,
+          "name": "Weighted Value",
+          "value": null,
+          "value_type": "single_select"
+        },
+        {
+          "id": 397072,
+          "name": "Parent Job ID",
+          "value": null,
+          "value_type": "single_select"
+        },
+        {
+          "id": 397073,
+          "name": "Active Until Date",
+          "value": "",
+          "value_type": "date"
+        },
+        {
+          "id": 31703,
+          "name": "Employment Type",
+          "value": "Regular",
+          "value_type": "single_select"
+        },
+        {
+          "id": 29942941,
+          "name": "Time Type",
+          "value": null,
+          "value_type": "single_select"
+        },
+        {
+          "id": 3465818,
+          "name": "Location Cost Tier",
+          "value": null,
+          "value_type": "single_select"
+        },
+        {
+          "id": 696737,
+          "name": "Skillset",
+          "value": "Infra SWE",
+          "value_type": "single_select"
+        },
+        {
+          "id": 113830,
+          "name": "Dropboxer Level",
+          "value": "IC3",
+          "value_type": "single_select"
+        },
+        {
+          "id": 54678,
+          "name": "Career Page Allocation",
+          "value": "Engineering",
+          "value_type": "single_select"
+        }
+      ],
+      "id": 6330377,
+      "updated_at": "2026-09-03T09:40:01-04:00",
+      "requisition_id": "PARENT",
+      "title": "Infrastructure Software Engineer",
+      "company_name": "Dropbox",
+      "first_published": "2025-10-22T15:14:52-04:00",
+      "language": "en",
+      "application_deadline": null,
+      "content": "&lt;div&gt;\n&lt;h2&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt;Role Description&lt;/span&gt;&lt;/h2&gt;\n&lt;/div&gt;\n&lt;p&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;As an Infrastructure Engineer, your role will be crucial in shaping and constructing the robust systems that not only support our current flagship products but also lay the groundwork for the next wave of engineering innovations. From optimizing user experiences across various projects to ensuring seamless scalability and data integrity, you&#39;ll be at the forefront of shaping the technological backbone of our platform.&lt;/span&gt;&lt;/p&gt;\n&lt;p&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;Collaborating closely with cross-functional teams, you&#39;ll leverage your expertise to tackle audacious challenges and push the boundaries of what&#39;s possible. Your contributions will directly impact millions of users, as every line of code you write furthers our mission to revolutionize the way people work and collaborate.&lt;/span&gt;&lt;/p&gt;\n&lt;p&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;Join us in redefining the future, where your passion for building scalable, reliable systems will drive meaningful change on a global scale.&lt;/span&gt;&lt;/p&gt;\n&lt;p&gt;&lt;span class=&quot; author-d-16z86ztz122z98z81zz82zz85zunv3z82zpqfnlamz84zz82z1lz85zz72zz76zwmz68zz71z5r6ijz83zqxz67zz74zz83zpkbz72z&quot;&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z95lz89zy6z71zz79zz84zz68zyz69zupz72zz79zcz69zz76zkz79zp1z66ztz67zxz71zz89zz86zz71z&quot;&gt;Our Engineering Career Framework is &lt;/span&gt;&lt;span class=&quot;attrlink url author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z95lz89zy6z71zz79zz84zz68zyz69zupz72zz79zcz69zz76zkz79zp1z66ztz67zxz71zz89zz86zz71z&quot;&gt;&lt;a class=&quot;attrlink&quot; href=&quot;https://dropbox.github.io/dbx-career-framework/&quot; target=&quot;_blank&quot; data-target-href=&quot;https://dropbox.github.io/dbx-career-framework/&quot;&gt;&lt;u&gt;viewable by anyone outside the company&lt;/u&gt;&lt;/a&gt;&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z95lz89zy6z71zz79zz84zz68zyz69zupz72zz79zcz69zz76zkz79zp1z66ztz67zxz71zz89zz86zz71z&quot;&gt; and describes what’s expected for our engineers at each of our career levels. Check out our blog post on this topic and more &lt;/span&gt;&lt;span class=&quot;attrlink url author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z95lz89zy6z71zz79zz84zz68zyz69zupz72zz79zcz69zz76zkz79zp1z66ztz67zxz71zz89zz86zz71z&quot;&gt;&lt;a class=&quot;attrlink&quot; href=&quot;https://dropbox.tech/culture/sharing-our-engineering-career-framework-with-the-world&quot; target=&quot;_blank&quot; data-target-href=&quot;https://dropbox.tech/culture/sharing-our-engineering-career-framework-with-the-world&quot;&gt;here&lt;/a&gt;&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z95lz89zy6z71zz79zz84zz68zyz69zupz72zz79zcz69zz76zkz79zp1z66ztz67zxz71zz89zz86zz71z&quot;&gt;.&lt;/span&gt;&lt;/span&gt;&lt;/p&gt;\n&lt;div&gt;\n&lt;h2&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt;Responsibilities&lt;/span&gt;&lt;/h2&gt;\n&lt;/div&gt;\n&lt;ul class=&quot;listtype-bullet listindent1 list-bullet1&quot;&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz82zfwz66zwgz76zz77zz88zoz67zz83z1z87zpoz80zz84zsz83zx8z67zz66zz84zz76zz74z7z83zz72zz86z&quot;&gt;Build &lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt;infrastructure capable of managing metadata for hundreds of billions of files, handling hundreds of petabytes of user data, and facilitating millions of concurrent connections.&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;Assist in&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt; expanding Dropbox&#39;s role as the data-fabric, linking hundreds of millions of applications, devices, and services worldwide, while spearheading efforts to improve interoperability and adaptability across various ecosystems.&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;M&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt;easur&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz82zfwz66zwgz76zz77zz88zoz67zz83z1z87zpoz80zz84zsz83zx8z67zz66zz84zz76zz74z7z83zz72zz86z&quot;&gt;e&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt; and optimiz&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;e&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt; Dropbox&#39;s analytics platform&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt; to&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt; maintain its status as one of the most advanced in the industry for extracting meaningful insights from vast data volumes.&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt;Collaborat&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;e&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt; with cross-functional teams to innovate and implement solutions that enhance the performance, reliability, and security of Dropbox&#39;s infrastructure, ensuring a seamless experience for users worldwide.&lt;/span&gt;&lt;/li&gt;\n&lt;/ul&gt;\n&lt;p&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt;On-call work may be necessary occasionally to help address bugs, outages, or other operational issues, with the goal of maintaining a stable and high-quality experience for our customers.&lt;/span&gt;&lt;/p&gt;\n&lt;h2&gt;Requirements&lt;/h2&gt;\n&lt;ul class=&quot;listtype-bullet listindent1 list-bullet1&quot;&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt;BS, MS, or PhD in Computer Science or related technical field involving coding&lt;/span&gt; &lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z h-lparen&quot;&gt;(e.g.,&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt; physics or mathematics), or equivalent technical experience&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;5&lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt;+ years of professional software development experience&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt;Demonstrated experience in building and managing large-scale, multi-threaded, and geographically distributed backend systems&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt;Proficient in programming and debugging across a range of languages such as Python, Go, C/C++, or Java&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt;Experience &lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;working &lt;/span&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph6z86zz86z7z89z3z66zz68z0z82zxz68zz67z1z74z8z79z7z70zz67zcyz80z&quot;&gt;with operating system internals, filesystems, databases, networks, and compilers&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;.&amp;nbsp;&lt;/span&gt;&lt;/li&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz81zz86zhnz122zz81z6z80z0y1z83zz85zpz81zz87ztc3mlz69zz74zz87zq2z69ztrz65z0&quot;&gt;Ability to i&lt;/span&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz82zfwz66zwgz76zz77zz88zoz67zz83z1z87zpoz80zz84zsz83zx8z67zz66zz84zz76zz74z7z83zz72zz86z&quot;&gt;ndependently execute tasks at hand&lt;/span&gt;&lt;/li&gt;\n&lt;/ul&gt;\n&lt;div&gt;\n&lt;h2 data-usually-unique-id=&quot;857540122113718267488572&quot;&gt;&lt;span class=&quot; author-d-iz88z86z86za0dz67zz78zz78zz74zz68zjz80zz71z9iz90z8h00wiph763z70zkxz79zz89ztyz87zz66zjm6pez70zz84zz68zexo&quot;&gt;Preferred Qualifications&lt;/span&gt;&lt;/h2&gt;\n&lt;/div&gt;\n&lt;ul class=&quot;listtype-bullet listindent1 list-bullet1&quot;&gt;\n&lt;li&gt;&lt;span class=&quot; author-d-1gg9uz65z1iz85zgdz68zmqkz84zo2qowz82zfwz66zwgz76zz77zz88zoz67zz83z1z87zpoz80zz84zsz83zx8z67zz66zz84zz76zz74z7z83zz72zz86z&quot;&gt;Familiarity with Semaphores and Mutexes&amp;nbsp;&lt;/span&gt;&lt;/li&gt;\n&lt;/ul&gt;\n&lt;h2&gt;Compensation&lt;/h2&gt;\n&lt;div&gt;&amp;nbsp;&lt;/div&gt;&lt;div class=&quot;content-pay-transparency&quot;&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;title&quot;&gt;Poland Pay Range&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;272 000 zł&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;368 000 zł PLN&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;",
+      "departments": [
+        {
+          "id": 61021,
+          "name": "EPD",
+          "child_ids": [
+            71459,
+            83217,
+            68343,
+            303026,
+            312997,
+            370699,
+            370700,
+            370701,
+            370702,
+            370703,
+            370704,
+            370705,
+            80053,
+            81549,
+            68971,
+            85728,
+            40891,
+            40862,
+            81552,
+            338922,
+            264223,
+            338923,
+            243123,
+            312993,
+            364824,
+            364825,
+            364834,
+            364826,
+            364828,
+            364827,
+            364829,
+            364830,
+            364831,
+            364832,
+            89574,
+            364833,
+            60174,
+            371032,
+            78106,
+            238755,
+            287013,
+            83220,
+            83218,
+            89575,
+            85737,
+            85755,
+            347809,
+            347859,
+            146800,
+            226275,
+            372574,
+            405512,
+            40856,
+            246926,
+            347810,
+            284920,
+            238759,
+            285855,
+            364836,
+            81396,
+            284918,
+            40844,
+            238780,
+            285856,
+            285857,
+            85726,
+            238781,
+            285858,
+            284916,
+            364835,
+            364839,
+            364844,
+            364846,
+            81392,
+            150320,
+            364845,
+            78109,
+            284921,
+            238762,
+            87756,
+            284917,
+            238764,
+            89573,
+            63446,
+            89582,
+            316130,
+            85777,
+            316131,
+            284923,
+            364838,
+            89572,
+            327490,
+            316132,
+            364837,
+            284924,
+            388832,
+            364842,
+            388833,
+            284925,
+            388834,
+            57456,
+            238754,
+            388835,
+            57577,
+            87755,
+            85778,
+            364840,
+            289301,
+            327489,
+            388836,
+            284922,
+            284919,
+            388837,
+            40842,
+            150318,
+            62473,
+            364843,
+            364841,
+            89579,
+            364847,
+            87757,
+            89580,
+            238778,
+            40940,
+            303027,
+            228798
+          ],
+          "parent_id": null
+        }
+      ],
+      "offices": [
+        {
+          "id": 86219,
+          "name": "Poland",
+          "location": null,
+          "child_ids": [],
+          "parent_id": 43643
+        }
+      ],
+      "ai_disclaimer": null,
+      "include_ai_disclaimer": null,
+      "ai_opt_out_request_url": null
+    }
+  ],
+  "meta": {
+    "total": 35
+  }
+}

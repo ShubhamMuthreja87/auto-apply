@@ -3,7 +3,10 @@ import { createApp } from "./app.js";
 import { logger } from "./logger.js";
 import { createRepo } from "./repo/create-repo.js";
 import { buildPipeline } from "./pipeline/pipeline.js";
-import { skeletonJobSource } from "./pipeline/skeleton-job-source.js";
+import { BOARDS } from "./discovery/boards.js";
+import { createDiscovery } from "./discovery/discovery.js";
+import { readBoardFixture } from "./discovery/fixtures.js";
+import { greenhouseJobSource } from "./discovery/greenhouse.js";
 import { recoverInterruptedRuns } from "./runs/recover-interrupted-runs.js";
 import { DEMO_UID } from "./user.js";
 
@@ -11,10 +14,16 @@ import { DEMO_UID } from "./user.js";
 // invalid stops the boot.
 const config = loadConfig();
 const persistence = createRepo(config);
-// The composition root: real clock and timers here, fakes in tests.
+// The composition root: real network, clock and timers here, fakes in tests.
+const discovery = createDiscovery({
+  sources: [greenhouseJobSource({ fetch, timeoutMs: 10_000 })],
+  boards: BOARDS,
+  readFixture: readBoardFixture,
+  mode: config.JOB_SOURCE,
+});
 const pipeline = buildPipeline({
   repo: persistence.repo,
-  jobSource: skeletonJobSource,
+  discovery,
   clock: () => new Date(),
   delay: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   newRunId: () => crypto.randomUUID(),
@@ -34,5 +43,6 @@ app.listen(config.PORT, () => {
     port: config.PORT,
     namespace: config.FIRESTORE_NAMESPACE,
     persistence: persistence.kind,
+    jobSource: config.JOB_SOURCE,
   });
 });

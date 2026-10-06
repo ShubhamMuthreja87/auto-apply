@@ -35,6 +35,12 @@ describe("loadConfig", () => {
     },
   );
 
+  it("reads live job boards by default and offers a fixtures-only job source", () => {
+    expect(loadConfig({}).JOB_SOURCE).toBe("live");
+    expect(loadConfig({ JOB_SOURCE: "fixtures" }).JOB_SOURCE).toBe("fixtures");
+    expect(() => loadConfig({ JOB_SOURCE: "scrape" })).toThrow();
+  });
+
   it("passes the credential variables through for loadCredential", () => {
     const config = loadConfig({
       FIREBASE_SERVICE_ACCOUNT_JSON: "{}",

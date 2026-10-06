@@ -40,7 +40,7 @@ interface Snapshot {
 }
 
 /** Validates a document read against the contract (ADR-0003: never trusted). */
-function validate<T>(schema: z.ZodType<T>, snap: Snapshot): T | Error {
+function validate<T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>, snap: Snapshot): T | Error {
   const parsed = schema.safeParse(snap.data());
   return parsed.success
     ? parsed.data
@@ -48,7 +48,7 @@ function validate<T>(schema: z.ZodType<T>, snap: Snapshot): T | Error {
 }
 
 /** For direct reads: a bad document rejects the caller's promise. */
-function parse<T>(schema: z.ZodType<T>, snap: Snapshot): T {
+function parse<T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>, snap: Snapshot): T {
   const valid = validate(schema, snap);
   if (valid instanceof Error) throw valid;
   return valid;
