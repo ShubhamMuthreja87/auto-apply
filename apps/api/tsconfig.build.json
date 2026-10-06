@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": false,
+    "outDir": "dist",
+    "rootDir": "src",
+    // Resolve @auto-apply/shared via its built dist (the workspace symlink),
+    // not the source `paths` mapping used for typecheck/dev — otherwise the
+    // source files land outside this project's rootDir.
+    "paths": {}
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
+}

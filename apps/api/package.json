@@ -1,0 +1,19 @@
+{
+  "name": "@auto-apply/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon --quiet --watch src --watch ../../packages/shared/src --ext ts --exec \"tsx src/index.ts\"",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@auto-apply/shared": "*",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "zod": "^3.23.8"
+  }
+}
