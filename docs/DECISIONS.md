@@ -46,3 +46,4 @@ Source of truth for WHAT the prototype does. `CLAUDE.md` summarises the technica
 - Scheduled or background runs, notifications
 - Horizontal scaling, queues, multiple pm2 instances (scale doc)
 - An evaluation harness for match quality
+- 2026-10-06 (time cut): discovery uses Greenhouse only; Lever and Ashby move to the design doc as next adapters (narrows D2).
