@@ -11,6 +11,6 @@
     "paths": {}
   },
   "include": ["src"],
-  // repo-contract.ts imports Vitest; it is test support, not shipped code.
-  "exclude": ["src/**/*.test.ts", "src/repo/repo-contract.ts"]
+  // Test support, not shipped code (repo-contract.ts imports Vitest).
+  "exclude": ["src/**/*.test.ts", "src/repo/repo-contract.ts", "src/discovery/recorded-fetch.ts"]
 }

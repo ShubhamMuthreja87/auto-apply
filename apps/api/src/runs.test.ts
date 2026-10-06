@@ -25,7 +25,7 @@ import { createApp } from "./app.js";
 import type { Config } from "./config.js";
 import { InMemoryRepo } from "./repo/in-memory-repo.js";
 import { buildPipeline } from "./pipeline/pipeline.js";
-import type { JobSource } from "./pipeline/ports.js";
+import type { Discovery } from "./pipeline/ports.js";
 
 const testConfig: Config = {
   NODE_ENV: "test",
@@ -33,6 +33,7 @@ const testConfig: Config = {
   FIRESTORE_NAMESPACE: "test-local",
   REPO: "memory",
   CORS_ORIGIN: "http://localhost:5173",
+  JOB_SOURCE: "fixtures",
 };
 
 function aPosting(jobId: string): Posting {
@@ -45,10 +46,12 @@ function aPosting(jobId: string): Posting {
     location: "Remote",
     descriptionText: "Build things.",
     applyUrl: `https://boards.greenhouse.io/acme/jobs/${jobId}`,
+    remote: true,
+    source: "live",
   };
 }
 
-const twoPostings: JobSource = { discover: async () => [aPosting("1"), aPosting("2")] };
+const twoPostings: Discovery = { discover: async () => [aPosting("1"), aPosting("2")] };
 
 /**
  * Wraps the in-memory repo to count live subscriptions, so a test can see the
@@ -104,7 +107,7 @@ function harness(heartbeatMs = 15_000) {
   let n = 0;
   const pipeline = buildPipeline({
     repo,
-    jobSource: twoPostings,
+    discovery: twoPostings,
     clock: () => new Date(),
     delay: () => gate,
     newRunId: () => `run-${++n}`,

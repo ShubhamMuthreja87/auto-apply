@@ -29,6 +29,10 @@ const envSchema = z.object({
   // Read by `loadCredential`; inline JSON wins over the key-file path.
   FIREBASE_SERVICE_ACCOUNT_JSON: optionalString,
   GOOGLE_APPLICATION_CREDENTIALS: optionalString,
+  // `live` reads the public ATS boards (D2) with a per-board fixture fallback
+  // (D3); `fixtures` reads only the recorded boards, never the network, for
+  // deterministic end-to-end runs (spec, Testing seam 6).
+  JOB_SOURCE: z.enum(["live", "fixtures"]).default("live"),
 });
 
 export type Config = z.infer<typeof envSchema>;
@@ -42,6 +46,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     CORS_ORIGIN: env.CORS_ORIGIN,
     FIREBASE_SERVICE_ACCOUNT_JSON: env.FIREBASE_SERVICE_ACCOUNT_JSON,
     GOOGLE_APPLICATION_CREDENTIALS: env.GOOGLE_APPLICATION_CREDENTIALS,
+    JOB_SOURCE: env.JOB_SOURCE,
   });
 
   // The `prod` namespace is only ever used on the server (CODING_STANDARDS,

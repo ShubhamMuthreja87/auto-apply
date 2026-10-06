@@ -5,17 +5,18 @@
  * fakes and an instant `delay`; production passes real timers.
  *
  * Ticket 05 is the skeleton: it walks the Run through `discovering →
- * evaluating → applying → completed` over whatever the `JobSource` returns,
+ * evaluating → applying → completed` over whatever `Discovery` returns (real
+ * ATS boards since ticket 06),
  * marking every Posting `skipped` because there is no evaluator yet. Later
  * tickets replace the evaluating and applying stages with real work.
  */
 import { emptyFunnel, jobKey, type Posting, type Repo, type Run } from "@auto-apply/shared";
 import { logger } from "../logger.js";
-import type { JobSource } from "./ports.js";
+import type { Discovery } from "./ports.js";
 
 export interface PipelineDeps {
   repo: Repo;
-  jobSource: JobSource;
+  discovery: Discovery;
   clock: () => Date;
   /** Paces the stages so the live view is watchable; instant in tests. */
   delay: (ms: number) => Promise<void>;
@@ -50,11 +51,11 @@ function messageOf(err: unknown): string {
 }
 
 export function buildPipeline(deps: PipelineDeps): Pipeline {
-  const { repo, jobSource, clock, delay, newRunId } = deps;
+  const { repo, discovery, clock, delay, newRunId } = deps;
 
   async function runStages(runId: string): Promise<void> {
     await delay(STEP_MS);
-    const postings = await jobSource.discover();
+    const postings = await discovery.discover();
     for (const posting of postings) await recordQueued(runId, posting);
     await repo.patchRun(runId, { funnelIncrements: { discovered: postings.length } });
 

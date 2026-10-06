@@ -16,6 +16,7 @@ const testConfig: Config = {
   FIRESTORE_NAMESPACE: "test-local",
   REPO: "memory",
   CORS_ORIGIN: "http://localhost:5173",
+  JOB_SOURCE: "fixtures",
 };
 
 describe("API", () => {

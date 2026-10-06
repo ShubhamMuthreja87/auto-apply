@@ -31,6 +31,8 @@ function anEvaluation(jobId: string, overrides: Partial<Evaluation> = {}): Evalu
       location: "Remote",
       descriptionText: "Build things.",
       applyUrl: `https://boards.greenhouse.io/acme/jobs/${jobId}`,
+      remote: true,
+      source: "live",
     },
     status: "queued",
     verdict: null,
@@ -135,6 +137,32 @@ describe("<RunPanel />", () => {
       expect.stringMatching(/submitted.*simulated/i),
       "strong match",
     ]);
+  });
+
+  it("labels jobs read from recorded fixtures instead of the live board (D3)", async () => {
+    fakeApi({ active: aRun() });
+    render(<RunPanel />);
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+
+    const withSource = (jobId: string, source: "live" | "fallback" | "fixture") => {
+      const evaluation = anEvaluation(jobId);
+      return { ...evaluation, posting: { ...evaluation.posting, source } };
+    };
+    act(() =>
+      FakeEventSource.latest().emit("snapshot", {
+        run: aRun(),
+        evaluations: [
+          withSource("1", "live"),
+          withSource("2", "fallback"),
+          withSource("3", "fixture"),
+        ],
+      }),
+    );
+
+    const sourceCells = jobRows().map((row) => within(row).getAllByRole("cell")[2]?.textContent);
+    expect(sourceCells[0]).not.toMatch(/fallback|fixture/i);
+    expect(sourceCells[1]).toMatch(/fallback/i);
+    expect(sourceCells[2]).toMatch(/fixture/i);
   });
 
   it("shows progress through the Run's jobs", async () => {
