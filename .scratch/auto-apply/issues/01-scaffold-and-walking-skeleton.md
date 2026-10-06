@@ -1,0 +1,15 @@
+# 01: Monorepo scaffold + contract skeleton + walking skeleton
+
+**What to build:** A booting monorepo where the web app shows data fetched from the API. `npm run dev` starts both apps; `npm run verify` (typecheck + lint + test) passes on a trivial test. This is the tracer-bullet base every other ticket builds on.
+
+**Blocked by:** None (can start immediately).
+
+**Status:** ready-for-agent
+
+- [ ] npm workspaces with `apps/api`, `apps/web`, `packages/shared`; TypeScript strict everywhere; Node `>=22` engines.
+- [ ] `packages/shared` exports a `contract.ts` skeleton: the Run and Evaluation status enums, the `Limits` constants (`MAX_IN_FLIGHT = 3`, `MAX_AI_EVALS = 15`), and a shared error-response shape. All as zod schemas + inferred types.
+- [ ] `apps/api` is an Express server with one health route returning a contract-typed JSON shape; a small logger (no stray `console.log`).
+- [ ] `apps/web` is Vite + React + TS rendering one page that calls the health route and displays its result, with loading/error states.
+- [ ] Permissive **dev** CORS so web (5173) can call api (3001); tightened to exact-origin + credentials later (ticket 15).
+- [ ] Scripts wired: `dev` (api + web together), `typecheck`, `lint`, `test`, `verify`, `build`. One passing Vitest test exists so `verify` is green.
+- [ ] Only dependencies from ADR-0002 are used.
