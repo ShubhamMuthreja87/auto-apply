@@ -9,11 +9,13 @@
  * friends — live in `contract.ts` because those *do* travel to the browser.
  */
 import type {
+  CriterionEvidence,
   Evaluation,
   EvaluationStatus,
   Run,
   RunFunnel,
   RunStatus,
+  ScoredBy,
   UserDoc,
   Verdict,
 } from "./contract.js";
@@ -47,6 +49,9 @@ export interface EvaluationDelta {
   verdict?: Verdict | null;
   score?: number | null;
   reason?: string | null;
+  /** Replaces the whole evidence list; it is written once, when the Posting is scored. */
+  evidence?: CriterionEvidence[];
+  scoredBy?: ScoredBy | null;
 }
 
 /** Mirrors a Firestore collection change: how an Evaluation entered the stream. */

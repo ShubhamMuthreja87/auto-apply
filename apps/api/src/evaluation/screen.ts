@@ -118,14 +118,20 @@ function escapeRegExp(text: string): string {
  * either ("part-time" matches "Part time").
  */
 export function containsTerm(text: string, term: string): boolean {
+  return findTerm(text, term) !== null;
+}
+
+/** Where `text` first mentions `term`, matched as {@link containsTerm} does. */
+export function findTerm(text: string, term: string): { index: number; length: number } | null {
   const words = term
     .trim()
     .split(/[\s-]+/)
     .filter(Boolean)
     .map(escapeRegExp);
-  if (words.length === 0) return false;
+  if (words.length === 0) return null;
   const pattern = new RegExp(`(?<![\\p{L}\\p{N}])${words.join("[\\s-]+")}(?![\\p{L}\\p{N}])`, "iu");
-  return pattern.test(text);
+  const match = pattern.exec(text);
+  return match ? { index: match.index, length: match[0].length } : null;
 }
 
 function firstTermIn(text: string, terms: readonly string[]): string | null {

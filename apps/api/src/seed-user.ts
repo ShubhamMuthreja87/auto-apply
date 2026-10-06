@@ -9,7 +9,7 @@
  * Every rubric rule carries a `source` quote copied verbatim from the
  * job-search prompt (D6); `user.test.ts` checks each one against the file.
  */
-import type { User } from "@auto-apply/shared";
+import { APPLY_MIN_FIT, APPLY_NOW_MIN_FIT, FIT_CAP, type User } from "@auto-apply/shared";
 
 const profile: User["profile"] = {
   fullName: "Shubham Muthreja",
@@ -479,10 +479,10 @@ const preferences: User["preferences"] = {
       source: "-2 IC in a stack he does not use",
     },
   ],
-  fitCap: 10,
+  fitCap: FIT_CAP,
   verdictBands: {
-    applyNowMinFit: 7,
-    applyMinFit: 5,
+    applyNowMinFit: APPLY_NOW_MIN_FIT,
+    applyMinFit: APPLY_MIN_FIT,
     source: "APPLY NOW = fit 7+ with no gaps. APPLY = fit 5-6, or 7+ with minor gaps.",
   },
   tierFraming: {

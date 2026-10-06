@@ -11,6 +11,7 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import {
+  HELD_REASONS,
   MAX_AI_EVALS,
   SKIP_REASONS,
   type Ats,
@@ -53,16 +54,38 @@ function SourceLabel({ source }: { source: PostingSource }) {
   );
 }
 
-/** The fixed skip reasons in words; every other reason is already written for people. */
-const skipReasonText: Record<string, string> = {
-  [SKIP_REASONS.seen]: "Seen in an earlier run",
-  [SKIP_REASONS.limit]: `Run limit reached (${MAX_AI_EVALS} evaluations per run)`,
-  [SKIP_REASONS.stretch]: "Stretch or below",
+/** The fixed skip and held reasons in words; every other reason is already written for people. */
+const fixedReasonText: Partial<Record<Evaluation["status"], Record<string, string>>> = {
+  skipped: {
+    [SKIP_REASONS.seen]: "Seen in an earlier run",
+    [SKIP_REASONS.limit]: `Run limit reached (${MAX_AI_EVALS} evaluations per run)`,
+    [SKIP_REASONS.stretch]: "Stretch or below",
+  },
+  held: {
+    [HELD_REASONS.belowAutoThreshold]: "Good match, below the auto-apply threshold",
+    [HELD_REASONS.needsYou]: "Needs your answers",
+  },
 };
 
 function reasonText({ status, reason }: Pick<Evaluation, "status" | "reason">): string {
   if (reason === null) return "—";
-  return (status === "skipped" ? skipReasonText[reason] : undefined) ?? reason;
+  return fixedReasonText[status]?.[reason] ?? reason;
+}
+
+/** Labels a score the keyword matcher produced instead of the AI (D24). */
+function FallbackLabel({ scoredBy }: Pick<Evaluation, "scoredBy">) {
+  if (scoredBy !== "fallback") return null;
+  return (
+    <Typography
+      component="div"
+      variant="caption"
+      color="text.secondary"
+      title="No AI judgement for this job; scored with the keyword matcher."
+      sx={{ whiteSpace: "nowrap" }}
+    >
+      fallback scoring
+    </Typography>
+  );
 }
 
 export function EvaluationsTable({ evaluations }: { evaluations: Evaluation[] }) {
@@ -81,7 +104,7 @@ export function EvaluationsTable({ evaluations }: { evaluations: Evaluation[] })
           </TableRow>
         </TableHead>
         <TableBody>
-          {evaluations.map(({ jobKey, posting, verdict, score, status, reason }) => (
+          {evaluations.map(({ jobKey, posting, verdict, score, scoredBy, status, reason }) => (
             <TableRow key={jobKey} hover>
               <TableCell sx={{ whiteSpace: "nowrap" }}>{posting.company}</TableCell>
               <TableCell sx={{ fontWeight: 500 }}>{posting.title}</TableCell>
@@ -98,6 +121,7 @@ export function EvaluationsTable({ evaluations }: { evaluations: Evaluation[] })
               </TableCell>
               <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums" }}>
                 {score === null ? "—" : Math.round(score)}
+                <FallbackLabel scoredBy={scoredBy} />
               </TableCell>
               <TableCell>
                 <StatusChip status={status} />

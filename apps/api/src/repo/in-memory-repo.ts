@@ -115,6 +115,8 @@ export class InMemoryRepo implements Repo {
     if (delta.verdict !== undefined) evaluation.verdict = delta.verdict;
     if (delta.score !== undefined) evaluation.score = delta.score;
     if (delta.reason !== undefined) evaluation.reason = delta.reason;
+    if (delta.evidence !== undefined) evaluation.evidence = clone(delta.evidence);
+    if (delta.scoredBy !== undefined) evaluation.scoredBy = delta.scoredBy;
     evaluation.updatedAt = new Date().toISOString();
     this.notifyEvaluation(runId, { type: "modified", evaluation });
   }

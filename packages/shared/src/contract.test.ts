@@ -7,6 +7,10 @@ import {
   MAX_IN_FLIGHT,
   MAX_AI_EVALS,
   LIMITS,
+  APPLY_MIN_FIT,
+  APPLY_NOW_MIN_FIT,
+  FIT_CAP,
+  evaluationSchema,
 } from "./index.js";
 
 describe("contract", () => {
@@ -52,5 +56,35 @@ describe("contract", () => {
     expect(() => healthResponseSchema.parse({ ...ok, repo: "postgres" })).toThrow();
     const { repo: _repo, ...withoutRepo } = ok;
     expect(() => healthResponseSchema.parse(withoutRepo)).toThrow();
+  });
+
+  it("pins the fit scale and Verdict bands from the job-search prompt (D8)", () => {
+    expect(FIT_CAP).toBe(10);
+    expect(APPLY_NOW_MIN_FIT).toBe(7);
+    expect(APPLY_MIN_FIT).toBe(5);
+  });
+
+  it("reads an Evaluation stored before scoring existed with no evidence and no scorer", () => {
+    const stored = {
+      jobKey: "greenhouse:acme:1",
+      runId: "run-1",
+      posting: {
+        ats: "greenhouse",
+        board: "acme",
+        jobId: "1",
+        title: "Engineer",
+        company: "Acme",
+        location: "Remote",
+        descriptionText: "",
+        applyUrl: "https://boards.greenhouse.io/acme/jobs/1",
+      },
+      status: "skipped",
+      verdict: null,
+      score: null,
+      reason: "seen",
+      createdAt: "t",
+      updatedAt: "t",
+    };
+    expect(evaluationSchema.parse(stored)).toMatchObject({ evidence: [], scoredBy: null });
   });
 });

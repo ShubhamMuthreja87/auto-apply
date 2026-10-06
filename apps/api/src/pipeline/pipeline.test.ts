@@ -14,8 +14,9 @@ import { createDiscovery } from "../discovery/discovery.js";
 import { readBoardFixture } from "../discovery/fixtures.js";
 import { greenhouseJobSource } from "../discovery/greenhouse.js";
 import { recordedFetch } from "../discovery/recorded-fetch.js";
+import { keywordMatcher } from "../evaluation/keyword-matcher.js";
 import { InMemoryRepo } from "../repo/in-memory-repo.js";
-import { AWAITING_SCORING_REASON, buildPipeline, type PipelineDeps } from "./pipeline.js";
+import { AWAITING_SUBMIT_REASON, buildPipeline, type PipelineDeps } from "./pipeline.js";
 import type { Discovery, JobEvaluator } from "./ports.js";
 import { SEED_USER } from "../seed-user.js";
 import { UserNotFoundError } from "../user.js";
@@ -45,7 +46,7 @@ function recordingEvaluator() {
   const evaluator: JobEvaluator = {
     evaluate: async (posting) => {
       judged.push(posting.jobId);
-      return [];
+      return { scoredBy: "fallback", judgements: [] };
     },
   };
   return { evaluator, judged };
@@ -310,7 +311,7 @@ describe("seen-skip (D15)", () => {
     await second.finished;
 
     const firstOutcomes = outcomes(await evaluationsOf(repo, first.runId));
-    expect(firstOutcomes["1"]).toBe(`skipped: ${AWAITING_SCORING_REASON}`);
+    expect(firstOutcomes["1"]).toBe("skipped: stretch");
     expect(firstOutcomes["2"]).toMatch(/^blocked: Mandatory onsite .*San Francisco, CA/);
     // The second Run looks visibly different: both were seen, nothing is re-judged.
     expect(outcomes(await evaluationsOf(repo, second.runId))).toEqual({
@@ -334,7 +335,7 @@ describe("seen-skip (D15)", () => {
       evaluate: async () => {
         calls++;
         if (calls === 1) throw new Error("evaluator unavailable");
-        return [];
+        return { scoredBy: "fallback", judgements: [] };
       },
     };
     const discovery: Discovery = { discover: async () => [aPosting("1")] };
@@ -352,7 +353,7 @@ describe("seen-skip (D15)", () => {
     expect(firstRun?.status).toBe("completed");
     expect(firstRun?.funnel.failed).toBe(1);
     expect(outcomes(await evaluationsOf(repo, second.runId))).toEqual({
-      "1": `skipped: ${AWAITING_SCORING_REASON}`,
+      "1": "skipped: stretch",
     });
   });
 });
@@ -382,7 +383,7 @@ describe("screening before evaluation (D7)", () => {
     expect(byJob.abroad).toMatch(/^blocked: .*San Francisco, CA/);
     expect(byJob.bank).toMatch(/^blocked: .*Barclays/);
     expect(byJob.intern).toBe("skipped: Title out of target: intern");
-    expect(byJob.fit).toBe(`skipped: ${AWAITING_SCORING_REASON}`);
+    expect(byJob.fit).toBe("skipped: stretch");
     expect(judged).toEqual(["fit"]);
     expect((await repo.getRun(runId))?.funnel).toMatchObject({
       discovered: 4,
@@ -445,7 +446,7 @@ describe("limits (D17)", () => {
         peak = Math.max(peak, inFlight);
         await new Promise((resolve) => setTimeout(resolve, 1));
         inFlight--;
-        return [];
+        return { scoredBy: "fallback", judgements: [] };
       },
     };
     const discovery: Discovery = { discover: async () => postings(10) };
@@ -478,7 +479,7 @@ describe("limits (D17)", () => {
       all.filter((e) => pattern.test(`${e.status}: ${e.reason ?? ""}`)).length;
     expect(count(/^skipped: seen$/)).toBe(4);
     expect(count(/^blocked: /)).toBe(5);
-    expect(count(new RegExp(`^skipped: ${AWAITING_SCORING_REASON}$`))).toBe(MAX_AI_EVALS);
+    expect(count(/^skipped: stretch$/)).toBe(MAX_AI_EVALS);
     // A Posting already pulled when the last slot went is skipped for the
     // limit; nothing after that is pulled, so it is never written.
     const limited = count(/^skipped: limit$/);
@@ -513,5 +514,239 @@ describe("limits (D17)", () => {
     expect(firstJudged).toBe(MAX_AI_EVALS);
     expect(judged).toHaveLength(discovered.length);
     expect(new Set(judged).size).toBe(discovered.length);
+  });
+});
+/** An evaluator that says the named criteria are met for the named Posting, quoting them. */
+function cannedEvaluator(metByJob: Record<string, string[]>): JobEvaluator {
+  return {
+    evaluate: async (posting, criteria) => ({
+      scoredBy: "ai",
+      judgements: criteria.map((c) => {
+        const met = (metByJob[posting.jobId] ?? []).includes(c.id);
+        return {
+          criterionId: c.id,
+          met,
+          evidence: met ? `quote: ${c.id}` : "",
+        };
+      }),
+    }),
+  };
+}
+
+const inIndia: Partial<Posting> = {
+  location: "Bengaluru, India",
+  remote: false,
+};
+
+describe("scoring and Verdict (D7, D8)", () => {
+  it("scores in code and lets the Verdict drive the outcome", async () => {
+    const repo = new InMemoryRepo();
+    const discovery: Discovery = {
+      discover: async () => [
+        // Manager title (+3, judged in code) + primary stack + startup + real-time = 8.
+        { ...aPosting("now"), ...inIndia, title: "Engineering Manager" },
+        // Manager title + primary stack = 6.
+        { ...aPosting("apply"), ...inIndia, title: "Engineering Manager" },
+        // No title tier, startup only = 1.
+        { ...aPosting("stretch"), ...inIndia, title: "Software Engineer" },
+      ],
+    };
+    const evaluator = cannedEvaluator({
+      now: ["stack_primary", "startup", "realtime_data"],
+      apply: ["stack_primary"],
+      stretch: ["startup"],
+    });
+    const pipeline = buildPipeline(deps({ repo, discovery, evaluator }));
+
+    const { runId, finished } = await pipeline.startRun("user-1");
+    await finished;
+
+    const byJob = new Map(
+      (await evaluationsOf(repo, runId)).map((e) => [e.posting.jobId, e]),
+    );
+    expect(byJob.get("now")).toMatchObject({
+      verdict: "APPLY_NOW",
+      score: 8,
+      status: "held",
+      reason: AWAITING_SUBMIT_REASON,
+      scoredBy: "ai",
+    });
+    expect(byJob.get("apply")).toMatchObject({
+      verdict: "APPLY",
+      score: 6,
+      status: "held",
+      reason: "below_auto_threshold",
+    });
+    expect(byJob.get("stretch")).toMatchObject({
+      verdict: "STRETCH",
+      score: 1,
+      status: "skipped",
+      reason: "stretch",
+    });
+    expect((await repo.getRun(runId))?.funnel).toMatchObject({
+      evaluated: 3,
+      held: 2,
+      skipped: 1,
+    });
+  });
+
+  it("stores every criterion's evidence, the title tier judged in code", async () => {
+    const repo = new InMemoryRepo();
+    const discovery: Discovery = {
+      discover: async () => [
+        { ...aPosting("1"), ...inIndia, title: "Engineering Manager" },
+      ],
+    };
+    const asked: string[][] = [];
+    const evaluator: JobEvaluator = {
+      evaluate: async (posting, criteria) => {
+        asked.push(criteria.map((c) => c.id));
+        return cannedEvaluator({ "1": ["startup"] }).evaluate(
+          posting,
+          criteria,
+        );
+      },
+    };
+    const pipeline = buildPipeline(deps({ repo, discovery, evaluator }));
+
+    const { runId, finished } = await pipeline.startRun("user-1");
+    await finished;
+
+    const [evaluation] = await evaluationsOf(repo, runId);
+    const byId = new Map(evaluation?.evidence.map((e) => [e.criterionId, e]));
+    expect(evaluation?.evidence).toHaveLength(
+      theUser.preferences.fitCriteria.length,
+    );
+    expect(byId.get("title_manager")).toMatchObject({
+      judgedBy: "code",
+      met: true,
+      evidence: "Engineering Manager",
+      points: 3,
+    });
+    expect(byId.get("startup")).toMatchObject({
+      judgedBy: "ai",
+      met: true,
+      evidence: "quote: startup",
+      points: 1,
+    });
+    // The evaluator is asked only for what code does not judge.
+    expect(asked[0]).not.toContain("title_manager");
+    expect(asked[0]).toContain("startup");
+  });
+
+  it("ignores an evaluator's judgement on a criterion code owns", async () => {
+    const repo = new InMemoryRepo();
+    const discovery: Discovery = {
+      discover: async () => [
+        { ...aPosting("1"), ...inIndia, title: "Software Engineer" },
+      ],
+    };
+    const overreaching: JobEvaluator = {
+      evaluate: async () => ({
+        scoredBy: "ai",
+        judgements: [
+          { criterionId: "title_manager", met: true, evidence: "trust me" },
+        ],
+      }),
+    };
+    const pipeline = buildPipeline(
+      deps({ repo, discovery, evaluator: overreaching }),
+    );
+
+    const { runId, finished } = await pipeline.startRun("user-1");
+    await finished;
+
+    const [evaluation] = await evaluationsOf(repo, runId);
+    expect(evaluation).toMatchObject({ score: 0, verdict: "STRETCH" });
+  });
+
+  it("gives a hard-blocked Posting the BLOCKED Verdict", async () => {
+    const repo = new InMemoryRepo();
+    const discovery: Discovery = {
+      discover: async () => [{ ...aPosting("1"), ...onsiteAbroad }],
+    };
+    const pipeline = buildPipeline(deps({ repo, discovery }));
+
+    const { runId, finished } = await pipeline.startRun("user-1");
+    await finished;
+
+    const [evaluation] = await evaluationsOf(repo, runId);
+    expect(evaluation).toMatchObject({
+      status: "blocked",
+      verdict: "BLOCKED",
+      score: null,
+    });
+  });
+
+  it("streams each Verdict live, before the Run finishes", async () => {
+    const repo = new InMemoryRepo();
+    const discovery: Discovery = {
+      discover: async () => [
+        { ...aPosting("1"), ...inIndia, title: "Engineering Manager" },
+      ],
+    };
+    const evaluator = cannedEvaluator({ "1": ["stack_primary"] });
+    // Discovery and the Posting's step pass; the Run's closing step waits.
+    const gated = gatedDelay();
+    let delays = 0;
+    const delay = () => (++delays <= 2 ? Promise.resolve() : gated.delay());
+    const pipeline = buildPipeline(deps({ repo, discovery, evaluator, delay }));
+
+    const { runId, finished } = await pipeline.startRun("user-1");
+    const scored: string[] = [];
+    const unsub = repo.watchEvaluations(
+      runId,
+      (batch) => {
+        for (const { evaluation } of batch) {
+          if (evaluation.verdict)
+            scored.push(`${evaluation.status}/${evaluation.verdict}`);
+        }
+      },
+      (error) => {
+        throw error;
+      },
+    );
+    const { statuses, unsub: unsubRun } = recordStatuses(repo, runId);
+    await vi.waitFor(() => expect(scored).toContain("held/APPLY"));
+    expect(statuses).not.toContain("completed");
+    gated.open();
+    await finished;
+    unsub();
+    unsubRun();
+  });
+
+  it("scores a whole Run with the keyword fallback matcher, labelled fallback (D24)", async () => {
+    const repo = new InMemoryRepo();
+    const posting: Posting = {
+      ...aPosting("1"),
+      ...inIndia,
+      title: "Engineering Manager",
+      descriptionText:
+        "Join a fast-growing startup. You will lead a hands-on team building real-time " +
+        "pipelines in TypeScript and Node, with LLM features across the product.",
+    };
+    const pipeline = buildPipeline(
+      deps({
+        repo,
+        discovery: { discover: async () => [posting] },
+        evaluator: keywordMatcher,
+      }),
+    );
+
+    const { runId, finished } = await pipeline.startRun("user-1");
+    await finished;
+
+    const [evaluation] = await evaluationsOf(repo, runId);
+    // Manager 3 + primary stack 3 + startup + hands-on + real-time + LLM = 10.
+    expect(evaluation).toMatchObject({
+      verdict: "APPLY_NOW",
+      score: 10,
+      scoredBy: "fallback",
+      status: "held",
+    });
+    const startup = evaluation?.evidence.find(
+      (e) => e.criterionId === "startup",
+    );
+    expect(startup?.evidence).toContain("fast-growing startup");
   });
 });

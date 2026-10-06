@@ -1,11 +1,11 @@
 /**
- * The interim `JobEvaluator` until ticket 08 wires in the keyword matcher (and
- * ticket 09 the AI client): it judges no criteria. It still sits at the
- * evaluator seam, so the Run's AI-evaluation cap, Seen marking and statuses
- * behave as they will once real judgements arrive.
+ * Superseded by the keyword matcher (`keyword-matcher.ts`, ticket 08) and no
+ * longer wired anywhere; kept only until a human approves deleting it.
+ *
+ * The interim `JobEvaluator` from ticket 07: it judges no criteria.
  */
 import type { JobEvaluator } from "../pipeline/ports.js";
 
 export const awaitingScoringEvaluator: JobEvaluator = {
-  evaluate: async () => [],
+  evaluate: async () => ({ scoredBy: "fallback", judgements: [] }),
 };

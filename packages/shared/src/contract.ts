@@ -418,9 +418,59 @@ export const verdictSchema = z.enum(["APPLY_NOW", "APPLY", "STRETCH", "BLOCKED"]
 export type Verdict = z.infer<typeof verdictSchema>;
 
 /**
+ * Fixed `reason`s of a `held` Evaluation (D8, D11): `below_auto_threshold` —
+ * the Verdict was APPLY, a match worth applying to but not unattended;
+ * `needs_you` — a required form field only the user can answer.
+ */
+export const HELD_REASONS = {
+  belowAutoThreshold: "below_auto_threshold",
+  needsYou: "needs_you",
+} as const;
+export type HeldReason = (typeof HELD_REASONS)[keyof typeof HELD_REASONS];
+
+/**
+ * The fit scale and Verdict bands (D8), from the job-search prompt: "FIT 1-10
+ * (cap 10)" and "APPLY NOW = fit 7+ with no gaps. APPLY = fit 5-6, or 7+ with
+ * minor gaps." Below `APPLY_MIN_FIT` is STRETCH. These seed the user's
+ * `preferences.fitCap` and `preferences.verdictBands`, which the scorer reads.
+ */
+export const FIT_CAP = 10;
+export const APPLY_NOW_MIN_FIT = 7;
+export const APPLY_MIN_FIT = 5;
+
+/**
+ * Which side of the reliability split judged a criterion (spec, Evaluation):
+ * `code` for what code parses properly (the title tier), `ai` for judgement
+ * over prose — answered by the AI or, as fallback, the keyword matcher.
+ */
+export const judgedBySchema = z.enum(["code", "ai"]);
+export type JudgedBy = z.infer<typeof judgedBySchema>;
+
+/** What judged the `ai` criteria of an Evaluation: the AI, or the keyword matcher (D24). */
+export const scoredBySchema = z.enum(["ai", "fallback"]);
+export type ScoredBy = z.infer<typeof scoredBySchema>;
+
+/**
+ * One rubric criterion as judged for one Posting (D7): met or not, the quote
+ * that supports it, and the points it added. `points` is the weight when the
+ * criterion counted, else 0 — a met criterion in a "highest only" group can be
+ * outscored by a sibling. The score is the capped sum of `points`.
+ */
+export const criterionEvidenceSchema = z.object({
+  criterionId: z.string(),
+  label: z.string(),
+  weight: z.number().int(),
+  judgedBy: judgedBySchema,
+  met: z.boolean(),
+  evidence: z.string(),
+  points: z.number().int(),
+});
+export type CriterionEvidence = z.infer<typeof criterionEvidenceSchema>;
+
+/**
  * The per-run record of what we decided about one Posting (GLOSSARY:
- * Evaluation), stored as one document under its Run. Per-criterion evidence and
- * the built Greenhouse payload are added by the scoring and submit tickets.
+ * Evaluation), stored as one document under its Run. The built Greenhouse
+ * payload is added by the submit ticket.
  */
 export const evaluationSchema = z.object({
   jobKey: z.string(),
@@ -430,6 +480,10 @@ export const evaluationSchema = z.object({
   verdict: verdictSchema.nullable(),
   score: z.number().nullable(),
   reason: z.string().nullable(),
+  /** Per-criterion evidence behind `score`; empty until the Posting is scored. */
+  evidence: z.array(criterionEvidenceSchema).default([]),
+  /** Who judged the AI-side criteria; `null` until scored, or when never scored. */
+  scoredBy: scoredBySchema.nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
