@@ -16,7 +16,9 @@ import {
   errorResponseSchema,
   evalEventSchema,
   retrySubmitResponseSchema,
+  RUN_INTERRUPTED_REASON,
   runEventSchema,
+  runsListResponseSchema,
   snapshotEventSchema,
   type Evaluation,
   type EvaluationChange,
@@ -35,6 +37,7 @@ import { keywordMatcher } from "./evaluation/keyword-matcher.js";
 import { greenhouseForms } from "./forms/greenhouse-forms.js";
 import { simulatedSubmitter } from "./submit/simulated-submitter.js";
 import { DEMO_UID } from "./user.js";
+import { recoverInterruptedRuns } from "./runs/recover-interrupted-runs.js";
 
 const testConfig: Config = loadConfig({
   ...TEST_AUTH_ENV,
@@ -237,6 +240,25 @@ describe("GET /api/runs/active", () => {
     const res = await request(app).get("/api/runs/active").set("Cookie", authCookie());
     expect(res.status).toBe(200);
     expect(activeRunResponseSchema.parse(res.body)).toEqual({ run: null });
+  });
+});
+
+describe("the latest Run after a restart (ticket 14)", () => {
+  it("is listed first by GET /api/runs, failed: interrupted, while none is active", async () => {
+    const { app, repo } = harness();
+    await request(app).post("/api/runs").set("Cookie", authCookie());
+
+    // The server restarts mid-Run: boot recovery fails it.
+    await recoverInterruptedRuns(repo, [DEMO_UID]);
+
+    const active = await request(app).get("/api/runs/active").set("Cookie", authCookie());
+    expect(activeRunResponseSchema.parse(active.body).run).toBeNull();
+    const list = await request(app).get("/api/runs").set("Cookie", authCookie());
+    expect(runsListResponseSchema.parse(list.body).runs[0]).toMatchObject({
+      runId: "run-1",
+      status: "failed",
+      reason: RUN_INTERRUPTED_REASON,
+    });
   });
 });
 

@@ -129,11 +129,12 @@ export async function updateMe(edits: UpdateMeRequest): Promise<UpdateMeResponse
 }
 
 /**
- * `GET /api/session`: whether the session cookie is valid. `false` on `401`;
- * any other failure throws, so "API down" is not mistaken for "signed out".
+ * `GET /api/session`: whether the session cookie is valid. `false` on `401`
+ * (which, like any 401, also signs the browser out); any other failure throws,
+ * so "API down" is not mistaken for "signed out".
  */
 export async function getSession(): Promise<boolean> {
-  const res = await fetch(`/api/session`, { credentials: "include" });
+  const res = await apiFetch(`/api/session`);
   if (res.status === 401) return false;
   sessionResponseSchema.parse(await readJson(res));
   return true;

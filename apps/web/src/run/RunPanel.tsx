@@ -1,6 +1,7 @@
 /**
  * The Auto-apply button and the live Run view (D20). On load it reattaches to
- * the user's active Run, so a refresh mid-Run loses nothing; the button starts
+ * the user's active Run, so a refresh mid-Run loses nothing, or else shows the
+ * most recent Run (finished, failed or interrupted); the button starts
  * a new Run and stays disabled while one is active (the API's 409 backs it up).
  */
 import { useEffect, useState } from "react";
@@ -22,7 +23,7 @@ import {
   type RunFunnel,
   type RunStatus,
 } from "@auto-apply/shared";
-import { ApiError, getActiveRun, messageOf, startRun } from "../api";
+import { ApiError, getActiveRun, listRuns, messageOf, startRun } from "../api";
 import { ConnectionIndicator } from "../ui/ConnectionIndicator";
 import { StatusChip } from "../ui/StatusChip";
 import { EvaluationsTable } from "./EvaluationsTable";
@@ -109,11 +110,14 @@ export function RunPanel() {
   useEffect(() => {
     let cancelled = false;
     getActiveRun()
+      // No active Run: show the most recent one instead (e.g. one a restart
+      // interrupted), so Home never claims "No runs yet" after a restart.
+      .then(async (active) => active ?? (await listRuns())[0] ?? null)
       .then((run) => {
         if (!cancelled && run) setRunId(run.runId);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setLoadError(`Could not load the active run: ${messageOf(err)}`);
+        if (!cancelled) setLoadError(`Could not load the latest run: ${messageOf(err)}`);
       })
       .finally(() => {
         if (!cancelled) setChecking(false);

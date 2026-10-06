@@ -4,10 +4,11 @@
  * API sends it back to login, and logout clears the session.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { App } from "../App";
+import { FakeEventSource } from "../test/fake-event-source";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 const unauthenticated = () =>
@@ -189,6 +190,45 @@ describe("login gate", () => {
     renderAt("/applied");
 
     await userEvent.click(await screen.findByRole("button", { name: /^retry$/i }));
+
+    expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
+  });
+
+  it("redirects to login when the live stream fails because the session expired", async () => {
+    FakeEventSource.instances = [];
+    vi.stubGlobal("EventSource", FakeEventSource);
+    const run = {
+      runId: "run-1",
+      uid: "demo-user",
+      status: "evaluating",
+      funnel: {
+        discovered: 2,
+        evaluated: 0,
+        blocked: 0,
+        skipped: 0,
+        held: 0,
+        submitted: 0,
+        failed: 0,
+      },
+      reason: null,
+      createdAt: "2026-10-06T12:00:00.000Z",
+      updatedAt: "2026-10-06T12:00:00.000Z",
+    };
+    let expired = false;
+    fakeApi({
+      signedIn: true,
+      routes: {
+        "/api/runs/active": () => json({ run }),
+        "/api/session": () => (expired ? unauthenticated() : json({ authenticated: true })),
+      },
+    });
+    renderAt("/");
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    act(() => FakeEventSource.latest().emit("snapshot", { run, evaluations: [] }));
+
+    // The JWT expires; the stream's reconnect answers 401 and the browser gives up.
+    expired = true;
+    act(() => FakeEventSource.latest().fail());
 
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
   });
