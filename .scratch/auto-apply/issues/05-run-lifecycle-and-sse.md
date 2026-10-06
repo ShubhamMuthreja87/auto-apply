@@ -26,3 +26,6 @@ Deferred, deliberately:
 - Interrupted-run sweep at boot → ticket 14. Until then, with Firestore, a restart mid-Run leaves that Run active and later POSTs get 409.
 - Single transition function rejecting illegal status moves → ticket 07. The skeleton patches statuses directly.
 - `JobEvaluator` / `ApplicationSubmitter` ports join `buildPipeline` with their tickets (08–11); only `JobSource` exists, backed by clearly-labelled placeholder Postings until ticket 06.
+
+## Log
+- Built in `102dfbe` before this run. 2026-10-06 audit: all bullets verified. The skeleton pipeline has since been replaced by the real one (tickets 06–11), the interrupted-run sweep is ticket 14, and the transition table is ticket 07.

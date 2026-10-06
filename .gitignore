@@ -13,3 +13,4 @@ test-results/
 
 # Playwright MCP screenshots and snapshots
 .playwright-mcp/
+.DS_Store
