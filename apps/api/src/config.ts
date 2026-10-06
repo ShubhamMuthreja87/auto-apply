@@ -9,6 +9,8 @@ const optionalString = z
   .optional()
   .transform((value) => (value ? value : undefined));
 
+const DEV_CORS_ORIGIN = "http://localhost:5173";
+
 /**
  * Environment is parsed once, at startup, and the process fails fast if it is
  * invalid (CODING_STANDARDS, General). The AI vars come from `ai/ai-env.ts`,
@@ -27,8 +29,9 @@ const envSchema = z
     // Firestore unless the in-memory twin is asked for explicitly (ADR-0004).
     REPO: repoKindSchema.default("firestore"),
     // Exactly one browser origin, with credentials, never `*` (D27). Same
-    // origin in production; the Vite dev server locally.
-    CORS_ORIGIN: z.string().url().default("http://localhost:5173"),
+    // origin in production, where it must be set (see `loadConfig`); the Vite
+    // dev server by default in development and test.
+    CORS_ORIGIN: optionalString.pipe(z.string().url().default(DEV_CORS_ORIGIN)),
     // Read by `loadCredential`; inline JSON wins over the key-file path.
     FIREBASE_SERVICE_ACCOUNT_JSON: optionalString,
     GOOGLE_APPLICATION_CREDENTIALS: optionalString,
@@ -61,6 +64,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   // In-memory data dies with the process; never in production (ADR-0004).
   if (config.REPO === "memory" && config.NODE_ENV === "production") {
     throw new Error("Refusing to start: REPO=memory is not allowed with NODE_ENV=production");
+  }
+
+  // Production never falls back to the dev origin: a forgotten CORS_ORIGIN
+  // fails here instead of silently allowing http://localhost:5173 (D27).
+  if (config.NODE_ENV === "production" && !env.CORS_ORIGIN) {
+    throw new Error(
+      "Refusing to start: CORS_ORIGIN must be set explicitly when NODE_ENV=production (e.g. https://<domain>)",
+    );
   }
 
   return config;

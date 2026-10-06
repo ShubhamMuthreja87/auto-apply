@@ -27,7 +27,12 @@ describe("createRepo (ADR-0004: no silent fallback)", () => {
   it("refuses to start in production without a credential", () => {
     expect(() =>
       createRepo(
-        loadConfig({ ...TEST_AUTH_ENV, NODE_ENV: "production", FIRESTORE_NAMESPACE: "prod" }),
+        loadConfig({
+          ...TEST_AUTH_ENV,
+          NODE_ENV: "production",
+          FIRESTORE_NAMESPACE: "prod",
+          CORS_ORIGIN: "https://apply.example.com",
+        }),
       ),
     ).toThrow(/credential/i);
   });

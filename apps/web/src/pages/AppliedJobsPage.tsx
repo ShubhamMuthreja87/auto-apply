@@ -143,7 +143,11 @@ function AppliedBody({
                 key={idOf(evaluation)}
                 evaluation={evaluation}
                 onView={() => setViewing(evaluation)}
-                onRetried={onRetried}
+                onRetried={(retried) => {
+                  onRetried(retried);
+                  // D19: "Retry shows the payload and succeeds".
+                  setViewing(retried);
+                }}
               />
             ))}
           </TableBody>

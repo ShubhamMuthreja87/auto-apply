@@ -62,10 +62,38 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ...TEST_AUTH_ENV, CORS_ORIGIN: "*" })).toThrow();
   });
 
+  it("requires an explicit CORS_ORIGIN in production instead of defaulting to localhost (D27)", () => {
+    for (const value of [undefined, ""]) {
+      expect(() =>
+        loadConfig({ ...TEST_AUTH_ENV, NODE_ENV: "production", CORS_ORIGIN: value }),
+      ).toThrow(/CORS_ORIGIN must be set explicitly when NODE_ENV=production/);
+    }
+    expect(
+      loadConfig({
+        ...TEST_AUTH_ENV,
+        NODE_ENV: "production",
+        CORS_ORIGIN: "https://apply.example.com",
+      }).CORS_ORIGIN,
+    ).toBe("https://apply.example.com");
+  });
+
+  it.each(["development", "test"])(
+    "keeps the Vite dev origin default when NODE_ENV=%s",
+    (nodeEnv) => {
+      expect(loadConfig({ ...TEST_AUTH_ENV, NODE_ENV: nodeEnv }).CORS_ORIGIN).toBe(
+        "http://localhost:5173",
+      );
+    },
+  );
+
   it("allows the prod namespace in production", () => {
     expect(
-      loadConfig({ ...TEST_AUTH_ENV, NODE_ENV: "production", FIRESTORE_NAMESPACE: "prod" })
-        .FIRESTORE_NAMESPACE,
+      loadConfig({
+        ...TEST_AUTH_ENV,
+        NODE_ENV: "production",
+        FIRESTORE_NAMESPACE: "prod",
+        CORS_ORIGIN: "https://apply.example.com",
+      }).FIRESTORE_NAMESPACE,
     ).toBe("prod");
   });
 
@@ -111,9 +139,14 @@ describe("loadConfig", () => {
   });
 
   it("refuses REPO=memory in production (it would lose every run on restart)", () => {
-    expect(() => loadConfig({ ...TEST_AUTH_ENV, NODE_ENV: "production", REPO: "memory" })).toThrow(
-      /REPO=memory is not allowed with NODE_ENV=production/,
-    );
+    expect(() =>
+      loadConfig({
+        ...TEST_AUTH_ENV,
+        NODE_ENV: "production",
+        REPO: "memory",
+        CORS_ORIGIN: "https://apply.example.com",
+      }),
+    ).toThrow(/REPO=memory is not allowed with NODE_ENV=production/);
   });
 
   it("rejects an unknown REPO value", () => {

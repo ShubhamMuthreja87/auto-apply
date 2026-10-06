@@ -142,6 +142,57 @@ describe("login gate", () => {
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
   });
 
+  it("redirects to login when a Retry answers 401 (an expired session)", async () => {
+    const retryable = {
+      jobKey: "greenhouse:acme:1",
+      runId: "run-1",
+      posting: {
+        ats: "greenhouse",
+        board: "acme",
+        jobId: "1",
+        title: "Engineering Manager",
+        company: "Acme",
+        location: "Bengaluru, India",
+        descriptionText: "Lead a team.",
+        applyUrl: "https://boards.greenhouse.io/acme/jobs/1",
+        remote: false,
+        source: "fixture",
+      },
+      status: "failed",
+      verdict: "APPLY_NOW",
+      score: 8,
+      reason: "simulated",
+      evidence: [],
+      scoredBy: "fallback",
+      missingFields: [],
+      submission: {
+        ats: "greenhouse",
+        endpoint: "https://boards-api.greenhouse.io/v1/boards/acme/jobs/1",
+        method: "POST",
+        sent: false,
+        formUrl: "https://job-boards.greenhouse.io/acme/jobs/1",
+        payload: {},
+        answers: [],
+        attempt: 1,
+        builtAt: "2026-10-06T12:00:00.000Z",
+      },
+      createdAt: "2026-10-06T12:00:00.000Z",
+      updatedAt: "2026-10-06T12:00:00.000Z",
+    };
+    fakeApi({
+      signedIn: true,
+      routes: {
+        "/api/evaluations": () => json({ evaluations: [retryable] }),
+        "/api/runs/run-1/jobs/greenhouse%3Aacme%3A1/retry": unauthenticated,
+      },
+    });
+    renderAt("/applied");
+
+    await userEvent.click(await screen.findByRole("button", { name: /^retry$/i }));
+
+    expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
+  });
+
   it("logs out: clears the session on the API and shows the login page", async () => {
     const fetchMock = fakeApi({ signedIn: true });
     renderAt("/");

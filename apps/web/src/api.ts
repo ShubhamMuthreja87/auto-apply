@@ -102,9 +102,9 @@ export async function listEvaluations(runId: string | null): Promise<Evaluation[
  * `ApiError` with code `not_retryable` (409) for anything else.
  */
 export async function retrySubmit(runId: string, jobKey: string): Promise<Evaluation> {
-  const res = await fetch(
+  const res = await apiFetch(
     `/api/runs/${encodeURIComponent(runId)}/jobs/${encodeURIComponent(jobKey)}/retry`,
-    { method: "POST", credentials: "include" },
+    { method: "POST" },
   );
   return retrySubmitResponseSchema.parse(await readJson(res)).evaluation;
 }

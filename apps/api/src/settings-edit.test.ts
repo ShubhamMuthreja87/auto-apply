@@ -278,6 +278,50 @@ describe("edits drive the next Run and form fill", () => {
     expect(after.reason).toMatch(/Acme Robotics/);
   });
 
+  it("an edited fit criterion weight changes the next Run's score (D6, ticket 17)", async () => {
+    const repo = await seeded();
+    const pipeline = pipelineOver(repo);
+
+    const before = await runOnce(repo, pipeline);
+    expect(before.evidence.find((e) => e.criterionId === "title_manager")?.points).toBe(3);
+
+    const res = await request(appWith(repo, pipeline))
+      .put("/api/me")
+      .set("Cookie", authCookie())
+      .send(
+        edits((body) => {
+          const manager = body.preferences.fitCriteria.find((c) => c.id === "title_manager");
+          if (manager) manager.weight = 1;
+        }),
+      );
+    expect(res.status).toBe(200);
+
+    const after = await runOnce(repo, pipeline);
+    expect(after.evidence.find((e) => e.criterionId === "title_manager")?.points).toBe(1);
+    expect(after.score).toBe((before.score ?? 0) - 2);
+  });
+
+  it("a removed fit criterion no longer scores in the next Run (D6, ticket 17)", async () => {
+    const repo = await seeded();
+    const pipeline = pipelineOver(repo);
+    const before = await runOnce(repo, pipeline);
+
+    await request(appWith(repo, pipeline))
+      .put("/api/me")
+      .set("Cookie", authCookie())
+      .send(
+        edits((body) => {
+          body.preferences.fitCriteria = body.preferences.fitCriteria.filter(
+            (c) => c.id !== "title_manager",
+          );
+        }),
+      );
+
+    const after = await runOnce(repo, pipeline);
+    expect(after.evidence.map((e) => e.criterionId)).not.toContain("title_manager");
+    expect(after.score).toBe((before.score ?? 0) - 3);
+  });
+
   it("edited profile and settings change how form fields resolve (D9)", async () => {
     const repo = await seeded();
     await request(appWith(repo))
