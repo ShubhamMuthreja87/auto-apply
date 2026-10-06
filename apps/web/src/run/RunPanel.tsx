@@ -15,7 +15,13 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import BoltIcon from "@mui/icons-material/Bolt";
 import TravelExploreIcon from "@mui/icons-material/TravelExplore";
-import { isRunActive, type Run, type RunFunnel, type RunStatus } from "@auto-apply/shared";
+import {
+  isRunActive,
+  RUN_INTERRUPTED_REASON,
+  type Run,
+  type RunFunnel,
+  type RunStatus,
+} from "@auto-apply/shared";
 import { ApiError, getActiveRun, messageOf, startRun } from "../api";
 import { ConnectionIndicator } from "../ui/ConnectionIndicator";
 import { StatusChip } from "../ui/StatusChip";
@@ -76,6 +82,14 @@ function NoRunsYet() {
   );
 }
 
+/** A Run's reason in words; `interrupted` is a code the server sets on startup. */
+function reasonText(run: Run): string | null {
+  if (run.reason === RUN_INTERRUPTED_REASON) {
+    return "Interrupted: the server restarted while this run was in progress, so it could not finish. Start a new run when you are ready.";
+  }
+  return run.reason;
+}
+
 const progressColors: Record<RunStatus, "primary" | "success" | "error"> = {
   discovering: "primary",
   evaluating: "primary",
@@ -88,6 +102,7 @@ export function RunPanel() {
   const [runId, setRunId] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
   const [starting, setStarting] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const stream = useRunStream(runId);
 
@@ -98,7 +113,7 @@ export function RunPanel() {
         if (!cancelled && run) setRunId(run.runId);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setStartError(`Could not load the active run: ${messageOf(err)}`);
+        if (!cancelled) setLoadError(`Could not load the active run: ${messageOf(err)}`);
       })
       .finally(() => {
         if (!cancelled) setChecking(false);
@@ -111,6 +126,7 @@ export function RunPanel() {
   async function onAutoApply() {
     setStarting(true);
     setStartError(null);
+    setLoadError(null);
     try {
       setRunId(await startRun());
     } catch (err) {
@@ -133,8 +149,12 @@ export function RunPanel() {
 
   const { run } = stream;
   // Waiting for the first snapshot counts as active, so a double click cannot
-  // slip in between POST and stream.
-  const runActive = run ? isRunActive(run.status) : runId !== null;
+  // slip in between POST and stream; a stream the browser gave up on does not
+  // (the API's 409 still guards a Run that is in fact running).
+  const runActive = run
+    ? isRunActive(run.status)
+    : runId !== null && stream.connection !== "closed";
+  const reason = run ? reasonText(run) : null;
   const progress = run ? progressOf(run) : null;
 
   return (
@@ -201,20 +221,24 @@ export function RunPanel() {
         </CardContent>
       </Card>
 
+      {loadError && <Alert severity="error">{loadError}</Alert>}
       {startError && <Alert severity="error">{startError}</Alert>}
       {stream.error && <Alert severity="error">Stream error: {stream.error}</Alert>}
-      {run?.reason && (
-        <Alert severity={run.status === "failed" ? "error" : "info"}>{run.reason}</Alert>
+      {run && reason && (
+        <Alert severity={run.status === "failed" ? "error" : "info"}>{reason}</Alert>
       )}
 
       {!runId ? (
         checking ? (
           <InlineLoading label="Checking for an active run…" />
-        ) : (
+        ) : loadError ? null : (
           <NoRunsYet />
         )
       ) : !run ? (
-        <InlineLoading label="Loading run…" />
+        // A closed stream with no Run has nothing to wait for; its alert says why.
+        stream.connection === "closed" ? null : (
+          <InlineLoading label="Loading run…" />
+        )
       ) : (
         <>
           <Box
