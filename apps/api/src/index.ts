@@ -4,18 +4,26 @@ import { logger } from "./logger.js";
 import { createRepo } from "./repo/create-repo.js";
 import { buildPipeline } from "./pipeline/pipeline.js";
 import { skeletonJobSource } from "./pipeline/skeleton-job-source.js";
+import { DEMO_UID, loadUser, seedUser } from "./user.js";
 
 // Env and the Firestore credential are both validated here, once; anything
 // invalid stops the boot.
 const config = loadConfig();
 const persistence = createRepo(config);
+const repo = persistence.repo;
+
+// First boot of a namespace writes the seed user; later boots keep any edits
+// (D13). A failure here stops the boot rather than serving without a user.
+await seedUser(repo, DEMO_UID);
+
 // The composition root: real clock and timers here, fakes in tests.
 const pipeline = buildPipeline({
-  repo: persistence.repo,
+  repo,
   jobSource: skeletonJobSource,
   clock: () => new Date(),
   delay: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   newRunId: () => crypto.randomUUID(),
+  loadUser: (uid) => loadUser(repo, uid),
 });
 const app = createApp(config, persistence, pipeline);
 

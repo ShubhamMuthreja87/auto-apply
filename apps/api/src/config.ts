@@ -29,6 +29,9 @@ const envSchema = z.object({
   // Read by `loadCredential`; inline JSON wins over the key-file path.
   FIREBASE_SERVICE_ACCOUNT_JSON: optionalString,
   GOOGLE_APPLICATION_CREDENTIALS: optionalString,
+  // The salary hard block's floor, in lakhs per annum. Kept out of the user
+  // document (compensation is never seeded); unset means the block is inactive.
+  SALARY_FLOOR_LPA: optionalString.pipe(z.coerce.number().positive().optional()),
 });
 
 export type Config = z.infer<typeof envSchema>;
@@ -42,6 +45,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     CORS_ORIGIN: env.CORS_ORIGIN,
     FIREBASE_SERVICE_ACCOUNT_JSON: env.FIREBASE_SERVICE_ACCOUNT_JSON,
     GOOGLE_APPLICATION_CREDENTIALS: env.GOOGLE_APPLICATION_CREDENTIALS,
+    SALARY_FLOOR_LPA: env.SALARY_FLOOR_LPA,
   });
 
   // The `prod` namespace is only ever used on the server (CODING_STANDARDS,
