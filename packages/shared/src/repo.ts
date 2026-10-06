@@ -57,6 +57,17 @@ export interface EvaluationDelta {
   missingFields?: MissingField[];
 }
 
+/** The editable parts of the user document; the uid is never rewritten. */
+export type UserUpdate = Pick<UserDoc, "profile" | "preferences" | "settings">;
+
+/** Thrown by `updateUser` when the user document does not exist. */
+export class UserMissingError extends Error {
+  constructor(readonly uid: string) {
+    super(`no user document for ${uid}`);
+    this.name = "UserMissingError";
+  }
+}
+
 /** Mirrors a Firestore collection change: how an Evaluation entered the stream. */
 export type ChangeType = "added" | "modified" | "removed";
 
@@ -93,6 +104,12 @@ export interface Repo {
   getUser(uid: string): Promise<UserDoc | null>;
   /** Seeds the user on first boot (D13); a no-op if the document already exists. */
   seedUserIfMissing(uid: string, doc: UserDoc): Promise<void>;
+  /**
+   * Replaces the profile, preferences and settings of an existing user whole
+   * (ticket 17); rejects with {@link UserMissingError} and creates nothing
+   * when there is no document, so an edit can never stand in for the seed.
+   */
+  updateUser(uid: string, update: UserUpdate): Promise<void>;
 
   /** Creates a Run; rejects with {@link ActiveRunExistsError} if one is active (D17). */
   createRun(run: Run): Promise<void>;

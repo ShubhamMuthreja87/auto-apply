@@ -21,6 +21,8 @@ import {
   type SubscriptionErrorHandler,
   type Unsubscribe,
   type UserDoc,
+  type UserUpdate,
+  UserMissingError,
 } from "@auto-apply/shared";
 import type { z } from "zod";
 
@@ -67,6 +69,13 @@ export class InMemoryRepo implements Repo {
 
   async seedUserIfMissing(uid: string, doc: UserDoc): Promise<void> {
     if (!this.users.has(uid)) this.users.set(uid, clone(doc));
+  }
+
+  async updateUser(uid: string, update: UserUpdate): Promise<void> {
+    const user = this.users.get(uid);
+    if (!user) throw new UserMissingError(uid);
+    const { profile, preferences, settings } = clone(update);
+    this.users.set(uid, { ...user, profile, preferences, settings });
   }
 
   async createRun(run: Run): Promise<void> {

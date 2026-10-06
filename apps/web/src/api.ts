@@ -10,9 +10,12 @@ import {
   evaluationsListResponseSchema,
   meResponseSchema,
   runsListResponseSchema,
+  updateMeResponseSchema,
   type Evaluation,
   type MeResponse,
   type Run,
+  type UpdateMeRequest,
+  type UpdateMeResponse,
 } from "@auto-apply/shared";
 
 // In dev the web app (5173) calls the API (3001) cross-origin; in production the
@@ -70,6 +73,20 @@ export async function listEvaluations(runId: string | null): Promise<Evaluation[
 export async function getMe(): Promise<MeResponse> {
   const res = await fetch(`${API_URL}/api/me`, { credentials: "include" });
   return meResponseSchema.parse(await readJson(res));
+}
+
+/**
+ * `PUT /api/me`: saves edits to profile, preferences and settings and returns
+ * the stored document; an `ApiError` with code `invalid_request` on 400.
+ */
+export async function updateMe(edits: UpdateMeRequest): Promise<UpdateMeResponse> {
+  const res = await fetch(`${API_URL}/api/me`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(edits),
+  });
+  return updateMeResponseSchema.parse(await readJson(res));
 }
 
 /** A caught error's message, for showing to the user. */

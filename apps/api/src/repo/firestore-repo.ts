@@ -28,9 +28,13 @@ import {
   type SubscriptionErrorHandler,
   type Unsubscribe,
   type UserDoc,
+  type UserUpdate,
+  UserMissingError,
 } from "@auto-apply/shared";
 import { nsDoc } from "../firestore/firestore.js";
 
+/** gRPC status for an `update()` on a document that does not exist. */
+const NOT_FOUND = 5;
 /** gRPC status for a `create()` on a document that already exists. */
 const ALREADY_EXISTS = 6;
 
@@ -76,6 +80,18 @@ export class FirestoreRepo implements Repo {
       await this.users().doc(uid).create(doc);
     } catch (err) {
       if (isAlreadyExists(err)) return;
+      throw err;
+    }
+  }
+
+  async updateUser(uid: string, update: UserUpdate): Promise<void> {
+    // `update()` replaces each named top-level field whole and fails on a
+    // missing document, so an edit never creates one in place of the seed.
+    const { profile, preferences, settings } = update;
+    try {
+      await this.users().doc(uid).update({ profile, preferences, settings });
+    } catch (err) {
+      if (hasGrpcCode(err, NOT_FOUND)) throw new UserMissingError(uid);
       throw err;
     }
   }
@@ -205,5 +221,9 @@ export class FirestoreRepo implements Repo {
 }
 
 function isAlreadyExists(err: unknown): boolean {
-  return typeof err === "object" && err !== null && "code" in err && err.code === ALREADY_EXISTS;
+  return hasGrpcCode(err, ALREADY_EXISTS);
+}
+
+function hasGrpcCode(err: unknown, code: number): boolean {
+  return typeof err === "object" && err !== null && "code" in err && err.code === code;
 }
