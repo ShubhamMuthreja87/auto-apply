@@ -27,6 +27,7 @@ function anEvaluation(overrides: Partial<Evaluation>): Evaluation {
     reason: null,
     evidence: [],
     scoredBy: null,
+    missingFields: [],
     createdAt: "2026-10-06T12:00:00.000Z",
     updatedAt: "2026-10-06T12:00:00.000Z",
     ...overrides,
@@ -57,6 +58,50 @@ describe("<EvaluationsTable /> reasons", () => {
     render(<EvaluationsTable evaluations={[anEvaluation(overrides)]} />);
 
     expect(screen.getByRole("row", { name: /Engineering Manager/ })).toHaveTextContent(text);
+  });
+});
+
+describe("<EvaluationsTable /> needs_you (D11)", () => {
+  it("lists the fields the user must answer, with why", () => {
+    render(
+      <EvaluationsTable
+        evaluations={[
+          anEvaluation({
+            status: "held",
+            verdict: "APPLY_NOW",
+            reason: "needs_you",
+            missingFields: [
+              {
+                id: "question_1",
+                label: "Agreement to Arbitrate",
+                why: "Legal agreement; never auto-answered (D10)",
+              },
+              {
+                id: "resume",
+                label: "Resume/CV",
+                why: "Not answered by your settings (documents.resumeUrl)",
+              },
+            ],
+          }),
+        ]}
+      />,
+    );
+
+    const row = screen.getByRole("row", { name: /Engineering Manager/ });
+    expect(row).toHaveTextContent("Needs your answers");
+    const list = screen.getByRole("list", { name: "Fields you need to answer" });
+    expect(list).toHaveTextContent("Agreement to Arbitrate — Legal agreement; never auto-answered");
+    expect(list).toHaveTextContent("Resume/CV");
+  });
+
+  it("shows no field list when nothing is missing", () => {
+    render(
+      <EvaluationsTable
+        evaluations={[anEvaluation({ status: "held", reason: "below_auto_threshold" })]}
+      />,
+    );
+
+    expect(screen.queryByRole("list", { name: "Fields you need to answer" })).toBeNull();
   });
 });
 

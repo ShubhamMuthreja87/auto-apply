@@ -8,6 +8,8 @@ import { createDiscovery } from "./discovery/discovery.js";
 import { readBoardFixture } from "./discovery/fixtures.js";
 import { greenhouseJobSource } from "./discovery/greenhouse.js";
 import { createScoring } from "./ai/scoring.js";
+import { createFreeTextAnswerer } from "./ai/free-text-answerer.js";
+import { greenhouseForms } from "./forms/greenhouse-forms.js";
 import { recoverInterruptedRuns } from "./runs/recover-interrupted-runs.js";
 import { DEMO_UID, loadUser, seedUser } from "./user.js";
 
@@ -35,6 +37,11 @@ const pipeline = buildPipeline({
   repo,
   discovery,
   evaluator: scoring.evaluator,
+  // APPLY NOW forms: GET only, recorded form as fallback (D3, D5); in
+  // fixtures mode the recordings alone, like discovery.
+  forms: greenhouseForms({ fetch, timeoutMs: 10_000, mode: config.JOB_SOURCE }),
+  // Without an AI key, required free text falls to the user (D24).
+  answerer: scoring.chat ? createFreeTextAnswerer({ chat: scoring.chat }) : null,
   scoringMode: scoring.mode,
   screening: { salaryFloorLpa: config.SALARY_FLOOR_LPA },
   clock: () => new Date(),

@@ -2,6 +2,7 @@
  * How an Evaluation's source, reason and scoring are shown, shared by the live
  * Run table and the Scanned jobs view so both say the same thing.
  */
+import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
 import Typography from "@mui/material/Typography";
 import {
@@ -10,6 +11,7 @@ import {
   SKIP_REASONS,
   type Ats,
   type Evaluation,
+  type MissingField,
   type Posting,
   type PostingSource,
 } from "@auto-apply/shared";
@@ -99,4 +101,24 @@ export function FallbackLabel({ scoredBy }: Pick<Evaluation, "scoredBy">) {
 /** A score rounded for display, or a dash before scoring. */
 export function scoreText(score: number | null): string {
   return score === null ? "—" : String(Math.round(score));
+}
+
+/**
+ * The required form fields only the user can answer, under a `needs_you`
+ * reason (D11): each field's label, and why it was not filled.
+ */
+export function MissingFieldsList({ fields }: { fields: readonly MissingField[] }) {
+  if (fields.length === 0) return null;
+  return (
+    <Box component="ul" aria-label="Fields you need to answer" sx={{ m: 0, mt: 0.5, pl: 2.5 }}>
+      {fields.map((field) => (
+        <Typography key={field.id} component="li" variant="caption" color="text.secondary">
+          <Box component="span" sx={{ color: "text.primary", fontWeight: 500 }}>
+            {field.label}
+          </Box>
+          {` — ${field.why}`}
+        </Typography>
+      ))}
+    </Box>
+  );
 }

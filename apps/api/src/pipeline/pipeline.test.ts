@@ -19,8 +19,16 @@ import { createAiEvaluator } from "../ai/ai-evaluator.js";
 import { createChatClient } from "../ai/chat-client.js";
 import { completion, readAiFixture, scriptedFetch } from "../ai/scripted-fetch.js";
 import { InMemoryRepo } from "../repo/in-memory-repo.js";
-import { AWAITING_SUBMIT_REASON, buildPipeline, type PipelineDeps } from "./pipeline.js";
-import type { Discovery, JobEvaluator } from "./ports.js";
+import { greenhouseForms } from "../forms/greenhouse-forms.js";
+import { FORM_READY_REASON, buildPipeline, type PipelineDeps } from "./pipeline.js";
+import type {
+  Discovery,
+  FormField,
+  FreeTextAnswerer,
+  FreeTextRequest,
+  GreenhouseForms,
+  JobEvaluator,
+} from "./ports.js";
 import { SEED_USER } from "../seed-user.js";
 import { UserNotFoundError } from "../user.js";
 
@@ -40,6 +48,28 @@ function aPosting(jobId: string): Posting {
     source: "live",
   };
 }
+
+/** A form the seed user's profile answers in full. */
+function formOf(fields: FormField[]): GreenhouseForms {
+  return {
+    fetchSchema: async ({ board, jobId }) => ({
+      formUrl: `https://job-boards.greenhouse.io/${board}/jobs/${jobId}`,
+      fields,
+      source: "live",
+    }),
+  };
+}
+
+const textField = (id: string, label: string, required = true): FormField => ({
+  id,
+  label,
+  description: "",
+  type: id === "essay" ? "textarea" : "text",
+  required,
+  group: "questions",
+});
+
+const completeForm = formOf([textField("first_name", "First Name"), textField("email", "Email")]);
 
 const twoPostings: Discovery = { discover: async () => [aPosting("1"), aPosting("2")] };
 
@@ -74,6 +104,7 @@ function deps(overrides: Partial<PipelineDeps> = {}): PipelineDeps {
     repo: new InMemoryRepo(),
     discovery: twoPostings,
     evaluator: recordingEvaluator().evaluator,
+    forms: completeForm,
     clock: () => new Date("2026-10-06T12:00:00.000Z"),
     delay: async () => {},
     newRunId: () => `run-${++n}`,
@@ -569,7 +600,7 @@ describe("scoring and Verdict (D7, D8)", () => {
       verdict: "APPLY_NOW",
       score: 8,
       status: "held",
-      reason: AWAITING_SUBMIT_REASON,
+      reason: FORM_READY_REASON,
       scoredBy: "ai",
     });
     expect(byJob.get("apply")).toMatchObject({
@@ -804,5 +835,176 @@ describe("scoring and Verdict (D7, D8)", () => {
       expect(evaluation?.scoredBy).toBe("fallback");
       expect(evaluation?.evidence.find((e) => e.criterionId === "startup")?.met).toBe(true);
     });
+  });
+});
+
+describe("form fill for APPLY NOW (D5, D9–D11)", () => {
+  /** An APPLY NOW Posting (manager title + stack + startup + real-time = 8) on `board`. */
+  function applyNow(board: string, jobId: string, title = "Engineering Manager"): Posting {
+    return { ...aPosting(jobId), ...inIndia, board, company: board, title };
+  }
+  const evaluatorFor = (jobId: string) =>
+    cannedEvaluator({ [jobId]: ["stack_primary", "startup", "realtime_data"] });
+
+  /** A fake answerer that records its requests and answers from a script. */
+  function scriptedAnswerer(
+    reply: (request: FreeTextRequest) => ReturnType<FreeTextAnswerer["answer"]>,
+  ) {
+    const requests: FreeTextRequest[] = [];
+    const answerer: FreeTextAnswerer = {
+      answer: (request) => {
+        requests.push(request);
+        return reply(request);
+      },
+    };
+    return { answerer, requests };
+  }
+
+  async function runOne(posting: Posting, overrides: Partial<PipelineDeps>) {
+    const repo = new InMemoryRepo();
+    const pipeline = buildPipeline(
+      deps({
+        repo,
+        discovery: { discover: async () => [posting] },
+        evaluator: evaluatorFor(posting.jobId),
+        ...overrides,
+      }),
+    );
+    const { runId, finished } = await pipeline.startRun("user-1");
+    await finished;
+    const [evaluation] = await evaluationsOf(repo, runId);
+    return { evaluation, run: await repo.getRun(runId) };
+  }
+
+  it("holds a fully resolved form for the simulated submit, with nothing missing", async () => {
+    const { evaluation, run } = await runOne(applyNow("acme", "1"), { forms: completeForm });
+
+    expect(evaluation).toMatchObject({
+      verdict: "APPLY_NOW",
+      score: 8,
+      status: "held",
+      reason: FORM_READY_REASON,
+      missingFields: [],
+    });
+    expect(run?.funnel).toMatchObject({ held: 1, evaluated: 1 });
+  });
+
+  it("holds Anthropic's recorded form as needs_you, listing what only the user can answer (D10, D11)", async () => {
+    const fake = recordedFetch();
+    const forms = greenhouseForms({ fetch: fake.fetch, timeoutMs: 1_000, mode: "live" });
+
+    const { evaluation } = await runOne(applyNow("anthropic", "5418402008"), { forms });
+
+    expect(evaluation).toMatchObject({ status: "held", reason: "needs_you", verdict: "APPLY_NOW" });
+    const missing = new Map(evaluation?.missingFields.map((f) => [f.id, f]));
+    expect(missing.get("question_18610019008")).toMatchObject({
+      label: "AI Policy for Application",
+      why: expect.stringMatching(/AI-policy/),
+    });
+    expect(missing.get("question_18610029008")?.why).toMatch(/Legal agreement/);
+    expect(missing.has("question_18610027008")).toBe(true); // interviewed here before?
+    // Filled in code from profile and settings, so not missing.
+    for (const id of ["first_name", "last_name", "email", "question_18610021008"]) {
+      expect(missing.has(id)).toBe(false);
+    }
+    // No AI configured: the required essay is the user's too (D24).
+    expect(missing.get("question_18610020008")?.why).toMatch(/no AI/i);
+    // GET only, never a write to Greenhouse.
+    expect(fake.calls.every((c) => c.method === "GET")).toBe(true);
+  });
+
+  it("lists Stripe's form fields the settings do not answer, but fills School and Degree", async () => {
+    const forms = greenhouseForms({ fetch: recordedFetch().fetch, timeoutMs: 1_000, mode: "live" });
+
+    const { evaluation } = await runOne(applyNow("stripe", "8113337"), { forms });
+
+    const ids = evaluation?.missingFields.map((f) => f.id) ?? [];
+    expect(evaluation?.reason).toBe("needs_you");
+    expect(ids).toContain("question_68474660"); // ever employed by Stripe?
+    expect(ids).toContain("question_68474661"); // WhatsApp opt-in (consent)
+    expect(ids).not.toContain("education.school");
+    expect(ids).not.toContain("education.degree");
+  });
+
+  it("drafts required free text with the AI from PII-free facts, framed by tier (D12, D23)", async () => {
+    const forms = formOf([textField("first_name", "First Name"), textField("essay", "Why us?")]);
+    const { answerer, requests } = scriptedAnswerer(async () => [
+      { fieldId: "essay", answer: "I lead teams that ship.", basedOn: ["experience.0"] },
+    ]);
+
+    const { evaluation } = await runOne(applyNow("acme", "1"), { forms, answerer });
+
+    expect(evaluation).toMatchObject({ status: "held", reason: FORM_READY_REASON });
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.framing).toBe("EM");
+    expect(requests[0]?.questions.map((q) => q.fieldId)).toEqual(["essay"]);
+    const sent = JSON.stringify(requests[0]?.facts);
+    for (const secret of [
+      "Shubham",
+      "Muthreja",
+      "shubham@muthreja.com",
+      "9566225447",
+      "Gurugram",
+    ]) {
+      expect(sent).not.toContain(secret);
+    }
+  });
+
+  it("uses Staff framing for an IC title (D12)", async () => {
+    const forms = formOf([textField("essay", "Why us?")]);
+    const { answerer, requests } = scriptedAnswerer(async () => []);
+    // Lead IC title (+2) + stack + startup + real-time = 7: still APPLY NOW.
+    await runOne(applyNow("acme", "1", "Staff Software Engineer"), { forms, answerer });
+
+    expect(requests[0]?.framing).toBe("Staff");
+  });
+
+  it("holds the job when an AI answer cites no fact it was given (D12)", async () => {
+    const forms = formOf([textField("essay", "Why us?")]);
+    const { answerer } = scriptedAnswerer(async () => [
+      { fieldId: "essay", answer: "I have 15 years at Google.", basedOn: ["made-up"] },
+    ]);
+
+    const { evaluation } = await runOne(applyNow("acme", "1"), { forms, answerer });
+
+    expect(evaluation).toMatchObject({ status: "held", reason: "needs_you" });
+    expect(evaluation?.missingFields).toEqual([
+      { id: "essay", label: "Why us?", why: expect.stringMatching(/could not ground/) },
+    ]);
+  });
+
+  it("spends no AI call on free text when another required field already needs the user", async () => {
+    const forms = formOf([
+      textField("essay", "Why us?"),
+      {
+        ...textField("q_arb", "Agreement to Arbitrate"),
+        type: "select",
+        options: [{ label: "I agree", value: 1 }],
+      },
+    ]);
+    const { answerer, requests } = scriptedAnswerer(async () => []);
+
+    const { evaluation } = await runOne(applyNow("acme", "1"), { forms, answerer });
+
+    expect(requests).toHaveLength(0);
+    expect(evaluation?.missingFields.map((f) => f.id)).toEqual(["essay", "q_arb"]);
+  });
+
+  it("fails the Posting with a reason, keeping its Verdict, when the form cannot be read", async () => {
+    const forms: GreenhouseForms = {
+      fetchSchema: async () => {
+        throw new Error("Application form for acme/1 unavailable: HTTP 503; no recorded form");
+      },
+    };
+
+    const { evaluation, run } = await runOne(applyNow("acme", "1"), { forms });
+
+    expect(evaluation).toMatchObject({
+      status: "failed",
+      verdict: "APPLY_NOW",
+      reason: expect.stringMatching(/Application form .* unavailable/),
+    });
+    expect(run).toMatchObject({ status: "completed" });
+    expect(run?.funnel).toMatchObject({ failed: 1 });
   });
 });

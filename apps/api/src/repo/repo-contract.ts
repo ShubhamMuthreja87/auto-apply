@@ -21,6 +21,7 @@ import {
   jobKey,
   type CriterionEvidence,
   type Evaluation,
+  type MissingField,
   type EvaluationChange,
   type Posting,
   type Repo,
@@ -107,6 +108,12 @@ const evidenceItem: CriterionEvidence = {
   points: 1,
 };
 
+const missingField: MissingField = {
+  id: "question_1",
+  label: "Agreement to Arbitrate",
+  why: "Legal agreement; never auto-answered (D10)",
+};
+
 function anEvaluation(posting: Posting, overrides: Partial<Evaluation> = {}): Evaluation {
   const now = new Date().toISOString();
   return {
@@ -119,6 +126,7 @@ function anEvaluation(posting: Posting, overrides: Partial<Evaluation> = {}): Ev
     reason: null,
     evidence: [],
     scoredBy: null,
+    missingFields: [],
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -396,6 +404,7 @@ export function describeRepoContract(
           score: 42,
           evidence: [evidenceItem],
           scoredBy: "fallback",
+          missingFields: [missingField],
         });
         await eventually(() => expect(changes.at(-1)?.evaluation.status).toBe("submitted"));
         // The first delivery introduces the document; every later one modifies it.
@@ -409,6 +418,7 @@ export function describeRepoContract(
         expect(changes.at(-1)?.evaluation.score).toBe(42);
         expect(changes.at(-1)?.evaluation.evidence).toEqual([evidenceItem]);
         expect(changes.at(-1)?.evaluation.scoredBy).toBe("fallback");
+        expect(changes.at(-1)?.evaluation.missingFields).toEqual([missingField]);
         unsub();
       });
 

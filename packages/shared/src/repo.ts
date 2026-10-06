@@ -12,6 +12,7 @@ import type {
   CriterionEvidence,
   Evaluation,
   EvaluationStatus,
+  MissingField,
   Run,
   RunFunnel,
   RunStatus,
@@ -52,6 +53,8 @@ export interface EvaluationDelta {
   /** Replaces the whole evidence list; it is written once, when the Posting is scored. */
   evidence?: CriterionEvidence[];
   scoredBy?: ScoredBy | null;
+  /** Replaces the whole list; written when a Posting is held as `needs_you` (D11). */
+  missingFields?: MissingField[];
 }
 
 /** Mirrors a Firestore collection change: how an Evaluation entered the stream. */
