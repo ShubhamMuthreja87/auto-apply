@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, waitFor, cleanup, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { App } from "./App";
@@ -84,11 +84,23 @@ describe("<App />", () => {
     expect(screen.getByText(/in-memory \(not persisted\)/i)).toBeInTheDocument();
   });
 
+  it.each([
+    ["/scanned", "Scanned jobs"],
+    ["/settings", "Settings"],
+  ])("routes %s to its built view, not the placeholder", (path, heading) => {
+    mockFetch(healthy());
+    renderAt(path);
+
+    expect(screen.getByRole("heading", { name: heading, level: 1 })).toBeInTheDocument();
+    expect(screen.queryByText("Not built yet")).not.toBeInTheDocument();
+  });
+
   it("shows an error state when the API responds with a failure", async () => {
     mockFetch(new Response("boom", { status: 500 }));
     renderAt("/settings");
 
-    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
-    expect(screen.getByRole("alert")).toHaveTextContent("500");
+    const footer = screen.getByRole("contentinfo");
+    await waitFor(() => expect(within(footer).getByRole("alert")).toBeInTheDocument());
+    expect(within(footer).getByRole("alert")).toHaveTextContent("500");
   });
 });

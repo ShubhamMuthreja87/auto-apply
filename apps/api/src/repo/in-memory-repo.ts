@@ -100,6 +100,13 @@ export class InMemoryRepo implements Repo {
     this.notifyRun(runId);
   }
 
+  async listRuns(uid: string): Promise<Run[]> {
+    return [...this.runs.values()]
+      .filter((run) => run.uid === uid)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map(clone);
+  }
+
   async putEvaluation(runId: string, evaluation: Evaluation): Promise<void> {
     const byKey = this.evaluations.get(runId) ?? new Map<string, Evaluation>();
     const type = byKey.has(evaluation.jobKey) ? "modified" : "added";
@@ -119,6 +126,18 @@ export class InMemoryRepo implements Repo {
     if (delta.scoredBy !== undefined) evaluation.scoredBy = delta.scoredBy;
     evaluation.updatedAt = new Date().toISOString();
     this.notifyEvaluation(runId, { type: "modified", evaluation });
+  }
+
+  async listEvaluations(runId: string): Promise<Evaluation[]> {
+    const byKey = this.evaluations.get(runId) ?? new Map<string, Evaluation>();
+    // Validated like the Firestore adapter's reads: a bad document rejects.
+    return [...byKey.values()]
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .map((evaluation) => {
+        const valid = validate(evaluationSchema, evaluation, `evaluation ${evaluation.jobKey}`);
+        if (valid instanceof Error) throw valid;
+        return valid;
+      });
   }
 
   async isSeen(jobKey: string): Promise<boolean> {

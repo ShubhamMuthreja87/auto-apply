@@ -1,7 +1,6 @@
 /**
- * A view whose ticket has not landed yet (Applied jobs: 11, Scanned jobs and
- * Settings: 12). It says so plainly instead of showing an empty list that looks
- * like real data.
+ * A view whose ticket has not landed yet (Applied jobs: 11). It says so plainly
+ * instead of showing an empty list that looks like real data.
  */
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";

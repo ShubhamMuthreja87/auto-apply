@@ -11,6 +11,7 @@ import type { Pipeline } from "./pipeline/pipeline.js";
 import { logger } from "./logger.js";
 import { runsRouter } from "./routes/runs.js";
 import { meRouter } from "./routes/me.js";
+import { scannedRouter } from "./routes/scanned.js";
 
 export interface AppOptions {
   /** Interval of the SSE heartbeat comment; 15 s by default (CLAUDE.md). */
@@ -51,6 +52,7 @@ export function createApp(
   });
 
   app.use(meRouter(persistence.repo));
+  app.use(scannedRouter(persistence.repo));
   app.use(runsRouter(persistence.repo, pipeline, options.heartbeatMs ?? 15_000));
 
   // Unknown routes get the shared JSON error shape, not Express's HTML default.

@@ -110,6 +110,14 @@ export class FirestoreRepo implements Repo {
     await this.runs().doc(runId).update(update);
   }
 
+  async listRuns(uid: string): Promise<Run[]> {
+    // Sorted in code, like `createRun`'s check: no composite index is needed.
+    const snap = await this.runsOf(uid).get();
+    return snap.docs
+      .map((doc) => parse(runSchema, doc))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
   async putEvaluation(runId: string, evaluation: Evaluation): Promise<void> {
     await this.jobs(runId).doc(evaluation.jobKey).set(evaluation);
   }
@@ -123,6 +131,11 @@ export class FirestoreRepo implements Repo {
     if (delta.evidence !== undefined) update.evidence = delta.evidence;
     if (delta.scoredBy !== undefined) update.scoredBy = delta.scoredBy;
     await this.jobs(runId).doc(jobKey).update(update);
+  }
+
+  async listEvaluations(runId: string): Promise<Evaluation[]> {
+    const snap = await this.jobs(runId).orderBy("createdAt").get();
+    return snap.docs.map((doc) => parse(evaluationSchema, doc));
   }
 
   async isSeen(jobKey: string): Promise<boolean> {

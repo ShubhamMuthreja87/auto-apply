@@ -7,6 +7,11 @@ import {
   activeRunResponseSchema,
   createRunResponseSchema,
   errorResponseSchema,
+  evaluationsListResponseSchema,
+  meResponseSchema,
+  runsListResponseSchema,
+  type Evaluation,
+  type MeResponse,
   type Run,
 } from "@auto-apply/shared";
 
@@ -46,6 +51,25 @@ export async function startRun(): Promise<string> {
 export async function getActiveRun(): Promise<Run | null> {
   const res = await fetch(`${API_URL}/api/runs/active`, { credentials: "include" });
   return activeRunResponseSchema.parse(await readJson(res)).run;
+}
+
+/** `GET /api/runs`: the user's Runs, newest first. */
+export async function listRuns(): Promise<Run[]> {
+  const res = await fetch(`${API_URL}/api/runs`, { credentials: "include" });
+  return runsListResponseSchema.parse(await readJson(res)).runs;
+}
+
+/** `GET /api/evaluations`: one Run's stored Evaluations, or every Run's when `runId` is null. */
+export async function listEvaluations(runId: string | null): Promise<Evaluation[]> {
+  const query = runId === null ? "" : `?runId=${encodeURIComponent(runId)}`;
+  const res = await fetch(`${API_URL}/api/evaluations${query}`, { credentials: "include" });
+  return evaluationsListResponseSchema.parse(await readJson(res)).evaluations;
+}
+
+/** `GET /api/me`: the user document (profile, preferences, settings). */
+export async function getMe(): Promise<MeResponse> {
+  const res = await fetch(`${API_URL}/api/me`, { credentials: "include" });
+  return meResponseSchema.parse(await readJson(res));
 }
 
 /** A caught error's message, for showing to the user. */

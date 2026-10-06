@@ -466,5 +466,53 @@ export function describeRepoContract(
         unsub();
       });
     });
+    describe("listing (Scanned jobs, ticket 12)", () => {
+      it("lists a user's runs newest first, and no other user's", async () => {
+        await repo.createRun(aRun({ status: "completed", createdAt: "2026-10-01T10:00:00.000Z" }));
+        await repo.createRun(
+          aRun({ runId: "run-2", status: "failed", createdAt: "2026-10-03T10:00:00.000Z" }),
+        );
+        await repo.createRun(aRun({ runId: "run-3", createdAt: "2026-10-02T10:00:00.000Z" }));
+        await repo.createRun(aRun({ runId: "run-9", uid: "user-2" }));
+
+        const runs = await repo.listRuns("user-1");
+
+        expect(runs.map((run) => run.runId)).toEqual(["run-2", "run-3", "run-1"]);
+        expect(await repo.listRuns("nobody")).toEqual([]);
+      });
+
+      it("lists a run's evaluations in the order they were added, with their latest state", async () => {
+        await repo.createRun(aRun());
+        await repo.createRun(aRun({ runId: "run-2", uid: "user-2" }));
+        await repo.putEvaluation(
+          "run-1",
+          anEvaluation(aPosting("1"), { createdAt: "2026-10-06T12:00:01.000Z" }),
+        );
+        await repo.putEvaluation(
+          "run-1",
+          anEvaluation(aPosting("2"), { createdAt: "2026-10-06T12:00:02.000Z" }),
+        );
+        await repo.putEvaluation("run-2", { ...anEvaluation(aPosting("9")), runId: "run-2" });
+        await repo.patchEvaluation("run-1", jobKey(aPosting("1")), {
+          status: "held",
+          verdict: "APPLY",
+          score: 6,
+          evidence: [evidenceItem],
+          scoredBy: "fallback",
+        });
+
+        const evaluations = await repo.listEvaluations("run-1");
+
+        expect(evaluations.map((e) => e.posting.jobId)).toEqual(["1", "2"]);
+        expect(evaluations[0]).toMatchObject({
+          status: "held",
+          verdict: "APPLY",
+          score: 6,
+          evidence: [evidenceItem],
+          scoredBy: "fallback",
+        });
+        expect(await repo.listEvaluations("unknown-run")).toEqual([]);
+      });
+    });
   });
 }
