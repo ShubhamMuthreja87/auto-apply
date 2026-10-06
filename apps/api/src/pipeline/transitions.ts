@@ -2,11 +2,11 @@
  * The one place that owns status transitions (D16; CODING_STANDARDS landmine:
  * status transitions). Each machine is a table of the moves it allows; every
  * Run and Evaluation status change in the API is checked here first and an
- * illegal move throws. Statuses only move forward. The single backward edge,
- * Retry on a simulated failure (failed → applying, D19), is added explicitly
- * with ticket 11.
+ * illegal move throws. Statuses only move forward, with one exception kept
+ * out of the forward table on purpose: Retry on a simulated failure
+ * (failed → applying, D19), checked by its own function.
  */
-import type { EvaluationStatus, RunStatus } from "@auto-apply/shared";
+import { FAILED_REASONS, type EvaluationStatus, type RunStatus } from "@auto-apply/shared";
 
 export class IllegalTransitionError extends Error {
   constructor(
@@ -49,4 +49,28 @@ export function assertRunTransition(from: RunStatus, to: RunStatus): void {
 
 export function assertEvaluationTransition(from: EvaluationStatus, to: EvaluationStatus): void {
   if (!evaluationMoves[from].includes(to)) throw new IllegalTransitionError("evaluation", from, to);
+}
+
+/**
+ * The single backward edge (D19): Retry moves an Evaluation that failed on
+ * purpose (`failed: simulated`) back to `applying`. Any other failure, or any
+ * other status, is not retryable.
+ */
+export const RETRY_EDGE = {
+  from: "failed",
+  reason: FAILED_REASONS.simulated,
+  to: "applying",
+} as const satisfies { from: EvaluationStatus; reason: string; to: EvaluationStatus };
+
+export function assertRetryTransition(from: {
+  status: EvaluationStatus;
+  reason: string | null;
+}): void {
+  if (from.status !== RETRY_EDGE.from || from.reason !== RETRY_EDGE.reason) {
+    throw new IllegalTransitionError(
+      "evaluation",
+      `${from.status}${from.reason ? ` (${from.reason})` : ""}`,
+      `${RETRY_EDGE.to} (retry)`,
+    );
+  }
 }

@@ -21,6 +21,8 @@ import { InMemoryRepo } from "./repo/in-memory-repo.js";
 import { buildPipeline, type Pipeline } from "./pipeline/pipeline.js";
 import { keywordMatcher } from "./evaluation/keyword-matcher.js";
 import { greenhouseForms } from "./forms/greenhouse-forms.js";
+import { simulatedSubmitter } from "./submit/simulated-submitter.js";
+import { authCookie, TEST_AUTH_ENV } from "./auth/test-auth.js";
 import { resolveFields } from "./forms/resolve.js";
 import type { FormField } from "./pipeline/ports.js";
 import { SEED_USER } from "./seed-user.js";
@@ -28,9 +30,11 @@ import { DEMO_UID, loadUser, seedUser } from "./user.js";
 
 const noPipeline: Pipeline = {
   startRun: () => Promise.reject(new Error("not used by this test")),
+  retrySubmit: () => Promise.reject(new Error("not used by this test")),
 };
 
 const testConfig: Config = loadConfig({
+  ...TEST_AUTH_ENV,
   NODE_ENV: "test",
   FIRESTORE_NAMESPACE: "test-local",
   REPO: "memory",
@@ -66,6 +70,7 @@ describe("PUT /api/me", () => {
 
     const res = await request(appWith(repo))
       .put("/api/me")
+      .set("Cookie", authCookie())
       .send(
         edits((body) => {
           body.profile.headline = "Staff Engineer";
@@ -81,14 +86,28 @@ describe("PUT /api/me", () => {
     expect(saved.preferences.excludedTitles.terms).toContain("Architect");
     expect(saved.settings.availability.noticePeriodDays).toBe(60);
 
-    const me = meResponseSchema.parse((await request(appWith(repo)).get("/api/me")).body);
+    const me = meResponseSchema.parse(
+      (await request(appWith(repo)).get("/api/me").set("Cookie", authCookie())).body,
+    );
     expect(me).toEqual(saved);
+  });
+
+  it("answers 401 without a session and stores nothing (D26)", async () => {
+    const repo = await seeded();
+
+    const res = await request(appWith(repo))
+      .put("/api/me")
+      .send(edits((body) => void (body.profile.headline = "Intruder")));
+
+    expect(res.status).toBe(401);
+    expect(await loadUser(repo, DEMO_UID)).toEqual({ uid: DEMO_UID, ...SEED_USER });
   });
 
   it("survives the next boot's seed: an edit is never overwritten (D13)", async () => {
     const repo = await seeded();
     await request(appWith(repo))
       .put("/api/me")
+      .set("Cookie", authCookie())
       .send(edits((body) => void (body.profile.headline = "Edited")));
 
     await seedUser(repo, DEMO_UID);
@@ -99,7 +118,10 @@ describe("PUT /api/me", () => {
   it("answers 404 and creates nothing when no user document exists", async () => {
     const repo = new InMemoryRepo();
 
-    const res = await request(appWith(repo)).put("/api/me").send(edits());
+    const res = await request(appWith(repo))
+      .put("/api/me")
+      .set("Cookie", authCookie())
+      .send(edits());
 
     expect(res.status).toBe(404);
     expect(errorResponseSchema.parse(res.body).error.code).toBe("user_not_found");
@@ -131,7 +153,10 @@ describe("PUT /api/me", () => {
   ])("rejects %s with 400 naming the field, and stores nothing", async (_case, edit, path) => {
     const repo = await seeded();
 
-    const res = await request(appWith(repo)).put("/api/me").send(edits(edit));
+    const res = await request(appWith(repo))
+      .put("/api/me")
+      .set("Cookie", authCookie())
+      .send(edits(edit));
 
     expect(res.status).toBe(400);
     const { error } = errorResponseSchema.parse(res.body);
@@ -144,6 +169,7 @@ describe("PUT /api/me", () => {
     const repo = await seeded();
     const res = await request(appWith(repo))
       .put("/api/me")
+      .set("Cookie", authCookie())
       .send(
         edits((body) => {
           (body.profile as { email: unknown }).email = { secret: "top-secret-value" };
@@ -159,12 +185,16 @@ describe("PUT /api/me", () => {
     const withSalary = edits() as UpdateMeRequest & { settings: Record<string, unknown> };
     withSalary.settings.compensation = { expectedLpa: 60 };
 
-    const ok = await request(appWith(repo)).put("/api/me").send(withSalary);
+    const ok = await request(appWith(repo))
+      .put("/api/me")
+      .set("Cookie", authCookie())
+      .send(withSalary);
     expect(ok.status).toBe(200);
     expect(JSON.stringify(await repo.getUser(DEMO_UID))).not.toMatch(/expectedLpa|60 LPA/);
 
     const floor = await request(appWith(repo))
       .put("/api/me")
+      .set("Cookie", authCookie())
       .send(
         edits((body) => {
           const rule = body.preferences.hardBlocks.find((r) => r.id === SALARY_FLOOR_RULE_ID);
@@ -180,7 +210,7 @@ describe("PUT /api/me", () => {
     const body = edits() as UpdateMeRequest & { settings: Record<string, unknown> };
     body.settings.alwaysUserOnly = [];
 
-    await request(appWith(repo)).put("/api/me").send(body);
+    await request(appWith(repo)).put("/api/me").set("Cookie", authCookie()).send(body);
 
     expect((await loadUser(repo, DEMO_UID)).settings.alwaysUserOnly).toEqual(
       SEED_USER.settings.alwaysUserOnly,
@@ -209,6 +239,7 @@ describe("edits drive the next Run and form fill", () => {
       discovery: { discover: async () => [{ ...acmeManager, jobId: String(++n) }] },
       evaluator: keywordMatcher,
       forms: greenhouseForms({ fetch, timeoutMs: 1_000, mode: "fixtures" }),
+      submitter: simulatedSubmitter({ clock: () => new Date(), delay: async () => {} }),
       clock: () => new Date(),
       delay: async () => {},
       newRunId: () => `run-${n}`,
@@ -234,6 +265,7 @@ describe("edits drive the next Run and form fill", () => {
 
     const res = await request(appWith(repo, pipeline))
       .put("/api/me")
+      .set("Cookie", authCookie())
       .send(
         edits((body) => {
           body.preferences.companyBlocks.categories[0]?.companies.push("Acme Robotics");
@@ -250,6 +282,7 @@ describe("edits drive the next Run and form fill", () => {
     const repo = await seeded();
     await request(appWith(repo))
       .put("/api/me")
+      .set("Cookie", authCookie())
       .send(
         edits((body) => {
           body.profile.email = "new@example.com";

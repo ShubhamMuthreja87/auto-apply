@@ -3,13 +3,14 @@ import { createApp } from "./app.js";
 import { logger } from "./logger.js";
 import { createRepo } from "./repo/create-repo.js";
 import { buildPipeline } from "./pipeline/pipeline.js";
-import { BOARDS } from "./discovery/boards.js";
+import { boardsFor } from "./discovery/boards.js";
 import { createDiscovery } from "./discovery/discovery.js";
 import { readBoardFixture } from "./discovery/fixtures.js";
 import { greenhouseJobSource } from "./discovery/greenhouse.js";
 import { createScoring } from "./ai/scoring.js";
 import { createFreeTextAnswerer } from "./ai/free-text-answerer.js";
 import { greenhouseForms } from "./forms/greenhouse-forms.js";
+import { simulatedSubmitter } from "./submit/simulated-submitter.js";
 import { recoverInterruptedRuns } from "./runs/recover-interrupted-runs.js";
 import { DEMO_UID, loadUser, seedUser } from "./user.js";
 
@@ -24,9 +25,12 @@ const repo = persistence.repo;
 await seedUser(repo, DEMO_UID);
 
 // The composition root: real network, clock and timers here, fakes in tests.
+const clock = () => new Date();
+const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const discovery = createDiscovery({
   sources: [greenhouseJobSource({ fetch, timeoutMs: 10_000 })],
-  boards: BOARDS,
+  // Fixtures mode adds the synthetic demo board; live never does.
+  boards: boardsFor(config.JOB_SOURCE),
   readFixture: readBoardFixture,
   mode: config.JOB_SOURCE,
 });
@@ -42,10 +46,12 @@ const pipeline = buildPipeline({
   forms: greenhouseForms({ fetch, timeoutMs: 10_000, mode: config.JOB_SOURCE }),
   // Without an AI key, required free text falls to the user (D24).
   answerer: scoring.chat ? createFreeTextAnswerer({ chat: scoring.chat }) : null,
+  // Builds and stores the real payload; never sends it (D18).
+  submitter: simulatedSubmitter({ clock, delay }),
   scoringMode: scoring.mode,
   screening: { salaryFloorLpa: config.SALARY_FLOOR_LPA },
-  clock: () => new Date(),
-  delay: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  clock,
+  delay,
   newRunId: () => crypto.randomUUID(),
   loadUser: (uid) => loadUser(repo, uid),
 });

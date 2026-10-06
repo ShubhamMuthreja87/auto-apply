@@ -1,9 +1,17 @@
 /**
  * The pipeline's outward-facing ports (CLAUDE.md, Flow 6). The pipeline depends
  * only on these and on the `Repo`; adapters and test fakes implement them, and
- * `buildPipeline` receives them. The submitter port joins with its ticket.
+ * `buildPipeline` receives them.
  */
-import type { Ats, FitCriterion, Posting, PostingSource, ScoredBy } from "@auto-apply/shared";
+import type {
+  Ats,
+  FitCriterion,
+  Posting,
+  PostingSource,
+  ScoredBy,
+  SimulatedSubmission,
+  SubmittedAnswer,
+} from "@auto-apply/shared";
 
 /** One public job board on one ATS, e.g. Greenhouse `stripe` (D2). */
 export interface BoardRef {
@@ -158,4 +166,37 @@ export interface FreeTextAnswer {
  */
 export interface FreeTextAnswerer {
   answer(request: FreeTextRequest): Promise<FreeTextAnswer[]>;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Simulated submission (D18, D19, ticket 11).
+ * -------------------------------------------------------------------------- */
+
+/** What a submit is built from: the Posting, its form, and every answered field. */
+export interface Application {
+  posting: Posting;
+  formUrl: string;
+  /** The fields that have an answer, in form order; unanswered optional fields are left out. */
+  answers: SubmittedAnswer[];
+  /** 1 for the first submit of this Evaluation, 2 after a Retry (D19). */
+  attempt: number;
+}
+
+/** The result of one simulated submit: the payload to store, and how the "send" went. */
+export interface SubmitResult {
+  /** `failed` only when asked to fail on purpose (D19). */
+  outcome: "submitted" | "failed";
+  submission: SimulatedSubmission;
+}
+
+/**
+ * Builds the real application payload with the ATS's own field ids, takes the
+ * time a send would take (injected `delay`), and returns the payload to store.
+ * It never sends anything: no POST, or any write, to an ATS or employer
+ * endpoint (D18). The pipeline owns the D19 rule and asks for the deliberate
+ * failure with `simulateFailure`; the payload is built either way, so a failed
+ * attempt can still be inspected.
+ */
+export interface ApplicationSubmitter {
+  submit(application: Application, options: { simulateFailure: boolean }): Promise<SubmitResult>;
 }

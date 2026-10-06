@@ -1,0 +1,24 @@
+{
+  "_synthetic": "SYNTHETIC DEMO FIXTURE - hand-made, not a recording of any real Greenhouse board. Used only when JOB_SOURCE=fixtures and by tests; never in the live board registry. See ../README-demo-synthetic.md.",
+  "jobs": [
+    {
+      "absolute_url": "https://boards.greenhouse.io/demo-synthetic/jobs/9000001",
+      "id": 9000001,
+      "internal_job_id": 9000001,
+      "title": "Engineering Manager, Platform (Demo)",
+      "company_name": "Demo Co (synthetic)",
+      "updated_at": "2026-10-06T09:00:00-04:00",
+      "first_published": "2026-10-06T09:00:00-04:00",
+      "location": {
+        "name": "Bengaluru, India"
+      },
+      "metadata": null,
+      "requisition_id": null,
+      "language": "en",
+      "content": "&lt;p&gt;Demo Co (synthetic) is a fast-growing startup. This posting is made up for the auto-apply demo.&lt;/p&gt;&lt;p&gt;You will lead a hands-on team building real-time pipelines in TypeScript and Node, with LLM features across the product.&lt;/p&gt;"
+    }
+  ],
+  "meta": {
+    "total": 1
+  }
+}

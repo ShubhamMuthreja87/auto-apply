@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { postingSchema } from "@auto-apply/shared";
-import { BOARDS } from "./boards.js";
+import { BOARDS, DEMO_BOARD, boardsFor } from "./boards.js";
 import { greenhouseJobSource } from "./greenhouse.js";
 import { readBoardFixture } from "./fixtures.js";
 import { recordedFetch } from "./recorded-fetch.js";
@@ -87,6 +87,22 @@ describe("board registry and fixtures", () => {
     expect(BOARDS.length).toBe(15);
     expect(BOARDS.every((b) => b.ats === "greenhouse")).toBe(true);
     expect(BOARDS.map((b) => b.board)).toEqual(expect.arrayContaining(["stripe", "anthropic"]));
+  });
+
+  it("keeps the synthetic demo board out of live Runs, and adds it in fixtures mode only", () => {
+    expect(BOARDS.some((b) => b.board.startsWith("demo-"))).toBe(false);
+    expect(boardsFor("live")).toEqual(BOARDS);
+    expect(boardsFor("fixtures")).toEqual([...BOARDS, DEMO_BOARD]);
+  });
+
+  it("reads the demo board as one clearly synthetic Posting", async () => {
+    const postings = await readBoardFixture(DEMO_BOARD, "fixture");
+    expect(postings).toHaveLength(1);
+    expect(postings[0]).toMatchObject({
+      board: "demo-synthetic",
+      company: "Demo Co (synthetic)",
+      source: "fixture",
+    });
   });
 
   it.each(BOARDS.map((b) => [b.board, b] as const))(

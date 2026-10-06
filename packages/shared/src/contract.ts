@@ -80,6 +80,25 @@ export const healthResponseSchema = z.object({
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
 
 /* -------------------------------------------------------------------------- *
+ * Auth (D26, ticket 15). One user, no signup; the session is a JWT in an
+ * httpOnly cookie the browser never reads, so no payload carries the token.
+ * -------------------------------------------------------------------------- */
+
+/** `POST /api/login` body. Bounded so a huge password never reaches bcrypt. */
+export const loginRequestSchema = z.object({
+  username: z.string().min(1).max(200),
+  password: z.string().min(1).max(200),
+});
+export type LoginRequest = z.infer<typeof loginRequestSchema>;
+
+/**
+ * `POST /api/login` (success) and `GET /api/session`: the cookie is valid.
+ * Deliberately PII-free; an unauthenticated caller gets `401` instead.
+ */
+export const sessionResponseSchema = z.object({ authenticated: z.literal(true) });
+export type SessionResponse = z.infer<typeof sessionResponseSchema>;
+
+/* -------------------------------------------------------------------------- *
  * Firestore documents (D14) and the identities built from them.
  *
  * These shapes travel to the browser over SSE as run and evaluation snapshots
@@ -541,9 +560,77 @@ export const missingFieldSchema = z.object({
 export type MissingField = z.infer<typeof missingFieldSchema>;
 
 /**
+ * Fixed `reason`s of a `failed` Evaluation that the UI recognises: `simulated`
+ * — the deliberate failure of a Run's first submit (D19), which Retry clears.
+ * Other failures carry a free-text reason.
+ */
+export const FAILED_REASONS = {
+  simulated: "simulated",
+} as const;
+export type FailedReason = (typeof FAILED_REASONS)[keyof typeof FAILED_REASONS];
+
+/** A value in a built Greenhouse payload: text, an option's value, or a multi-select's values. */
+export const payloadValueSchema = z.union([
+  z.string(),
+  z.number(),
+  z.array(z.union([z.string(), z.number()])),
+]);
+export type PayloadValue = z.infer<typeof payloadValueSchema>;
+
+/** The normalised type of an application-form field (spec, Greenhouse form merge). */
+export const formFieldTypeSchema = z.enum([
+  "text",
+  "textarea",
+  "select",
+  "multiselect",
+  "file",
+  "boolean",
+]);
+export type FormFieldTypeName = z.infer<typeof formFieldTypeSchema>;
+
+/** One choice of a select field; `value` is what the ATS expects back in the payload. */
+export const formOptionSchema = z.object({
+  label: z.string(),
+  value: z.union([z.string(), z.number()]),
+});
+
+/**
+ * One answered form field behind a submission (D9): the ATS's field id, its
+ * label and type, which source answered it, and the answer — text, or the
+ * chosen options of a select. "View payload" shows these, and Retry rebuilds
+ * the payload from them (D19).
+ */
+export const submittedAnswerSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  type: formFieldTypeSchema,
+  source: z.enum(["profile", "settings", "ai"]),
+  value: z.union([z.string(), z.array(formOptionSchema)]),
+});
+export type SubmittedAnswer = z.infer<typeof submittedAnswerSchema>;
+
+/**
+ * A simulated application (D18): the real Greenhouse payload, keyed by the
+ * form's own field ids, built and stored but never sent — `sent` is always
+ * `false`. `endpoint` names where a real submit would go; nothing calls it.
+ * `attempt` counts submits of this Evaluation (2 after a Retry, D19).
+ */
+export const simulatedSubmissionSchema = z.object({
+  ats: atsSchema,
+  endpoint: z.string().url(),
+  method: z.literal("POST"),
+  sent: z.literal(false),
+  formUrl: z.string().url(),
+  payload: z.record(z.string(), payloadValueSchema),
+  answers: z.array(submittedAnswerSchema),
+  attempt: z.number().int().positive(),
+  builtAt: z.string(),
+});
+export type SimulatedSubmission = z.infer<typeof simulatedSubmissionSchema>;
+
+/**
  * The per-run record of what we decided about one Posting (GLOSSARY:
- * Evaluation), stored as one document under its Run. The built Greenhouse
- * payload is added by the submit ticket.
+ * Evaluation), stored as one document under its Run.
  */
 export const evaluationSchema = z.object({
   jobKey: z.string(),
@@ -559,6 +646,8 @@ export const evaluationSchema = z.object({
   scoredBy: scoredBySchema.nullable().default(null),
   /** The required form fields the user must answer when `held: needs_you` (D11); else empty. */
   missingFields: z.array(missingFieldSchema).default([]),
+  /** The built, never-sent payload once a submit was attempted (D18); else `null`. */
+  submission: simulatedSubmissionSchema.nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -608,6 +697,13 @@ export const snapshotEventSchema = z.object({
   evaluations: z.array(evaluationSchema),
 });
 export type SnapshotEvent = z.infer<typeof snapshotEventSchema>;
+
+/**
+ * `POST /api/runs/:runId/jobs/:jobKey/retry` → `200`: Retry of a simulated
+ * failure (D19) succeeded; the Evaluation is now `submitted`, with its payload.
+ */
+export const retrySubmitResponseSchema = z.object({ evaluation: evaluationSchema });
+export type RetrySubmitResponse = z.infer<typeof retrySubmitResponseSchema>;
 
 /** The latest Run document. */
 export const runEventSchema = runSchema;

@@ -8,31 +8,39 @@ import { ThemeProvider } from "@mui/material/styles";
 import { theme } from "./theme";
 import { AppShell } from "./shell/AppShell";
 import { RunPanel } from "./run/RunPanel";
-import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { AppliedJobsPage } from "./pages/AppliedJobsPage";
 import { ScannedJobsPage } from "./pages/ScannedJobsPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { LoginPage } from "./pages/LoginPage";
+import { AuthProvider } from "./auth/AuthProvider";
+import { RequireAuth } from "./auth/RequireAuth";
 
+/**
+ * Login is the only page outside the gate (D26); every other path goes
+ * through `RequireAuth` to the shell and its views.
+ */
 export function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <AppShell>
+      <AuthProvider>
         <Routes>
-          <Route path="/" element={<RunPanel />} />
-          <Route
-            path="/applied"
-            element={
-              <PlaceholderPage
-                title="Applied jobs"
-                description="Each simulated submission and the payload built for it will be listed here."
-              />
-            }
-          />
-          <Route path="/scanned" element={<ScannedJobsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="*" element={<RequireAuth>{shell}</RequireAuth>} />
         </Routes>
-      </AppShell>
+      </AuthProvider>
     </ThemeProvider>
   );
 }
+
+const shell = (
+  <AppShell>
+    <Routes>
+      <Route path="/" element={<RunPanel />} />
+      <Route path="/applied" element={<AppliedJobsPage />} />
+      <Route path="/scanned" element={<ScannedJobsPage />} />
+      <Route path="/settings" element={<SettingsPage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  </AppShell>
+);

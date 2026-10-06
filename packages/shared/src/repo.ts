@@ -17,6 +17,7 @@ import type {
   RunFunnel,
   RunStatus,
   ScoredBy,
+  SimulatedSubmission,
   UserDoc,
   Verdict,
 } from "./contract.js";
@@ -34,7 +35,8 @@ export type SubscriptionErrorHandler = (error: Error) => void;
 
 /**
  * A forward-only patch to a Run. `funnelIncrements` are *added* to the current
- * counts — never an overwrite — so the Firestore adapter can map them to
+ * counts — never an overwrite; a negative one moves a count, as Retry moves a
+ * job from `failed` to `submitted` (D19) — so the Firestore adapter can map them to
  * `FieldValue.increment` (CODING_STANDARDS landmine: lost updates). `updatedAt`
  * is set by the adapter, not the caller.
  */
@@ -55,6 +57,8 @@ export interface EvaluationDelta {
   scoredBy?: ScoredBy | null;
   /** Replaces the whole list; written when a Posting is held as `needs_you` (D11). */
   missingFields?: MissingField[];
+  /** Replaces the stored simulated submission (D18); written on every submit attempt. */
+  submission?: SimulatedSubmission | null;
 }
 
 /** The editable parts of the user document; the uid is never rewritten. */

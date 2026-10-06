@@ -8,6 +8,7 @@ import {
 import {
   IllegalTransitionError,
   assertEvaluationTransition,
+  assertRetryTransition,
   assertRunTransition,
 } from "./transitions.js";
 
@@ -21,7 +22,7 @@ const legalRunMoves: ReadonlyArray<[RunStatus, RunStatus]> = [
   ["applying", "failed"],
 ];
 
-/** Every legal Evaluation move (D16). Retry (failed → applying) arrives with ticket 11. */
+/** Every legal forward Evaluation move (D16). Retry is its own, explicit edge (below). */
 const legalEvaluationMoves: ReadonlyArray<[EvaluationStatus, EvaluationStatus]> = [
   ["queued", "evaluating"],
   ["evaluating", "blocked"],
@@ -70,5 +71,25 @@ describe("Evaluation transitions", () => {
     expect(() => assertEvaluationTransition("skipped", "evaluating")).toThrow(
       "illegal evaluation transition: skipped → evaluating",
     );
+  });
+});
+
+describe("Retry: the one backward edge (D19)", () => {
+  it("allows failed → applying only for a simulated failure", () => {
+    expect(() => assertRetryTransition({ status: "failed", reason: "simulated" })).not.toThrow();
+  });
+
+  it("is not a forward move: the ordinary check still rejects failed → applying", () => {
+    expect(() => assertEvaluationTransition("failed", "applying")).toThrow(IllegalTransitionError);
+  });
+
+  it.each([
+    { status: "failed", reason: "Application form unavailable" },
+    { status: "failed", reason: null },
+    { status: "submitted", reason: null },
+    { status: "held", reason: "simulated" },
+    { status: "applying", reason: null },
+  ] as const)("rejects retrying $status ($reason)", (from) => {
+    expect(() => assertRetryTransition(from)).toThrow(IllegalTransitionError);
   });
 });
