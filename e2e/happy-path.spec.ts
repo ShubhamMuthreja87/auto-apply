@@ -57,7 +57,13 @@ test("auto-apply: live run, simulated failure, Retry, submitted (simulated)", as
   await expect(appliedRow).toContainText("Simulated failure (demo)");
   await appliedRow.getByRole("button", { name: "Retry" }).click();
 
-  // 6. Submitted (simulated), and nothing left to retry.
+  // 6. Retry shows the payload (D19), built and never sent.
+  const payload = page.getByRole("dialog");
+  await expect(payload).toContainText(DEMO_COMPANY);
+  await expect(payload).toContainText("Not sent");
+  await payload.getByRole("button", { name: "Close" }).click();
+
+  // 7. Submitted (simulated), and nothing left to retry.
   await expect(appliedRow).toContainText("Submitted (simulated)");
   await expect(appliedRow.getByTestId("status-chip")).toHaveAttribute("data-status", "submitted");
   await expect(appliedRow).toContainText("attempt 2");
