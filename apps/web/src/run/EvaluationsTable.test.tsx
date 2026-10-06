@@ -28,6 +28,7 @@ function anEvaluation(overrides: Partial<Evaluation>): Evaluation {
     evidence: [],
     scoredBy: null,
     missingFields: [],
+    submission: null,
     createdAt: "2026-10-06T12:00:00.000Z",
     updatedAt: "2026-10-06T12:00:00.000Z",
     ...overrides,

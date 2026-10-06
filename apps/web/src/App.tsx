@@ -8,7 +8,7 @@ import { ThemeProvider } from "@mui/material/styles";
 import { theme } from "./theme";
 import { AppShell } from "./shell/AppShell";
 import { RunPanel } from "./run/RunPanel";
-import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { AppliedJobsPage } from "./pages/AppliedJobsPage";
 import { ScannedJobsPage } from "./pages/ScannedJobsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 
@@ -19,15 +19,7 @@ export function App() {
       <AppShell>
         <Routes>
           <Route path="/" element={<RunPanel />} />
-          <Route
-            path="/applied"
-            element={
-              <PlaceholderPage
-                title="Applied jobs"
-                description="Each simulated submission and the payload built for it will be listed here."
-              />
-            }
-          />
+          <Route path="/applied" element={<AppliedJobsPage />} />
           <Route path="/scanned" element={<ScannedJobsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

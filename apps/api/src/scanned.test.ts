@@ -22,6 +22,7 @@ import { DEMO_UID } from "./user.js";
 
 const noPipeline: Pipeline = {
   startRun: () => Promise.reject(new Error("not used by these tests")),
+  retrySubmit: () => Promise.reject(new Error("not used by these tests")),
 };
 
 const testConfig: Config = loadConfig({
@@ -82,6 +83,7 @@ function anEvaluation(
     evidence: [],
     scoredBy: null,
     missingFields: [],
+    submission: null,
     createdAt: "2026-10-06T12:00:00.000Z",
     updatedAt: "2026-10-06T12:00:00.000Z",
     ...overrides,

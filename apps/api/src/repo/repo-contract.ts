@@ -28,6 +28,7 @@ import {
   type Run,
   type RunStatus,
   type EvaluationStatus,
+  type SimulatedSubmission,
   type UserDoc,
 } from "@auto-apply/shared";
 
@@ -114,6 +115,26 @@ const missingField: MissingField = {
   why: "Legal agreement; never auto-answered (D10)",
 };
 
+const submission: SimulatedSubmission = {
+  ats: "greenhouse",
+  endpoint: "https://boards-api.greenhouse.io/v1/boards/acme/jobs/1",
+  method: "POST",
+  sent: false,
+  formUrl: "https://job-boards.greenhouse.io/acme/jobs/1",
+  payload: { first_name: "Ada", question_7: 0, "question_8[]": [101, 102] },
+  answers: [
+    {
+      id: "question_7",
+      label: "Sponsorship?",
+      type: "select",
+      source: "settings",
+      value: [{ label: "No", value: 0 }],
+    },
+  ],
+  attempt: 1,
+  builtAt: "2026-10-06T12:00:00.000Z",
+};
+
 function anEvaluation(posting: Posting, overrides: Partial<Evaluation> = {}): Evaluation {
   const now = new Date().toISOString();
   return {
@@ -127,6 +148,7 @@ function anEvaluation(posting: Posting, overrides: Partial<Evaluation> = {}): Ev
     evidence: [],
     scoredBy: null,
     missingFields: [],
+    submission: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -405,6 +427,7 @@ export function describeRepoContract(
           evidence: [evidenceItem],
           scoredBy: "fallback",
           missingFields: [missingField],
+          submission,
         });
         await eventually(() => expect(changes.at(-1)?.evaluation.status).toBe("submitted"));
         // The first delivery introduces the document; every later one modifies it.
@@ -419,6 +442,7 @@ export function describeRepoContract(
         expect(changes.at(-1)?.evaluation.evidence).toEqual([evidenceItem]);
         expect(changes.at(-1)?.evaluation.scoredBy).toBe("fallback");
         expect(changes.at(-1)?.evaluation.missingFields).toEqual([missingField]);
+        expect(changes.at(-1)?.evaluation.submission).toEqual(submission);
         unsub();
       });
 

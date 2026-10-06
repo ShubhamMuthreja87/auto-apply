@@ -23,12 +23,19 @@
  *   5. Form fill (D5, D9–D12, `forms/fill-form.ts`): the Greenhouse form is
  *      read and merged and every field resolved. A required field left
  *      unanswered → `held: needs_you` with the fields listed (D11). A
- *      complete form waits for the simulated submit (ticket 11) as `held`
- *      with {@link FORM_READY_REASON}.
+ *      complete form moves the Posting to `applying`.
+ *   6. Simulated submit (D18, D19), in the Run's `applying` stage, one
+ *      Posting at a time in discovery order: the `ApplicationSubmitter`
+ *      builds the real payload from the answered fields and the pipeline
+ *      stores it, never sending it. The Run's first submit fails on purpose
+ *      (`failed: simulated`); {@link Pipeline.retrySubmit} is the Retry that
+ *      then succeeds (`submitted`).
  *
- * Every status change goes through the transition table (`transitions.ts`).
+ * Every status change goes through the transition table (`transitions.ts`);
+ * Retry is its one explicit backward edge.
  */
 import {
+  FAILED_REASONS,
   MAX_AI_EVALS,
   MAX_IN_FLIGHT,
   HELD_REASONS,
@@ -36,6 +43,7 @@ import {
   emptyFunnel,
   jobKey,
   type CriterionEvidence,
+  type Evaluation,
   type EvaluationDelta,
   type EvaluationStatus,
   type Posting,
@@ -44,15 +52,28 @@ import {
   type RunFunnel,
   type RunStatus,
   type ScoredBy,
+  type SubmittedAnswer,
   type User,
 } from "@auto-apply/shared";
 import { aiCriteria, buildRubric, judgeInCode } from "../evaluation/rubric.js";
 import { scoreJudgements } from "../evaluation/score.js";
 import { screenPosting, type ScreeningOptions } from "../evaluation/screen.js";
 import { fillForm } from "../forms/fill-form.js";
+import type { FieldResolution } from "../forms/resolve.js";
 import { logger } from "../logger.js";
-import type { Discovery, FreeTextAnswerer, GreenhouseForms, JobEvaluator } from "./ports.js";
-import { assertEvaluationTransition, assertRunTransition } from "./transitions.js";
+import type {
+  Application,
+  ApplicationSubmitter,
+  Discovery,
+  FreeTextAnswerer,
+  GreenhouseForms,
+  JobEvaluator,
+} from "./ports.js";
+import {
+  assertEvaluationTransition,
+  assertRetryTransition,
+  assertRunTransition,
+} from "./transitions.js";
 
 export interface PipelineDeps {
   repo: Repo;
@@ -65,6 +86,8 @@ export interface PipelineDeps {
    * is configured, so free text falls to the user (D24).
    */
   answerer?: FreeTextAnswerer | null;
+  /** Builds and stores the payload of a complete form; never sends it (D18). */
+  submitter: ApplicationSubmitter;
   /**
    * How Runs score, recorded on each Run so the UI can say so (D24):
    * `fallback` when no AI key is configured and `evaluator` is the keyword
@@ -102,17 +125,52 @@ export interface Pipeline {
    * active Run (D17).
    */
   startRun(uid: string): Promise<StartedRun>;
+  /**
+   * Retry (D19): resubmits an Evaluation that failed on purpose, rebuilding
+   * its payload from the stored answers, and resolves with it `submitted`.
+   * Rejects with {@link EvaluationNotFoundError} for an unknown Run or job, and
+   * with `IllegalTransitionError` for anything but `failed: simulated` —
+   * including a second Retry already under way.
+   */
+  retrySubmit(runId: string, jobKey: string): Promise<Evaluation>;
+}
+
+export class EvaluationNotFoundError extends Error {
+  constructor(
+    readonly runId: string,
+    readonly jobKey: string,
+  ) {
+    super(`no evaluation ${jobKey} in run ${runId}`);
+    this.name = "EvaluationNotFoundError";
+  }
 }
 
 /** Pause per stage and per Posting, so a demo can watch the statuses move. */
 const STEP_MS = 500;
 
-/**
- * Interim outcome of an APPLY NOW Posting whose form is fully resolved, until
- * the simulated submit (ticket 11) lands: held, so nothing looks submitted.
- * Ticket 11 replaces it with `applying → submitted (simulated) | failed`.
- */
-export const FORM_READY_REASON = "Form complete; simulated submit is not built yet";
+/** An APPLY NOW Posting with a complete form, waiting for the Run's `applying` stage. */
+interface ReadyApplication {
+  key: string;
+  /** Its place in discovery order, so submits (and so D19's first one) are deterministic. */
+  order: number;
+  application: Application;
+}
+
+/** The answered fields of a filled form, as stored with its submission. */
+function answersOf(resolutions: readonly FieldResolution[]): SubmittedAnswer[] {
+  return resolutions.flatMap((r): SubmittedAnswer[] => {
+    if (r.source === "user" || r.value === undefined || r.value.length === 0) return [];
+    return [
+      {
+        id: r.field.id,
+        label: r.field.label,
+        type: r.field.type,
+        source: r.source,
+        value: r.value,
+      },
+    ];
+  });
+}
 
 /** EM framing for manager titles, Staff for IC titles (D12), from the code-judged title tier. */
 function framingFor(user: User, evidence: readonly CriterionEvidence[]): "EM" | "Staff" {
@@ -131,6 +189,7 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
     evaluator,
     forms,
     answerer = null,
+    submitter,
     scoringMode,
     screening = {},
     clock,
@@ -167,11 +226,93 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
     await repo.patchRun(runId, { funnelIncrements: { discovered: postings.length } });
 
     await run.move("evaluating");
-    await evaluateAll(runId, user, postings);
+    const ready = await evaluateAll(runId, user, postings);
 
     await run.move("applying");
     await delay(STEP_MS);
+    await submitAll(runId, ready);
     await run.move("completed");
+  }
+
+  /**
+   * The `applying` stage: every complete form is submitted (simulated), one
+   * at a time in discovery order. The Run's first submit fails on purpose
+   * (D19) so the demo shows failure and Retry.
+   */
+  async function submitAll(runId: string, ready: ReadyApplication[]): Promise<void> {
+    const inOrder = [...ready].sort((a, b) => a.order - b.order);
+    for (const [index, { key, application }] of inOrder.entries()) {
+      await submitOne(runId, key, application, { simulateFailure: index === 0 });
+    }
+  }
+
+  /**
+   * One simulated submit of an Evaluation already `applying`: store the
+   * built payload and record the outcome. A submitter error fails only this
+   * Evaluation, with its reason.
+   */
+  async function submitOne(
+    runId: string,
+    key: string,
+    application: Application,
+    options: { simulateFailure: boolean },
+  ): Promise<void> {
+    let to: EvaluationStatus;
+    let delta: EvaluationDelta;
+    try {
+      const { outcome, submission } = await submitter.submit(application, options);
+      to = outcome;
+      delta = { submission, reason: outcome === "failed" ? FAILED_REASONS.simulated : null };
+    } catch (err) {
+      to = "failed";
+      delta = { reason: messageOf(err) };
+      logger.error("submit_failed", { runId, jobKey: key, reason: delta.reason });
+    }
+    assertEvaluationTransition("applying", to);
+    await repo.patchEvaluation(runId, key, { ...delta, status: to });
+    await repo.patchRun(runId, {
+      funnelIncrements: { [to === "submitted" ? "submitted" : "failed"]: 1 },
+    });
+    logger.info("application_submitted_simulated", {
+      runId,
+      jobKey: key,
+      outcome: to,
+      attempt: application.attempt,
+    });
+  }
+
+  /** Retries in progress, so a double click cannot resubmit twice. */
+  const retrying = new Set<string>();
+
+  async function retrySubmit(runId: string, key: string): Promise<Evaluation> {
+    const lock = `${runId}/${key}`;
+    const evaluation = (await repo.listEvaluations(runId)).find((e) => e.jobKey === key);
+    if (!evaluation) throw new EvaluationNotFoundError(runId, key);
+    // A Retry already under way has the Evaluation in `applying`: not retryable.
+    assertRetryTransition(retrying.has(lock) ? { status: "applying", reason: null } : evaluation);
+    const stored = evaluation.submission;
+    if (!stored) throw new Error(`No stored submission to retry for ${key}`);
+    retrying.add(lock);
+    try {
+      await repo.patchEvaluation(runId, key, { status: "applying", reason: null });
+      await repo.patchRun(runId, { funnelIncrements: { failed: -1 } });
+      await submitOne(
+        runId,
+        key,
+        {
+          posting: evaluation.posting,
+          formUrl: stored.formUrl,
+          answers: stored.answers,
+          attempt: stored.attempt + 1,
+        },
+        { simulateFailure: false },
+      );
+    } finally {
+      retrying.delete(lock);
+    }
+    const after = (await repo.listEvaluations(runId)).find((e) => e.jobKey === key);
+    if (!after) throw new EvaluationNotFoundError(runId, key);
+    return after;
   }
 
   /**
@@ -179,7 +320,12 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
    * none are left or every AI-evaluation slot is taken. Slots are counted
    * synchronously, so the cap holds however the workers interleave.
    */
-  async function evaluateAll(runId: string, user: User, postings: readonly Posting[]) {
+  async function evaluateAll(
+    runId: string,
+    user: User,
+    postings: readonly Posting[],
+  ): Promise<ReadyApplication[]> {
+    const ready: ReadyApplication[] = [];
     let next = 0;
     let slotsTaken = 0;
     const slots = {
@@ -189,12 +335,18 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
         return true;
       },
     };
-    const pull = (): Posting | undefined =>
-      slotsTaken < MAX_AI_EVALS && next < postings.length ? postings[next++] : undefined;
+    const pull = (): { posting: Posting; order: number } | undefined => {
+      if (slotsTaken >= MAX_AI_EVALS || next >= postings.length) return undefined;
+      const order = next++;
+      const posting = postings[order];
+      return posting ? { posting, order } : undefined;
+    };
 
     async function worker(): Promise<void> {
-      for (let posting = pull(); posting; posting = pull()) {
-        await evaluateOne(runId, user, posting, slots);
+      for (let item = pull(); item; item = pull()) {
+        const { posting, order } = item;
+        const application = await evaluateOne(runId, user, posting, slots);
+        if (application) ready.push({ key: jobKey(posting), order, application });
       }
     }
     await Promise.all(Array.from({ length: MAX_IN_FLIGHT }, worker));
@@ -203,15 +355,21 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
       discovered: postings.length,
       pulled: next,
       aiEvaluations: slotsTaken,
+      readyToSubmit: ready.length,
     });
+    return ready;
   }
 
+  /**
+   * Takes one Posting to its outcome, or to `applying` with a complete form:
+   * then it returns the application for the Run's `applying` stage.
+   */
   async function evaluateOne(
     runId: string,
     user: User,
     posting: Posting,
     slots: { take(): boolean },
-  ): Promise<void> {
+  ): Promise<Application | null> {
     const key = jobKey(posting);
     const current: { status: EvaluationStatus } = { status: "queued" };
     async function move(to: EvaluationStatus, delta: EvaluationDelta = {}) {
@@ -225,12 +383,13 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
       counted: keyof RunFunnel,
       options: { markSeen: boolean; evaluated?: boolean },
       outcome: EvaluationDelta = {},
-    ) {
+    ): Promise<null> {
       await move(to, { ...outcome, reason });
       if (options.markSeen) await repo.markSeen(key);
       await repo.patchRun(runId, {
         funnelIncrements: { [counted]: 1, ...(options.evaluated ? { evaluated: 1 } : {}) },
       });
+      return null;
     }
 
     await recordQueued(runId, posting);
@@ -301,24 +460,34 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
           missing: fill.missing.length,
         });
         if (fill.missing.length > 0) {
-          await finish("held", HELD_REASONS.needsYou, "held", scoredOptions, {
+          return await finish("held", HELD_REASONS.needsYou, "held", scoredOptions, {
             missingFields: fill.missing,
           });
-        } else {
-          await finish("held", FORM_READY_REASON, "held", scoredOptions);
         }
-      } else if (scored.verdict === "APPLY") {
-        await finish("held", HELD_REASONS.belowAutoThreshold, "held", scoredOptions, outcome);
-      } else {
-        await finish("skipped", SKIP_REASONS.stretch, "skipped", scoredOptions, outcome);
+        // Complete: it waits as `applying` for the Run's submit stage, which
+        // counts it submitted or failed.
+        await move("applying", { reason: null });
+        await repo.markSeen(key);
+        await repo.patchRun(runId, { funnelIncrements: { evaluated: 1 } });
+        return { posting, formUrl: fill.formUrl, answers: answersOf(fill.resolutions), attempt: 1 };
       }
+      if (scored.verdict === "APPLY") {
+        return await finish(
+          "held",
+          HELD_REASONS.belowAutoThreshold,
+          "held",
+          scoredOptions,
+          outcome,
+        );
+      }
+      return await finish("skipped", SKIP_REASONS.stretch, "skipped", scoredOptions, outcome);
     } catch (err) {
       // One Posting's failure never fails the Run (CODING_STANDARDS: never
       // swallow errors — it becomes a `failed` Evaluation with its reason).
       if (current.status !== "evaluating") throw err;
       const reason = messageOf(err);
       logger.error("posting_failed", { runId, jobKey: key, reason });
-      await finish("failed", reason, "failed", { markSeen: false });
+      return await finish("failed", reason, "failed", { markSeen: false });
     }
   }
 
@@ -336,6 +505,7 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
       evidence: [],
       scoredBy: null,
       missingFields: [],
+      submission: null,
       createdAt: now,
       updatedAt: now,
     });
@@ -372,5 +542,6 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
       );
       return { runId: created.runId, finished };
     },
+    retrySubmit,
   };
 }

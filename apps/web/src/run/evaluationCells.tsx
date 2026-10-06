@@ -6,6 +6,7 @@ import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
 import Typography from "@mui/material/Typography";
 import {
+  FAILED_REASONS,
   HELD_REASONS,
   MAX_AI_EVALS,
   SKIP_REASONS,
@@ -74,6 +75,9 @@ const fixedReasonText: Partial<Record<Evaluation["status"], Record<string, strin
   held: {
     [HELD_REASONS.belowAutoThreshold]: "Good match, below the auto-apply threshold",
     [HELD_REASONS.needsYou]: "Needs your answers",
+  },
+  failed: {
+    [FAILED_REASONS.simulated]: "Simulated failure (demo)",
   },
 };
 

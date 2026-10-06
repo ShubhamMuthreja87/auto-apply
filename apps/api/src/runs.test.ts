@@ -12,10 +12,13 @@ import {
   activeRunResponseSchema,
   createRunResponseSchema,
   doneEventSchema,
+  emptyFunnel,
   errorResponseSchema,
   evalEventSchema,
+  retrySubmitResponseSchema,
   runEventSchema,
   snapshotEventSchema,
+  type Evaluation,
   type EvaluationChange,
   type Posting,
   type Run,
@@ -29,6 +32,8 @@ import type { Discovery } from "./pipeline/ports.js";
 import { SEED_USER } from "./seed-user.js";
 import { keywordMatcher } from "./evaluation/keyword-matcher.js";
 import { greenhouseForms } from "./forms/greenhouse-forms.js";
+import { simulatedSubmitter } from "./submit/simulated-submitter.js";
+import { DEMO_UID } from "./user.js";
 
 const testConfig: Config = loadConfig({
   NODE_ENV: "test",
@@ -112,6 +117,7 @@ function harness(heartbeatMs = 15_000) {
     discovery: twoPostings,
     evaluator: keywordMatcher,
     forms: greenhouseForms({ fetch, timeoutMs: 1_000, mode: "fixtures" }),
+    submitter: simulatedSubmitter({ clock: () => new Date(), delay: () => gate }),
     clock: () => new Date(),
     delay: () => gate,
     newRunId: () => `run-${++n}`,
@@ -370,5 +376,99 @@ describe("GET /api/runs/:runId/events", () => {
     stream.close();
 
     await vi.waitFor(() => expect(repo.live).toBe(0));
+  });
+});
+
+describe("POST /api/runs/:runId/jobs/:jobKey/retry (D19)", () => {
+  const key = "greenhouse:acme:1";
+
+  /** A finished Run whose one job failed its first submit on purpose. */
+  async function withSimulatedFailure(overrides: Partial<Evaluation> = {}) {
+    const h = harness();
+    h.openGate();
+    const now = "2026-10-06T12:00:00.000Z";
+    await h.repo.createRun({
+      runId: "run-x",
+      uid: DEMO_UID,
+      status: "completed",
+      funnel: { ...emptyFunnel(), discovered: 1, evaluated: 1, failed: 1 },
+      reason: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await h.repo.putEvaluation("run-x", {
+      jobKey: key,
+      runId: "run-x",
+      posting: aPosting("1"),
+      status: "failed",
+      verdict: "APPLY_NOW",
+      score: 8,
+      reason: "simulated",
+      evidence: [],
+      scoredBy: "fallback",
+      missingFields: [],
+      submission: {
+        ats: "greenhouse",
+        endpoint: "https://boards-api.greenhouse.io/v1/boards/acme/jobs/1",
+        method: "POST",
+        sent: false,
+        formUrl: "https://job-boards.greenhouse.io/acme/jobs/1",
+        payload: { first_name: "Shubham" },
+        answers: [
+          {
+            id: "first_name",
+            label: "First Name",
+            type: "text",
+            source: "profile",
+            value: "Shubham",
+          },
+        ],
+        attempt: 1,
+        builtAt: now,
+      },
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+    });
+    return h;
+  }
+
+  const retryUrl = (runId: string, jobKey: string) =>
+    `/api/runs/${runId}/jobs/${encodeURIComponent(jobKey)}/retry`;
+
+  it("resubmits a simulated failure and returns it submitted, with its rebuilt payload", async () => {
+    const { app, repo } = await withSimulatedFailure();
+
+    const res = await request(app).post(retryUrl("run-x", key));
+
+    expect(res.status).toBe(200);
+    const { evaluation } = retrySubmitResponseSchema.parse(res.body);
+    expect(evaluation).toMatchObject({ status: "submitted", reason: null });
+    expect(evaluation.submission).toMatchObject({
+      attempt: 2,
+      sent: false,
+      payload: { first_name: "Shubham" },
+    });
+    expect((await repo.getRun("run-x"))?.funnel).toMatchObject({ submitted: 1, failed: 0 });
+  });
+
+  it("returns 409 for a job that is not a simulated failure", async () => {
+    const { app } = await withSimulatedFailure({ reason: "Application form unavailable" });
+
+    const res = await request(app).post(retryUrl("run-x", key));
+
+    expect(res.status).toBe(409);
+    expect(errorResponseSchema.parse(res.body).error.code).toBe("not_retryable");
+  });
+
+  it("returns 404 for an unknown Run or job, and 400 for a malformed job key", async () => {
+    const { app } = await withSimulatedFailure();
+
+    const noRun = await request(app).post(retryUrl("run-nope", key));
+    const noJob = await request(app).post(retryUrl("run-x", "greenhouse:acme:2"));
+    const malformed = await request(app).post(retryUrl("run-x", "greenhouse/../etc"));
+
+    expect([noRun.status, noJob.status, malformed.status]).toEqual([404, 404, 400]);
+    expect(errorResponseSchema.parse(noJob.body).error.code).toBe("job_not_found");
   });
 });
