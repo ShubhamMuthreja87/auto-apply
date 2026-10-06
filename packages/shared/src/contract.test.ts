@@ -86,7 +86,11 @@ describe("contract", () => {
       createdAt: "t",
       updatedAt: "t",
     };
-    expect(evaluationSchema.parse(stored)).toMatchObject({ evidence: [], scoredBy: null });
+    expect(evaluationSchema.parse(stored)).toMatchObject({
+      evidence: [],
+      scoredBy: null,
+      missingFields: [],
+    });
   });
 
   it("reads a Run with or without its scoring mode, and only ai or fallback (D24)", () => {

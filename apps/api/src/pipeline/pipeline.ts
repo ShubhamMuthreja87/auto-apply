@@ -19,8 +19,12 @@
  *      by the evaluator; `score.ts` sums the weights into a fit score and a
  *      Verdict, stored with every criterion's evidence. The Verdict drives
  *      the outcome: APPLY → `held: below_auto_threshold`; STRETCH →
- *      `skipped: stretch`; APPLY NOW → fill and submit, which tickets 10/11
- *      build — until then it is `held` with {@link AWAITING_SUBMIT_REASON}.
+ *      `skipped: stretch`; APPLY NOW → fill the form.
+ *   5. Form fill (D5, D9–D12, `forms/fill-form.ts`): the Greenhouse form is
+ *      read and merged and every field resolved. A required field left
+ *      unanswered → `held: needs_you` with the fields listed (D11). A
+ *      complete form waits for the simulated submit (ticket 11) as `held`
+ *      with {@link FORM_READY_REASON}.
  *
  * Every status change goes through the transition table (`transitions.ts`).
  */
@@ -31,6 +35,7 @@ import {
   SKIP_REASONS,
   emptyFunnel,
   jobKey,
+  type CriterionEvidence,
   type EvaluationDelta,
   type EvaluationStatus,
   type Posting,
@@ -44,14 +49,22 @@ import {
 import { aiCriteria, buildRubric, judgeInCode } from "../evaluation/rubric.js";
 import { scoreJudgements } from "../evaluation/score.js";
 import { screenPosting, type ScreeningOptions } from "../evaluation/screen.js";
+import { fillForm } from "../forms/fill-form.js";
 import { logger } from "../logger.js";
-import type { Discovery, JobEvaluator } from "./ports.js";
+import type { Discovery, FreeTextAnswerer, GreenhouseForms, JobEvaluator } from "./ports.js";
 import { assertEvaluationTransition, assertRunTransition } from "./transitions.js";
 
 export interface PipelineDeps {
   repo: Repo;
   discovery: Discovery;
   evaluator: JobEvaluator;
+  /** Reads an APPLY NOW Posting's Greenhouse application form (D5). */
+  forms: GreenhouseForms;
+  /**
+   * Drafts required free-text answers (D9, D12); `null` or omitted when no AI
+   * is configured, so free text falls to the user (D24).
+   */
+  answerer?: FreeTextAnswerer | null;
   /**
    * How Runs score, recorded on each Run so the UI can say so (D24):
    * `fallback` when no AI key is configured and `evaluator` is the keyword
@@ -95,10 +108,17 @@ export interface Pipeline {
 const STEP_MS = 500;
 
 /**
- * Interim outcome of an APPLY NOW Posting until form fill (ticket 10) and the
- * simulated submit (ticket 11) land: held, so nothing looks submitted.
+ * Interim outcome of an APPLY NOW Posting whose form is fully resolved, until
+ * the simulated submit (ticket 11) lands: held, so nothing looks submitted.
+ * Ticket 11 replaces it with `applying → submitted (simulated) | failed`.
  */
-export const AWAITING_SUBMIT_REASON = "APPLY NOW; form fill and simulated submit are not built yet";
+export const FORM_READY_REASON = "Form complete; simulated submit is not built yet";
+
+/** EM framing for manager titles, Staff for IC titles (D12), from the code-judged title tier. */
+function framingFor(user: User, evidence: readonly CriterionEvidence[]): "EM" | "Staff" {
+  const manager = evidence.some((e) => e.criterionId === "title_manager" && e.points > 0);
+  return manager ? user.preferences.tierFraming.manager : user.preferences.tierFraming.ic;
+}
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -109,6 +129,8 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
     repo,
     discovery,
     evaluator,
+    forms,
+    answerer = null,
     scoringMode,
     screening = {},
     clock,
@@ -262,7 +284,29 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
       };
       const scoredOptions = { markSeen: true, evaluated: true };
       if (scored.verdict === "APPLY_NOW") {
-        await finish("held", AWAITING_SUBMIT_REASON, "held", scoredOptions, outcome);
+        // The Verdict streams while the form is read; a form that cannot be
+        // read fails the Posting below, keeping its Verdict.
+        await repo.patchEvaluation(runId, key, outcome);
+        const fill = await fillForm(
+          { forms, answerer },
+          posting,
+          user,
+          framingFor(user, scored.evidence),
+        );
+        logger.info("form_resolved", {
+          runId,
+          jobKey: key,
+          formSource: fill.source,
+          fields: fill.resolutions.length,
+          missing: fill.missing.length,
+        });
+        if (fill.missing.length > 0) {
+          await finish("held", HELD_REASONS.needsYou, "held", scoredOptions, {
+            missingFields: fill.missing,
+          });
+        } else {
+          await finish("held", FORM_READY_REASON, "held", scoredOptions);
+        }
       } else if (scored.verdict === "APPLY") {
         await finish("held", HELD_REASONS.belowAutoThreshold, "held", scoredOptions, outcome);
       } else {
@@ -291,6 +335,7 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
       reason: null,
       evidence: [],
       scoredBy: null,
+      missingFields: [],
       createdAt: now,
       updatedAt: now,
     });

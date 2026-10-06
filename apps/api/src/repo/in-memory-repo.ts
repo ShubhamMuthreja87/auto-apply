@@ -124,6 +124,7 @@ export class InMemoryRepo implements Repo {
     if (delta.reason !== undefined) evaluation.reason = delta.reason;
     if (delta.evidence !== undefined) evaluation.evidence = clone(delta.evidence);
     if (delta.scoredBy !== undefined) evaluation.scoredBy = delta.scoredBy;
+    if (delta.missingFields !== undefined) evaluation.missingFields = clone(delta.missingFields);
     evaluation.updatedAt = new Date().toISOString();
     this.notifyEvaluation(runId, { type: "modified", evaluation });
   }

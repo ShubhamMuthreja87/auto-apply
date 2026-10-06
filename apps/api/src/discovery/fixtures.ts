@@ -18,6 +18,18 @@ export async function readBoardRecording(ref: BoardRef): Promise<unknown> {
   return JSON.parse(await readFile(file, "utf8")) as unknown;
 }
 
+/**
+ * The recorded Greenhouse application form (`?questions=true`) of one job, as
+ * the raw JSON Greenhouse returned (GET, untouched): the form adapter's test
+ * input and its D3 fallback. Throws when that job's form was not recorded.
+ */
+export async function readFormRecording(job: { board: string; jobId: string }): Promise<unknown> {
+  if (!/^[a-z0-9-]+$/.test(job.board)) throw new Error(`Invalid board name: ${job.board}`);
+  if (!/^[0-9]+$/.test(job.jobId)) throw new Error(`Invalid job id: ${job.jobId}`);
+  const file = new URL(`greenhouse/forms/${job.board}-${job.jobId}.json`, FIXTURES_DIR);
+  return JSON.parse(await readFile(file, "utf8")) as unknown;
+}
+
 /** Reads a board's recording as Postings labelled `fallback` or `fixture`. */
 export type FixtureReader = (
   ref: BoardRef,

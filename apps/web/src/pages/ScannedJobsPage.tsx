@@ -30,7 +30,13 @@ import type { CriterionEvidence, Evaluation, Run, ScoredBy } from "@auto-apply/s
 import { listEvaluations, listRuns } from "../api";
 import { useLoad, type LoadState } from "../useLoad";
 import { StatusChip, VerdictChip } from "../ui/StatusChip";
-import { FallbackLabel, PostingSourceCell, reasonText, scoreText } from "../run/evaluationCells";
+import {
+  FallbackLabel,
+  MissingFieldsList,
+  PostingSourceCell,
+  reasonText,
+  scoreText,
+} from "../run/evaluationCells";
 
 const ALL_RUNS = "all";
 const COLUMNS = 8;
@@ -178,7 +184,8 @@ function ScannedTable({ evaluations }: { evaluations: Evaluation[] }) {
 
 function ScannedRow({ evaluation }: { evaluation: Evaluation }) {
   const [open, setOpen] = useState(false);
-  const { posting, verdict, score, scoredBy, status, reason, evidence, createdAt } = evaluation;
+  const { posting, verdict, score, scoredBy, status, reason, missingFields, evidence, createdAt } =
+    evaluation;
 
   return (
     <Fragment>
@@ -215,6 +222,7 @@ function ScannedRow({ evaluation }: { evaluation: Evaluation }) {
         </TableCell>
         <TableCell sx={{ color: "text.secondary", minWidth: 200 }}>
           {reasonText({ status, reason })}
+          <MissingFieldsList fields={missingFields} />
         </TableCell>
       </TableRow>
       <TableRow>

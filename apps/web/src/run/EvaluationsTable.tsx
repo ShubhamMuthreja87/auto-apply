@@ -10,7 +10,13 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import type { Evaluation } from "@auto-apply/shared";
 import { StatusChip, VerdictChip } from "../ui/StatusChip";
-import { FallbackLabel, PostingSourceCell, reasonText, scoreText } from "./evaluationCells";
+import {
+  FallbackLabel,
+  MissingFieldsList,
+  PostingSourceCell,
+  reasonText,
+  scoreText,
+} from "./evaluationCells";
 
 export function EvaluationsTable({ evaluations }: { evaluations: Evaluation[] }) {
   return (
@@ -28,28 +34,31 @@ export function EvaluationsTable({ evaluations }: { evaluations: Evaluation[] })
           </TableRow>
         </TableHead>
         <TableBody>
-          {evaluations.map(({ jobKey, posting, verdict, score, scoredBy, status, reason }) => (
-            <TableRow key={jobKey} hover>
-              <TableCell sx={{ whiteSpace: "nowrap" }}>{posting.company}</TableCell>
-              <TableCell sx={{ fontWeight: 500 }}>{posting.title}</TableCell>
-              <TableCell sx={{ whiteSpace: "nowrap" }}>
-                <PostingSourceCell posting={posting} />
-              </TableCell>
-              <TableCell>
-                <VerdictChip verdict={verdict} />
-              </TableCell>
-              <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums" }}>
-                {scoreText(score)}
-                <FallbackLabel scoredBy={scoredBy} />
-              </TableCell>
-              <TableCell>
-                <StatusChip status={status} />
-              </TableCell>
-              <TableCell sx={{ color: "text.secondary", minWidth: 200 }}>
-                {reasonText({ status, reason })}
-              </TableCell>
-            </TableRow>
-          ))}
+          {evaluations.map(
+            ({ jobKey, posting, verdict, score, scoredBy, status, reason, missingFields }) => (
+              <TableRow key={jobKey} hover>
+                <TableCell sx={{ whiteSpace: "nowrap" }}>{posting.company}</TableCell>
+                <TableCell sx={{ fontWeight: 500 }}>{posting.title}</TableCell>
+                <TableCell sx={{ whiteSpace: "nowrap" }}>
+                  <PostingSourceCell posting={posting} />
+                </TableCell>
+                <TableCell>
+                  <VerdictChip verdict={verdict} />
+                </TableCell>
+                <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                  {scoreText(score)}
+                  <FallbackLabel scoredBy={scoredBy} />
+                </TableCell>
+                <TableCell>
+                  <StatusChip status={status} />
+                </TableCell>
+                <TableCell sx={{ color: "text.secondary", minWidth: 200 }}>
+                  {reasonText({ status, reason })}
+                  <MissingFieldsList fields={missingFields} />
+                </TableCell>
+              </TableRow>
+            ),
+          )}
         </TableBody>
       </Table>
     </TableContainer>

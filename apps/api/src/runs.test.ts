@@ -28,6 +28,7 @@ import { buildPipeline } from "./pipeline/pipeline.js";
 import type { Discovery } from "./pipeline/ports.js";
 import { SEED_USER } from "./seed-user.js";
 import { keywordMatcher } from "./evaluation/keyword-matcher.js";
+import { greenhouseForms } from "./forms/greenhouse-forms.js";
 
 const testConfig: Config = loadConfig({
   NODE_ENV: "test",
@@ -110,6 +111,7 @@ function harness(heartbeatMs = 15_000) {
     repo,
     discovery: twoPostings,
     evaluator: keywordMatcher,
+    forms: greenhouseForms({ fetch, timeoutMs: 1_000, mode: "fixtures" }),
     clock: () => new Date(),
     delay: () => gate,
     newRunId: () => `run-${++n}`,

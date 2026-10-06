@@ -3,7 +3,7 @@
  * only on these and on the `Repo`; adapters and test fakes implement them, and
  * `buildPipeline` receives them. The submitter port joins with its ticket.
  */
-import type { Ats, FitCriterion, Posting, ScoredBy } from "@auto-apply/shared";
+import type { Ats, FitCriterion, Posting, PostingSource, ScoredBy } from "@auto-apply/shared";
 
 /** One public job board on one ATS, e.g. Greenhouse `stripe` (D2). */
 export interface BoardRef {
@@ -58,4 +58,104 @@ export interface EvaluatorResult {
  */
 export interface JobEvaluator {
   evaluate(posting: Posting, criteria: readonly FitCriterion[]): Promise<EvaluatorResult>;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Application forms (D5, D9–D12, ticket 10).
+ * -------------------------------------------------------------------------- */
+
+/** The normalised field types of an application form (spec, Greenhouse form merge). */
+export type FormFieldType = "text" | "textarea" | "select" | "multiselect" | "file" | "boolean";
+
+/** One choice of a select field; `value` is what the ATS expects back in the payload. */
+export interface FormOption {
+  label: string;
+  value: string | number;
+}
+
+/**
+ * Where a field came from in the ATS's form data. `compliance` and
+ * `demographic` are the API's own EEOC/demographic groups: never auto-answered
+ * (D10).
+ */
+export type FormFieldGroup = "questions" | "location" | "education" | "compliance" | "demographic";
+
+/** One field of a merged application form (spec: `Field`). */
+export interface FormField {
+  /** The ATS's own field name, used as the payload key (D18), e.g. `question_68474653`. */
+  id: string;
+  label: string;
+  /** The question's help text, as plain text; may be empty. */
+  description: string;
+  type: FormFieldType;
+  required: boolean;
+  /** Choices of a select or multiselect field. */
+  options?: FormOption[];
+  group: FormFieldGroup;
+}
+
+/** A Posting's application form with every question group merged into one list (D5). */
+export interface FormSchema {
+  /**
+   * Where a person opens the form: the hosted Greenhouse URL, or the embed
+   * URL when the hosted one leaves Greenhouse (Stripe's redirects to
+   * stripe.com, D5).
+   */
+  formUrl: string;
+  fields: FormField[];
+  /** `live`, or the recorded form: `fallback` after a failed GET, `fixture` by choice (D3). */
+  source: PostingSource;
+}
+
+/**
+ * Reads a Greenhouse job's application form (`?questions=true`), GET only,
+ * falling back to its recorded form (D3, D5). A capability of its own, not a
+ * `JobSource` method: only Greenhouse exposes its form as data (D4). Throws
+ * when neither the live form nor a recording can be read.
+ */
+export interface GreenhouseForms {
+  fetchSchema(job: { board: string; jobId: string }): Promise<FormSchema>;
+}
+
+/** A fact about the candidate an AI answer may draw on; never contact details (D23). */
+export interface CandidateFact {
+  /** e.g. `experience.0`, `settings.availability`; answers cite these (D12). */
+  id: string;
+  text: string;
+}
+
+/** A free-text question for the model, copied from the employer's form (untrusted). */
+export interface FreeTextQuestion {
+  fieldId: string;
+  label: string;
+  description: string;
+}
+
+export interface FreeTextRequest {
+  /** The job being applied to; its text is untrusted. */
+  posting: Posting;
+  /** EM framing for manager titles, Staff for IC titles (D12). */
+  framing: "EM" | "Staff";
+  facts: readonly CandidateFact[];
+  questions: readonly FreeTextQuestion[];
+}
+
+/** One drafted answer and the facts it rests on (D12). */
+export interface FreeTextAnswer {
+  fieldId: string;
+  answer: string;
+  /** Ids of the {@link CandidateFact}s the answer is based on. */
+  basedOn: string[];
+}
+
+/**
+ * Drafts answers to an application form's free-text questions (D9) from the
+ * candidate's facts only. It answers what it can ground in those facts and
+ * leaves the rest out; the caller also drops any answer that cites no given
+ * fact. When the model gives no usable answer it returns `[]` rather than
+ * throwing, so those fields fall to the user. The AI adapter is
+ * `ai/free-text-answerer.ts`; tests use fakes.
+ */
+export interface FreeTextAnswerer {
+  answer(request: FreeTextRequest): Promise<FreeTextAnswer[]>;
 }

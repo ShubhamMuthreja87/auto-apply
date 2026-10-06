@@ -475,6 +475,19 @@ export const criterionEvidenceSchema = z.object({
 export type CriterionEvidence = z.infer<typeof criterionEvidenceSchema>;
 
 /**
+ * A required application-form field nobody but the user can answer (D11),
+ * listed on a `held: needs_you` Evaluation. `id` is the ATS's own field name
+ * (e.g. Greenhouse `question_18610029008`); `why` says why it was not filled,
+ * e.g. "Legal agreement; never auto-answered (D10)".
+ */
+export const missingFieldSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  why: z.string(),
+});
+export type MissingField = z.infer<typeof missingFieldSchema>;
+
+/**
  * The per-run record of what we decided about one Posting (GLOSSARY:
  * Evaluation), stored as one document under its Run. The built Greenhouse
  * payload is added by the submit ticket.
@@ -491,6 +504,8 @@ export const evaluationSchema = z.object({
   evidence: z.array(criterionEvidenceSchema).default([]),
   /** Who judged the AI-side criteria; `null` until scored, or when never scored. */
   scoredBy: scoredBySchema.nullable().default(null),
+  /** The required form fields the user must answer when `held: needs_you` (D11); else empty. */
+  missingFields: z.array(missingFieldSchema).default([]),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
