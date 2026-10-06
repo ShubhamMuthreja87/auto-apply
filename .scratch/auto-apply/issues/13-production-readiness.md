@@ -11,3 +11,6 @@
 - [ ] README skeleton: setup instructions, architecture explanation (the ports, the pipeline, SSE), and testing notes (the seams and how to run each suite, including the credential-gated Firestore suite).
 - [ ] The server runs plain `node` on the built files with production dependencies only; confirmed by a clean build + start locally.
 - [ ] `deploy/` remains byte-for-byte unchanged.
+- [ ] **Production bug (added by the author, 2026-10-06):** the web build calls `http://localhost:3001` directly, so the deployed site (https://assignment.muthreja.com) fails with mixed-content errors. The web app must call the API with relative URLs (`/api/...`) in every build. Remove the localhost default; if a base-URL override is kept, it must default to empty.
+- [ ] In dev, the Vite dev-server proxy forwards `/api` (including the SSE stream, with no buffering) to `http://localhost:3001`.
+- [ ] A test asserts the production build (`apps/web/dist`) contains no "localhost".
