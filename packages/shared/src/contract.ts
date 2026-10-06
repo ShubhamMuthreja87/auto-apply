@@ -197,3 +197,47 @@ export const evaluationSchema = z.object({
   updatedAt: z.string(),
 });
 export type Evaluation = z.infer<typeof evaluationSchema>;
+
+/* -------------------------------------------------------------------------- *
+ * Run API and the live stream (D21, ticket 05).
+ * -------------------------------------------------------------------------- */
+
+/** `POST /api/runs` → `202`: the Run was created and is running in the background. */
+export const createRunResponseSchema = z.object({ runId: z.string() });
+export type CreateRunResponse = z.infer<typeof createRunResponseSchema>;
+
+/**
+ * `GET /api/runs/active`: the user's active Run, if any, so a refreshed or new
+ * tab can reattach to the live stream instead of losing it.
+ */
+export const activeRunResponseSchema = z.object({ run: runSchema.nullable() });
+export type ActiveRunResponse = z.infer<typeof activeRunResponseSchema>;
+
+/**
+ * Named events on `GET /api/runs/:runId/events` (D21). Every connect starts
+ * with one `snapshot`, then `run` / `eval` deltas carrying full documents, never
+ * increments (ADR-0003); a terminal `run` is followed by `done` and the stream
+ * ends. `error` reports a subscription failure instead of going quiet. There is
+ * no `Last-Event-ID`: a reconnect simply re-snapshots.
+ */
+export const sseEventNameSchema = z.enum(["snapshot", "run", "eval", "done", "error"]);
+export type SseEventName = z.infer<typeof sseEventNameSchema>;
+
+/** The full current state on connect. Funnel counts are `run.funnel`. */
+export const snapshotEventSchema = z.object({
+  run: runSchema,
+  evaluations: z.array(evaluationSchema),
+});
+export type SnapshotEvent = z.infer<typeof snapshotEventSchema>;
+
+/** The latest Run document. */
+export const runEventSchema = runSchema;
+/** The latest version of one Evaluation; consumers keep the latest per Job Key. */
+export const evalEventSchema = evaluationSchema;
+
+/** Sent once, after the terminal `run` event, just before the stream ends. */
+export const doneEventSchema = z.object({ runId: z.string(), status: runStatusSchema });
+export type DoneEvent = z.infer<typeof doneEventSchema>;
+
+/** A subscription failure surfaced on the stream, in the shared error shape. */
+export const errorEventSchema = errorResponseSchema;

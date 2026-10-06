@@ -58,7 +58,7 @@ export class InMemoryRepo implements Repo {
   private readonly evaluations = new Map<string, Map<string, Evaluation>>();
   private readonly seen = new Set<string>();
   private readonly runListeners = new Map<string, Set<Listener<Run>>>();
-  private readonly evalListeners = new Map<string, Set<Listener<EvaluationChange>>>();
+  private readonly evalListeners = new Map<string, Set<Listener<EvaluationChange[]>>>();
 
   async getUser(uid: string): Promise<UserDoc | null> {
     const user = this.users.get(uid);
@@ -74,6 +74,11 @@ export class InMemoryRepo implements Repo {
     if (active) throw new ActiveRunExistsError(run.uid, active.runId);
     this.runs.set(run.runId, clone(run));
     this.notifyRun(run.runId);
+  }
+
+  async getRun(runId: string): Promise<Run | null> {
+    const run = this.runs.get(runId);
+    return run ? clone(run) : null;
   }
 
   async getActiveRun(uid: string): Promise<Run | null> {
@@ -137,20 +142,20 @@ export class InMemoryRepo implements Repo {
 
   watchEvaluations(
     runId: string,
-    cb: (change: EvaluationChange) => void,
+    cb: (changes: EvaluationChange[]) => void,
     onError: SubscriptionErrorHandler,
   ): Unsubscribe {
-    const listener: Listener<EvaluationChange> = { cb, onError, ready: false };
-    const set = this.evalListeners.get(runId) ?? new Set<Listener<EvaluationChange>>();
+    const listener: Listener<EvaluationChange[]> = { cb, onError, ready: false };
+    const set = this.evalListeners.get(runId) ?? new Set<Listener<EvaluationChange[]>>();
     set.add(listener);
     this.evalListeners.set(runId, set);
     queueMicrotask(() => {
-      const byKey = this.evaluations.get(runId);
-      if (byKey) {
-        for (const evaluation of byKey.values()) {
-          deliverEvaluation(listener, { type: "added", evaluation });
-        }
-      }
+      const byKey = this.evaluations.get(runId) ?? new Map<string, Evaluation>();
+      const initial = [...byKey.values()].map((evaluation) => ({
+        type: "added" as const,
+        evaluation,
+      }));
+      deliverEvaluations(listener, initial);
       listener.ready = true;
     });
     return () => set.delete(listener);
@@ -176,7 +181,7 @@ export class InMemoryRepo implements Repo {
     const set = this.evalListeners.get(runId);
     if (!set) return;
     for (const listener of set) {
-      if (listener.ready) deliverEvaluation(listener, change);
+      if (listener.ready) deliverEvaluations(listener, [change]);
     }
   }
 }
@@ -187,9 +192,20 @@ function deliverRun(listener: Listener<Run>, run: Run): void {
   else listener.cb(valid);
 }
 
-function deliverEvaluation(listener: Listener<EvaluationChange>, change: EvaluationChange): void {
-  const { evaluation } = change;
-  const valid = validate(evaluationSchema, evaluation, `evaluation ${evaluation.jobKey}`);
-  if (valid instanceof Error) listener.onError(valid);
-  else listener.cb({ type: change.type, evaluation: valid });
+/**
+ * Delivers one batch, as a Firestore query snapshot does: invalid documents go
+ * to `onError` one by one and are left out; the batch itself always arrives,
+ * even empty, so the initial snapshot is never silent.
+ */
+function deliverEvaluations(
+  listener: Listener<EvaluationChange[]>,
+  changes: readonly EvaluationChange[],
+): void {
+  const valid: EvaluationChange[] = [];
+  for (const { type, evaluation } of changes) {
+    const parsed = validate(evaluationSchema, evaluation, `evaluation ${evaluation.jobKey}`);
+    if (parsed instanceof Error) listener.onError(parsed);
+    else valid.push({ type, evaluation: parsed });
+  }
+  listener.cb(valid);
 }

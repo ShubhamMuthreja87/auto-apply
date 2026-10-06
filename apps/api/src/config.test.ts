@@ -14,6 +14,14 @@ describe("loadConfig", () => {
     );
   });
 
+  it("allows exactly one CORS origin, the Vite dev server by default (D27)", () => {
+    expect(loadConfig({}).CORS_ORIGIN).toBe("http://localhost:5173");
+    expect(loadConfig({ CORS_ORIGIN: "https://apply.example.com" }).CORS_ORIGIN).toBe(
+      "https://apply.example.com",
+    );
+    expect(() => loadConfig({ CORS_ORIGIN: "*" })).toThrow();
+  });
+
   it("allows the prod namespace in production", () => {
     expect(
       loadConfig({ NODE_ENV: "production", FIRESTORE_NAMESPACE: "prod" }).FIRESTORE_NAMESPACE,

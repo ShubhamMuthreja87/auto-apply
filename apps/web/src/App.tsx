@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import { healthResponseSchema, type HealthResponse } from "@auto-apply/shared";
-
-// In dev the web app (5173) calls the API (3001) cross-origin; in production the
-// same origin serves both and nginx proxies /api, so the default is a bare path.
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
+import { API_URL } from "./api";
+import { RunPanel } from "./run/RunPanel";
 
 type State =
   | { kind: "loading" }
@@ -45,6 +43,7 @@ export function App() {
   return (
     <main>
       <h1>AI Auto-Apply</h1>
+      <RunPanel />
       {state.kind === "loading" && <p role="status">Checking API…</p>}
       {state.kind === "error" && <p role="alert">Could not reach the API: {state.message}</p>}
       {state.kind === "ready" && (

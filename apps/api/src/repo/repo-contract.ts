@@ -55,8 +55,10 @@ function expectCoalescedInOrder<T>(actual: readonly T[], expected: readonly T[])
   let cursor = 0;
   for (const value of actual) {
     while (cursor < expected.length && expected[cursor] !== value) cursor++;
-    expect(cursor, `${JSON.stringify(actual)} is not in the order of ${JSON.stringify(expected)}`)
-      .toBeLessThan(expected.length);
+    expect(
+      cursor,
+      `${JSON.stringify(actual)} is not in the order of ${JSON.stringify(expected)}`,
+    ).toBeLessThan(expected.length);
     cursor++;
   }
 }
@@ -159,6 +161,17 @@ export function describeRepoContract(
         await repo.seedUserIfMissing("user-1", aUser({ profile: { title: "Overwritten" } }));
         const user = await repo.getUser("user-1");
         expect(user?.profile).toEqual({ title: "Staff" });
+      });
+    });
+
+    describe("getRun", () => {
+      it("returns null for an unknown run, then the run once created", async () => {
+        expect(await repo.getRun("run-1")).toBeNull();
+        await repo.createRun(aRun());
+        await repo.patchRun("run-1", { status: "evaluating" });
+        const run = await repo.getRun("run-1");
+        expect(run?.runId).toBe("run-1");
+        expect(run?.status).toBe("evaluating");
       });
     });
 
@@ -303,6 +316,34 @@ export function describeRepoContract(
     });
 
     describe("watchEvaluations", () => {
+      it("always delivers an initial batch, empty for a run with no evaluations", async () => {
+        await repo.createRun(aRun());
+        const batches: EvaluationChange[][] = [];
+        const unsub = repo.watchEvaluations(
+          "run-1",
+          (batch) => batches.push(batch),
+          recordUnexpected,
+        );
+        expect(batches).toHaveLength(0);
+        await eventually(() => expect(batches).toEqual([[]]));
+        unsub();
+      });
+
+      it("delivers the initial snapshot as one batch", async () => {
+        await repo.createRun(aRun());
+        await repo.putEvaluation("run-1", anEvaluation(aPosting("1")));
+        await repo.putEvaluation("run-1", anEvaluation(aPosting("2")));
+        const batches: EvaluationChange[][] = [];
+        const unsub = repo.watchEvaluations(
+          "run-1",
+          (batch) => batches.push(batch),
+          recordUnexpected,
+        );
+        await eventually(() => expect(batches).toHaveLength(1));
+        expect(batches[0]).toHaveLength(2);
+        unsub();
+      });
+
       it("replays existing evaluations as 'added' in insertion order", async () => {
         await repo.createRun(aRun());
         const p1 = aPosting("1");
@@ -310,7 +351,11 @@ export function describeRepoContract(
         await repo.putEvaluation("run-1", anEvaluation(p1));
         await repo.putEvaluation("run-1", anEvaluation(p2));
         const changes: EvaluationChange[] = [];
-        const unsub = repo.watchEvaluations("run-1", (change) => changes.push(change), recordUnexpected);
+        const unsub = repo.watchEvaluations(
+          "run-1",
+          (batch) => changes.push(...batch),
+          recordUnexpected,
+        );
         expect(changes).toHaveLength(0);
         await eventually(() => expect(changes).toHaveLength(2));
         expect(changes.map((c) => c.type)).toEqual(["added", "added"]);
@@ -322,7 +367,11 @@ export function describeRepoContract(
         await repo.createRun(aRun());
         const posting = aPosting("1");
         const changes: EvaluationChange[] = [];
-        const unsub = repo.watchEvaluations("run-1", (change) => changes.push(change), recordUnexpected);
+        const unsub = repo.watchEvaluations(
+          "run-1",
+          (batch) => changes.push(...batch),
+          recordUnexpected,
+        );
         await settle();
         await repo.putEvaluation("run-1", anEvaluation(posting));
         await repo.patchEvaluation("run-1", jobKey(posting), { status: "evaluating" });
@@ -347,7 +396,11 @@ export function describeRepoContract(
       it("stops delivering after unsubscribe (no listener leak)", async () => {
         await repo.createRun(aRun());
         const changes: EvaluationChange[] = [];
-        const unsub = repo.watchEvaluations("run-1", (change) => changes.push(change), recordUnexpected);
+        const unsub = repo.watchEvaluations(
+          "run-1",
+          (batch) => changes.push(...batch),
+          recordUnexpected,
+        );
         await settle();
         unsub();
         await repo.putEvaluation("run-1", anEvaluation(aPosting("1")));
@@ -359,7 +412,11 @@ export function describeRepoContract(
         await repo.createRun(aRun());
         await repo.createRun(aRun({ runId: "run-2", uid: "user-2" }));
         const changes: EvaluationChange[] = [];
-        const unsub = repo.watchEvaluations("run-1", (change) => changes.push(change), recordUnexpected);
+        const unsub = repo.watchEvaluations(
+          "run-1",
+          (batch) => changes.push(...batch),
+          recordUnexpected,
+        );
         await settle();
         await repo.putEvaluation("run-2", { ...anEvaluation(aPosting("9")), runId: "run-2" });
         await settle();
@@ -374,7 +431,7 @@ export function describeRepoContract(
         const errors: Error[] = [];
         const unsub = repo.watchEvaluations(
           "run-1",
-          (change) => changes.push(change),
+          (batch) => changes.push(...batch),
           (error) => errors.push(error),
         );
         await settle();

@@ -9,7 +9,7 @@ const optionalString = z
 
 /**
  * Environment is parsed once, at startup, and the process fails fast if it is
- * invalid (CODING_STANDARDS, General). Later tickets add the auth, CORS and AI
+ * invalid (CODING_STANDARDS, General). Later tickets add the auth and AI
  * vars.
  */
 const envSchema = z.object({
@@ -23,6 +23,9 @@ const envSchema = z.object({
     .default("dev"),
   // Firestore unless the in-memory twin is asked for explicitly (ADR-0004).
   REPO: repoKindSchema.default("firestore"),
+  // Exactly one browser origin, with credentials, never `*` (D27). Same
+  // origin in production; the Vite dev server locally.
+  CORS_ORIGIN: z.string().url().default("http://localhost:5173"),
   // Read by `loadCredential`; inline JSON wins over the key-file path.
   FIREBASE_SERVICE_ACCOUNT_JSON: optionalString,
   GOOGLE_APPLICATION_CREDENTIALS: optionalString,
@@ -36,6 +39,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     PORT: env.PORT,
     FIRESTORE_NAMESPACE: env.FIRESTORE_NAMESPACE,
     REPO: env.REPO,
+    CORS_ORIGIN: env.CORS_ORIGIN,
     FIREBASE_SERVICE_ACCOUNT_JSON: env.FIREBASE_SERVICE_ACCOUNT_JSON,
     GOOGLE_APPLICATION_CREDENTIALS: env.GOOGLE_APPLICATION_CREDENTIALS,
   });

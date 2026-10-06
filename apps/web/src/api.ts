@@ -1,0 +1,53 @@
+/**
+ * The browser's calls to the API, each response parsed with the shared
+ * contract. Credentials ride every call so the auth cookie (ticket 15) works
+ * cross-origin in dev.
+ */
+import {
+  activeRunResponseSchema,
+  createRunResponseSchema,
+  errorResponseSchema,
+  type Run,
+} from "@auto-apply/shared";
+
+// In dev the web app (5173) calls the API (3001) cross-origin; in production the
+// same origin serves both and nginx proxies /api, so VITE_API_URL is "".
+export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
+
+/** A non-2xx answer, carrying the contract's error code when there is one. */
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string | null,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+async function readJson(res: Response): Promise<unknown> {
+  if (res.ok) return res.json();
+  const body = errorResponseSchema.safeParse(await res.json().catch(() => null));
+  throw new ApiError(
+    res.status,
+    body.success ? body.data.error.code : null,
+    body.success ? body.data.error.message : `API responded ${res.status}`,
+  );
+}
+
+/** `POST /api/runs`: starts a Run; an `ApiError` with code `run_active` on 409. */
+export async function startRun(): Promise<string> {
+  const res = await fetch(`${API_URL}/api/runs`, { method: "POST", credentials: "include" });
+  return createRunResponseSchema.parse(await readJson(res)).runId;
+}
+
+/** `GET /api/runs/active`: the Run to reattach to after a refresh, if any. */
+export async function getActiveRun(): Promise<Run | null> {
+  const res = await fetch(`${API_URL}/api/runs/active`, { credentials: "include" });
+  return activeRunResponseSchema.parse(await readJson(res)).run;
+}
+
+export function runEventsUrl(runId: string): string {
+  return `${API_URL}/api/runs/${encodeURIComponent(runId)}/events`;
+}

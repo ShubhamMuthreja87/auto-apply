@@ -2,10 +2,15 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, waitFor, cleanup } from "@testing-library/react";
 import { App } from "./App";
 
+/** Answers `/api/health` with `response`; the Run panel sees no active Run. */
 function mockFetch(response: Response) {
   vi.stubGlobal(
     "fetch",
-    vi.fn(async () => response),
+    vi.fn(async (input: RequestInfo | URL) =>
+      String(input).endsWith("/api/runs/active")
+        ? new Response(JSON.stringify({ run: null }), { status: 200 })
+        : response,
+    ),
   );
 }
 

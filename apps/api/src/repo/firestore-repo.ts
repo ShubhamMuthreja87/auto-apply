@@ -91,6 +91,11 @@ export class FirestoreRepo implements Repo {
     });
   }
 
+  async getRun(runId: string): Promise<Run | null> {
+    const snap = await this.runs().doc(runId).get();
+    return snap.exists ? parse(runSchema, snap) : null;
+  }
+
   async getActiveRun(uid: string): Promise<Run | null> {
     return findActiveRun(await this.runsOf(uid).get()) ?? null;
   }
@@ -142,7 +147,7 @@ export class FirestoreRepo implements Repo {
 
   watchEvaluations(
     runId: string,
-    cb: (change: EvaluationChange) => void,
+    cb: (changes: EvaluationChange[]) => void,
     onError: SubscriptionErrorHandler,
   ): Unsubscribe {
     // Ordered by creation so the initial snapshot replays evaluations in the
@@ -150,11 +155,13 @@ export class FirestoreRepo implements Repo {
     const query = this.jobs(runId).orderBy("createdAt");
     return query.onSnapshot(
       (snap) => {
+        const changes: EvaluationChange[] = [];
         for (const change of snap.docChanges()) {
           const evaluation = validate(evaluationSchema, change.doc);
           if (evaluation instanceof Error) onError(evaluation);
-          else cb({ type: change.type, evaluation });
+          else changes.push({ type: change.type, evaluation });
         }
+        cb(changes);
       },
       onError,
     );

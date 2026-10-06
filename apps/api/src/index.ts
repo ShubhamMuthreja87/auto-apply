@@ -2,12 +2,22 @@ import { loadConfig } from "./config.js";
 import { createApp } from "./app.js";
 import { logger } from "./logger.js";
 import { createRepo } from "./repo/create-repo.js";
+import { buildPipeline } from "./pipeline/pipeline.js";
+import { skeletonJobSource } from "./pipeline/skeleton-job-source.js";
 
 // Env and the Firestore credential are both validated here, once; anything
-// invalid stops the boot. The run routes use `persistence.repo` from ticket 05.
+// invalid stops the boot.
 const config = loadConfig();
 const persistence = createRepo(config);
-const app = createApp(config, persistence);
+// The composition root: real clock and timers here, fakes in tests.
+const pipeline = buildPipeline({
+  repo: persistence.repo,
+  jobSource: skeletonJobSource,
+  clock: () => new Date(),
+  delay: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  newRunId: () => crypto.randomUUID(),
+});
+const app = createApp(config, persistence, pipeline);
 
 if (persistence.kind === "memory") {
   logger.warn("persistence_in_memory", { reason: "REPO=memory; data is lost on restart" });

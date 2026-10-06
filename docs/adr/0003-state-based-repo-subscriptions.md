@@ -11,3 +11,4 @@
 
 - The shared contract suite polls for deliveries and asserts "in order, possibly coalesced, ends on the latest write"; the in-memory twin's stricter one-per-write behaviour is pinned in its own test, not relied on by consumers.
 - SSE deltas (ticket 05) carry full Run / Evaluation documents, never increments.
+- `watchEvaluations` delivers **batches**, one per snapshot, like a Firestore query `onSnapshot`. The initial batch always arrives, even when it is empty, so the SSE stream knows when it holds the full initial state before sending its `snapshot` event (ticket 05). Without it, a Run with no Evaluations yet would never produce an initial callback, and "nothing yet" would look the same as "not loaded".

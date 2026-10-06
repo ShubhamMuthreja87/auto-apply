@@ -88,6 +88,7 @@ export interface Repo {
 
   /** Creates a Run; rejects with {@link ActiveRunExistsError} if one is active (D17). */
   createRun(run: Run): Promise<void>;
+  getRun(runId: string): Promise<Run | null>;
   getActiveRun(uid: string): Promise<Run | null>;
   patchRun(runId: string, delta: RunDelta): Promise<void>;
 
@@ -99,9 +100,14 @@ export interface Repo {
   markSeen(jobKey: string): Promise<void>;
 
   watchRun(runId: string, cb: (run: Run) => void, onError: SubscriptionErrorHandler): Unsubscribe;
+  /**
+   * Like Firestore's query `onSnapshot`, delivers one batch per snapshot: the
+   * initial batch always arrives (every Evaluation as `added`, possibly `[]`),
+   * so a consumer knows when it has the full initial state.
+   */
   watchEvaluations(
     runId: string,
-    cb: (change: EvaluationChange) => void,
+    cb: (changes: EvaluationChange[]) => void,
     onError: SubscriptionErrorHandler,
   ): Unsubscribe;
 }
