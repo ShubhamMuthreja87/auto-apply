@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { repoKindSchema } from "@auto-apply/shared";
-import { AI_ENV_KEYS, aiEnvSchema } from "./ai/ai-env.js";
-import { AUTH_ENV_KEYS, authEnvSchema } from "./auth/auth-env.js";
+import { aiEnvSchema } from "./ai/ai-env.js";
+import { authEnvSchema } from "./auth/auth-env.js";
 
 /** An env var that may be absent or blank; blank counts as unset. */
 const optionalString = z
@@ -45,19 +45,12 @@ const envSchema = z
 
 export type Config = z.infer<typeof envSchema>;
 
+/** Every variable the server reads; `apps/api/.env.example` documents each one. */
+export const CONFIG_KEYS = Object.keys(envSchema.shape) as (keyof Config)[];
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const config = envSchema.parse({
-    NODE_ENV: env.NODE_ENV,
-    PORT: env.PORT,
-    FIRESTORE_NAMESPACE: env.FIRESTORE_NAMESPACE,
-    REPO: env.REPO,
-    CORS_ORIGIN: env.CORS_ORIGIN,
-    FIREBASE_SERVICE_ACCOUNT_JSON: env.FIREBASE_SERVICE_ACCOUNT_JSON,
-    GOOGLE_APPLICATION_CREDENTIALS: env.GOOGLE_APPLICATION_CREDENTIALS,
-    JOB_SOURCE: env.JOB_SOURCE,
-    SALARY_FLOOR_LPA: env.SALARY_FLOOR_LPA,
-    ...Object.fromEntries([...AI_ENV_KEYS, ...AUTH_ENV_KEYS].map((key) => [key, env[key]])),
-  });
+  // Only the schema's own keys are read, never the whole environment.
+  const config = envSchema.parse(Object.fromEntries(CONFIG_KEYS.map((key) => [key, env[key]])));
 
   // The `prod` namespace is only ever used on the server (CODING_STANDARDS,
   // Namespace isolation).

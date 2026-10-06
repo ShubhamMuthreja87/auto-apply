@@ -1,7 +1,12 @@
 /**
  * The browser's calls to the API, each response parsed with the shared
- * contract. Credentials ride every call so the auth cookie (ticket 15) works
- * cross-origin in dev.
+ * contract.
+ *
+ * Every URL is relative (`/api/...`), so the browser only ever talks to the
+ * page's own origin: nginx proxies `/api` in production, the Vite dev server's
+ * proxy does it in dev (`vite.config.ts`). An absolute `http://` API URL would
+ * be blocked as mixed content on the https site. Credentials ride every call
+ * so the auth cookie (D26) is sent.
  */
 import {
   activeRunResponseSchema,
@@ -21,10 +26,6 @@ import {
   type UpdateMeRequest,
   type UpdateMeResponse,
 } from "@auto-apply/shared";
-
-// In dev the web app (5173) calls the API (3001) cross-origin; in production the
-// same origin serves both and nginx proxies /api, so VITE_API_URL is "".
-export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
 
 /** A non-2xx answer, carrying the contract's error code when there is one. */
 export class ApiError extends Error {
@@ -55,7 +56,7 @@ export function onUnauthorized(handler: UnauthorizedHandler): () => void {
 
 /** Every call carries the session cookie; a `401` signs the browser out. */
 async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  const res = await fetch(`${API_URL}${path}`, { ...init, credentials: "include" });
+  const res = await fetch(path, { ...init, credentials: "include" });
   if (res.status === 401) unauthorizedHandler?.();
   return res;
 }
@@ -102,7 +103,7 @@ export async function listEvaluations(runId: string | null): Promise<Evaluation[
  */
 export async function retrySubmit(runId: string, jobKey: string): Promise<Evaluation> {
   const res = await fetch(
-    `${API_URL}/api/runs/${encodeURIComponent(runId)}/jobs/${encodeURIComponent(jobKey)}/retry`,
+    `/api/runs/${encodeURIComponent(runId)}/jobs/${encodeURIComponent(jobKey)}/retry`,
     { method: "POST", credentials: "include" },
   );
   return retrySubmitResponseSchema.parse(await readJson(res)).evaluation;
@@ -132,7 +133,7 @@ export async function updateMe(edits: UpdateMeRequest): Promise<UpdateMeResponse
  * any other failure throws, so "API down" is not mistaken for "signed out".
  */
 export async function getSession(): Promise<boolean> {
-  const res = await fetch(`${API_URL}/api/session`, { credentials: "include" });
+  const res = await fetch(`/api/session`, { credentials: "include" });
   if (res.status === 401) return false;
   sessionResponseSchema.parse(await readJson(res));
   return true;
@@ -144,7 +145,7 @@ export async function getSession(): Promise<boolean> {
  * password is not a lost session, so it does not trigger the 401 handler.
  */
 export async function login(credentials: LoginRequest): Promise<void> {
-  const res = await fetch(`${API_URL}/api/login`, {
+  const res = await fetch(`/api/login`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -155,7 +156,7 @@ export async function login(credentials: LoginRequest): Promise<void> {
 
 /** `POST /api/logout`: clears the session cookie. */
 export async function logout(): Promise<void> {
-  const res = await fetch(`${API_URL}/api/logout`, { method: "POST", credentials: "include" });
+  const res = await fetch(`/api/logout`, { method: "POST", credentials: "include" });
   if (!res.ok) await readJson(res);
 }
 
@@ -165,5 +166,5 @@ export function messageOf(err: unknown): string {
 }
 
 export function runEventsUrl(runId: string): string {
-  return `${API_URL}/api/runs/${encodeURIComponent(runId)}/events`;
+  return `/api/runs/${encodeURIComponent(runId)}/events`;
 }

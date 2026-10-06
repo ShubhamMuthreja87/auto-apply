@@ -19,5 +19,3 @@ export const authEnvSchema = z.object({
   /** HMAC key for the session JWT; long and random (`openssl rand -hex 32`). */
   JWT_SECRET: z.string().min(32, "must be at least 32 characters"),
 });
-
-export const AUTH_ENV_KEYS = ["AUTH_USERNAME", "AUTH_PASSWORD_HASH", "JWT_SECRET"] as const;

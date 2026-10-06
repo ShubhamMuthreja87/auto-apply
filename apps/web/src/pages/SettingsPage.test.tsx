@@ -131,7 +131,7 @@ function fakeApi(
 ) {
   const puts: Put[] = [];
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const path = new URL(String(input), "http://localhost").pathname;
+    const path = new URL(String(input), location.origin).pathname;
     if (path !== "/api/me")
       return json({ error: { code: "not_found", message: "Not found" } }, 404);
     if (init?.method === "PUT") {

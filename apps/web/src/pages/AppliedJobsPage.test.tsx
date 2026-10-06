@@ -91,7 +91,7 @@ function fakeApi({
   retryResponse?: () => Response;
 } = {}) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = new URL(String(input));
+    const url = new URL(String(input), location.origin);
     if (url.pathname === "/api/evaluations") {
       return evaluationsResponse ? evaluationsResponse() : json({ evaluations });
     }

@@ -1,6 +1,45 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { loadConfig } from "./config.js";
+import { CONFIG_KEYS, loadConfig } from "./config.js";
 import { TEST_AUTH_ENV } from "./auth/test-auth.js";
+
+describe(".env.example", () => {
+  const example = readFileSync(new URL("../.env.example", import.meta.url), "utf8");
+
+  it("documents every variable the server reads, set or commented out", () => {
+    // `KEY=` or `# KEY=` at the start of a line.
+    const documented = new Set(
+      [...example.matchAll(/^#?\s*([A-Z][A-Z0-9_]*)=/gm)].map((match) => match[1]),
+    );
+    expect(CONFIG_KEYS.filter((key) => !documented.has(key))).toEqual([]);
+  });
+
+  it("covers the core, Firebase, CORS, auth and AI variables", () => {
+    expect(CONFIG_KEYS).toEqual(
+      expect.arrayContaining([
+        "NODE_ENV",
+        "PORT",
+        "FIRESTORE_NAMESPACE",
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        "FIREBASE_SERVICE_ACCOUNT_JSON",
+        "CORS_ORIGIN",
+        "AUTH_USERNAME",
+        "AUTH_PASSWORD_HASH",
+        "JWT_SECRET",
+        "AI_PROVIDER",
+        "AI_BASE_URL",
+        "AI_MODEL",
+        "AI_API_KEY",
+      ]),
+    );
+  });
+
+  it("holds no secret values", () => {
+    for (const key of ["AUTH_PASSWORD_HASH", "JWT_SECRET", "AI_API_KEY"]) {
+      expect(example).not.toMatch(new RegExp(`^${key}=\\S`, "m"));
+    }
+  });
+});
 
 describe("loadConfig", () => {
   it("defaults to the dev namespace in development", () => {
