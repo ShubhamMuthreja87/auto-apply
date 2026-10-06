@@ -26,6 +26,7 @@ import {
 } from "@auto-apply/shared";
 import { createApp } from "./app.js";
 import { loadConfig, type Config } from "./config.js";
+import { authCookie, TEST_AUTH_ENV } from "./auth/test-auth.js";
 import { InMemoryRepo } from "./repo/in-memory-repo.js";
 import { buildPipeline } from "./pipeline/pipeline.js";
 import type { Discovery } from "./pipeline/ports.js";
@@ -36,6 +37,7 @@ import { simulatedSubmitter } from "./submit/simulated-submitter.js";
 import { DEMO_UID } from "./user.js";
 
 const testConfig: Config = loadConfig({
+  ...TEST_AUTH_ENV,
   NODE_ENV: "test",
   FIRESTORE_NAMESPACE: "test-local",
   REPO: "memory",
@@ -150,6 +152,8 @@ async function openStream(app: ReturnType<typeof harness>["app"], runId: string)
   const controller = new AbortController();
   const res = await fetch(`http://127.0.0.1:${port}/api/runs/${runId}/events`, {
     signal: controller.signal,
+    // The stream authenticates off the session cookie at connect (D26).
+    headers: { Cookie: authCookie() },
   });
   const reader = res.body?.pipeThrough(new TextDecoderStream()).getReader();
   let buffer = "";
@@ -206,19 +210,21 @@ describe("POST /api/runs", () => {
   it("creates a Run and returns 202 with its id, before the Run finishes", async () => {
     const { app } = harness();
 
-    const res = await request(app).post("/api/runs");
+    const res = await request(app).post("/api/runs").set("Cookie", authCookie());
 
     expect(res.status).toBe(202);
     const { runId } = createRunResponseSchema.parse(res.body);
-    const active = activeRunResponseSchema.parse((await request(app).get("/api/runs/active")).body);
+    const active = activeRunResponseSchema.parse(
+      (await request(app).get("/api/runs/active").set("Cookie", authCookie())).body,
+    );
     expect(active.run).toMatchObject({ runId, status: "discovering" });
   });
 
   it("returns 409 in the shared error shape while a Run is active (D17)", async () => {
     const { app } = harness();
-    await request(app).post("/api/runs");
+    await request(app).post("/api/runs").set("Cookie", authCookie());
 
-    const res = await request(app).post("/api/runs");
+    const res = await request(app).post("/api/runs").set("Cookie", authCookie());
 
     expect(res.status).toBe(409);
     expect(errorResponseSchema.parse(res.body).error.code).toBe("run_active");
@@ -228,7 +234,7 @@ describe("POST /api/runs", () => {
 describe("GET /api/runs/active", () => {
   it("returns null when no Run is active", async () => {
     const { app } = harness();
-    const res = await request(app).get("/api/runs/active");
+    const res = await request(app).get("/api/runs/active").set("Cookie", authCookie());
     expect(res.status).toBe(200);
     expect(activeRunResponseSchema.parse(res.body)).toEqual({ run: null });
   });
@@ -237,21 +243,23 @@ describe("GET /api/runs/active", () => {
 describe("GET /api/runs/:runId/events", () => {
   it("returns 404 in the shared error shape for an unknown Run", async () => {
     const { app } = harness();
-    const res = await request(app).get("/api/runs/nope/events");
+    const res = await request(app).get("/api/runs/nope/events").set("Cookie", authCookie());
     expect(res.status).toBe(404);
     expect(errorResponseSchema.parse(res.body).error.code).toBe("run_not_found");
   });
 
   it("returns 400 for a malformed run id", async () => {
     const { app } = harness();
-    const res = await request(app).get("/api/runs/bad%20id!/events");
+    const res = await request(app).get("/api/runs/bad%20id!/events").set("Cookie", authCookie());
     expect(res.status).toBe(400);
     expect(errorResponseSchema.parse(res.body).error.code).toBe("invalid_request");
   });
 
   it("sets the SSE headers nginx and browsers need", async () => {
     const { app } = harness();
-    const { runId } = createRunResponseSchema.parse((await request(app).post("/api/runs")).body);
+    const { runId } = createRunResponseSchema.parse(
+      (await request(app).post("/api/runs").set("Cookie", authCookie())).body,
+    );
 
     const stream = await openStream(app, runId);
 
@@ -263,7 +271,9 @@ describe("GET /api/runs/:runId/events", () => {
 
   it("streams snapshot → run/eval deltas → terminal run → done, then ends", async () => {
     const { app, openGate } = harness();
-    const { runId } = createRunResponseSchema.parse((await request(app).post("/api/runs")).body);
+    const { runId } = createRunResponseSchema.parse(
+      (await request(app).post("/api/runs").set("Cookie", authCookie())).body,
+    );
     const stream = await openStream(app, runId);
 
     const first = await stream.next();
@@ -322,7 +332,9 @@ describe("GET /api/runs/:runId/events", () => {
   it("brings every Evaluation up to date before done, even if its listener lags the Run's", async () => {
     const { app, repo, openGate } = harness();
     repo.lagEvaluationDeltas = true;
-    const { runId } = createRunResponseSchema.parse((await request(app).post("/api/runs")).body);
+    const { runId } = createRunResponseSchema.parse(
+      (await request(app).post("/api/runs").set("Cookie", authCookie())).body,
+    );
     const stream = await openStream(app, runId);
     expect(await stream.next()).toMatchObject({ event: "snapshot" });
 
@@ -343,7 +355,9 @@ describe("GET /api/runs/:runId/events", () => {
 
   it("reports a subscription failure before the snapshot and ends the stream", async () => {
     const { app, repo } = harness();
-    const { runId } = createRunResponseSchema.parse((await request(app).post("/api/runs")).body);
+    const { runId } = createRunResponseSchema.parse(
+      (await request(app).post("/api/runs").set("Cookie", authCookie())).body,
+    );
     repo.failRunListener = true;
 
     const frames = await (await openStream(app, runId)).rest();
@@ -358,7 +372,9 @@ describe("GET /api/runs/:runId/events", () => {
 
   it("sends a heartbeat comment while the Run is quiet", async () => {
     const { app } = harness(10);
-    const { runId } = createRunResponseSchema.parse((await request(app).post("/api/runs")).body);
+    const { runId } = createRunResponseSchema.parse(
+      (await request(app).post("/api/runs").set("Cookie", authCookie())).body,
+    );
     const stream = await openStream(app, runId);
 
     expect(await stream.next()).toMatchObject({ event: "snapshot" });
@@ -368,7 +384,9 @@ describe("GET /api/runs/:runId/events", () => {
 
   it("releases its repository listeners when the client disconnects", async () => {
     const { app, repo } = harness();
-    const { runId } = createRunResponseSchema.parse((await request(app).post("/api/runs")).body);
+    const { runId } = createRunResponseSchema.parse(
+      (await request(app).post("/api/runs").set("Cookie", authCookie())).body,
+    );
     const stream = await openStream(app, runId);
     await stream.next();
     expect(repo.live).toBe(2);
@@ -439,7 +457,7 @@ describe("POST /api/runs/:runId/jobs/:jobKey/retry (D19)", () => {
   it("resubmits a simulated failure and returns it submitted, with its rebuilt payload", async () => {
     const { app, repo } = await withSimulatedFailure();
 
-    const res = await request(app).post(retryUrl("run-x", key));
+    const res = await request(app).post(retryUrl("run-x", key)).set("Cookie", authCookie());
 
     expect(res.status).toBe(200);
     const { evaluation } = retrySubmitResponseSchema.parse(res.body);
@@ -455,7 +473,7 @@ describe("POST /api/runs/:runId/jobs/:jobKey/retry (D19)", () => {
   it("returns 409 for a job that is not a simulated failure", async () => {
     const { app } = await withSimulatedFailure({ reason: "Application form unavailable" });
 
-    const res = await request(app).post(retryUrl("run-x", key));
+    const res = await request(app).post(retryUrl("run-x", key)).set("Cookie", authCookie());
 
     expect(res.status).toBe(409);
     expect(errorResponseSchema.parse(res.body).error.code).toBe("not_retryable");
@@ -464,9 +482,13 @@ describe("POST /api/runs/:runId/jobs/:jobKey/retry (D19)", () => {
   it("returns 404 for an unknown Run or job, and 400 for a malformed job key", async () => {
     const { app } = await withSimulatedFailure();
 
-    const noRun = await request(app).post(retryUrl("run-nope", key));
-    const noJob = await request(app).post(retryUrl("run-x", "greenhouse:acme:2"));
-    const malformed = await request(app).post(retryUrl("run-x", "greenhouse/../etc"));
+    const noRun = await request(app).post(retryUrl("run-nope", key)).set("Cookie", authCookie());
+    const noJob = await request(app)
+      .post(retryUrl("run-x", "greenhouse:acme:2"))
+      .set("Cookie", authCookie());
+    const malformed = await request(app)
+      .post(retryUrl("run-x", "greenhouse/../etc"))
+      .set("Cookie", authCookie());
 
     expect([noRun.status, noJob.status, malformed.status]).toEqual([404, 404, 400]);
     expect(errorResponseSchema.parse(noJob.body).error.code).toBe("job_not_found");

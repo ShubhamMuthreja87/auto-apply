@@ -3,6 +3,7 @@ import request from "supertest";
 import { healthResponseSchema } from "@auto-apply/shared";
 import { createApp } from "./app.js";
 import { loadConfig, type Config } from "./config.js";
+import { authCookie, TEST_AUTH_ENV } from "./auth/test-auth.js";
 import { InMemoryRepo } from "./repo/in-memory-repo.js";
 import type { Pipeline } from "./pipeline/pipeline.js";
 
@@ -12,6 +13,7 @@ const noPipeline: Pipeline = {
 };
 
 const testConfig: Config = loadConfig({
+  ...TEST_AUTH_ENV,
   NODE_ENV: "test",
   FIRESTORE_NAMESPACE: "test-local",
   REPO: "memory",
@@ -48,7 +50,7 @@ describe("API", () => {
   });
 
   it("returns the shared JSON error shape for unknown routes", async () => {
-    const res = await request(app).get("/api/does-not-exist");
+    const res = await request(app).get("/api/does-not-exist").set("Cookie", authCookie());
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ error: { code: "not_found", message: "Not found" } });
   });

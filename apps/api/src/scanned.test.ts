@@ -16,6 +16,7 @@ import {
 } from "@auto-apply/shared";
 import { createApp } from "./app.js";
 import { loadConfig, type Config } from "./config.js";
+import { authCookie, TEST_AUTH_ENV } from "./auth/test-auth.js";
 import { InMemoryRepo } from "./repo/in-memory-repo.js";
 import type { Pipeline } from "./pipeline/pipeline.js";
 import { DEMO_UID } from "./user.js";
@@ -26,6 +27,7 @@ const noPipeline: Pipeline = {
 };
 
 const testConfig: Config = loadConfig({
+  ...TEST_AUTH_ENV,
   NODE_ENV: "test",
   PORT: "3001",
   FIRESTORE_NAMESPACE: "test-local",
@@ -124,7 +126,9 @@ async function seeded(): Promise<InMemoryRepo> {
 
 describe("GET /api/runs", () => {
   it("lists the user's Runs newest first", async () => {
-    const res = await request(appWith(await seeded())).get("/api/runs");
+    const res = await request(appWith(await seeded()))
+      .get("/api/runs")
+      .set("Cookie", authCookie());
 
     expect(res.status).toBe(200);
     const { runs } = runsListResponseSchema.parse(res.body);
@@ -132,7 +136,9 @@ describe("GET /api/runs", () => {
   });
 
   it("answers an empty list before the first Run", async () => {
-    const res = await request(appWith(new InMemoryRepo())).get("/api/runs");
+    const res = await request(appWith(new InMemoryRepo()))
+      .get("/api/runs")
+      .set("Cookie", authCookie());
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ runs: [] });
@@ -141,7 +147,9 @@ describe("GET /api/runs", () => {
 
 describe("GET /api/evaluations", () => {
   it("lists every Run's Evaluations, newest Run first, with verdict, reason, scoredBy and evidence", async () => {
-    const res = await request(appWith(await seeded())).get("/api/evaluations");
+    const res = await request(appWith(await seeded()))
+      .get("/api/evaluations")
+      .set("Cookie", authCookie());
 
     expect(res.status).toBe(200);
     const { evaluations } = evaluationsListResponseSchema.parse(res.body);
@@ -159,7 +167,9 @@ describe("GET /api/evaluations", () => {
   });
 
   it("lists one Run's Evaluations when given its id", async () => {
-    const res = await request(appWith(await seeded())).get("/api/evaluations?runId=run-old");
+    const res = await request(appWith(await seeded()))
+      .get("/api/evaluations?runId=run-old")
+      .set("Cookie", authCookie());
 
     expect(res.status).toBe(200);
     const { evaluations } = evaluationsListResponseSchema.parse(res.body);
@@ -167,14 +177,18 @@ describe("GET /api/evaluations", () => {
   });
 
   it("answers 404 for another user's Run", async () => {
-    const res = await request(appWith(await seeded())).get("/api/evaluations?runId=run-other");
+    const res = await request(appWith(await seeded()))
+      .get("/api/evaluations?runId=run-other")
+      .set("Cookie", authCookie());
 
     expect(res.status).toBe(404);
     expect(errorResponseSchema.parse(res.body).error.code).toBe("run_not_found");
   });
 
   it("answers 400 for a malformed run id", async () => {
-    const res = await request(appWith(await seeded())).get("/api/evaluations?runId=..%2Fusers");
+    const res = await request(appWith(await seeded()))
+      .get("/api/evaluations?runId=..%2Fusers")
+      .set("Cookie", authCookie());
 
     expect(res.status).toBe(400);
     expect(errorResponseSchema.parse(res.body).error.code).toBe("invalid_request");
@@ -186,7 +200,7 @@ describe("GET /api/evaluations", () => {
       status: "exploded" as Evaluation["status"],
     });
 
-    const res = await request(appWith(repo)).get("/api/evaluations");
+    const res = await request(appWith(repo)).get("/api/evaluations").set("Cookie", authCookie());
 
     expect(res.status).toBe(500);
     expect(res.body).toEqual({ error: { code: "internal", message: "Internal server error" } });

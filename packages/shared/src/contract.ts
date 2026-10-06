@@ -80,6 +80,25 @@ export const healthResponseSchema = z.object({
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
 
 /* -------------------------------------------------------------------------- *
+ * Auth (D26, ticket 15). One user, no signup; the session is a JWT in an
+ * httpOnly cookie the browser never reads, so no payload carries the token.
+ * -------------------------------------------------------------------------- */
+
+/** `POST /api/login` body. Bounded so a huge password never reaches bcrypt. */
+export const loginRequestSchema = z.object({
+  username: z.string().min(1).max(200),
+  password: z.string().min(1).max(200),
+});
+export type LoginRequest = z.infer<typeof loginRequestSchema>;
+
+/**
+ * `POST /api/login` (success) and `GET /api/session`: the cookie is valid.
+ * Deliberately PII-free; an unauthenticated caller gets `401` instead.
+ */
+export const sessionResponseSchema = z.object({ authenticated: z.literal(true) });
+export type SessionResponse = z.infer<typeof sessionResponseSchema>;
+
+/* -------------------------------------------------------------------------- *
  * Firestore documents (D14) and the identities built from them.
  *
  * These shapes travel to the browser over SSE as run and evaluation snapshots

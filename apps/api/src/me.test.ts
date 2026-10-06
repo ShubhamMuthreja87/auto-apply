@@ -7,6 +7,7 @@ import request from "supertest";
 import { errorResponseSchema, meResponseSchema } from "@auto-apply/shared";
 import { createApp } from "./app.js";
 import { loadConfig, type Config } from "./config.js";
+import { authCookie, TEST_AUTH_ENV } from "./auth/test-auth.js";
 import { InMemoryRepo } from "./repo/in-memory-repo.js";
 import type { Pipeline } from "./pipeline/pipeline.js";
 import { DEMO_UID, seedUser } from "./user.js";
@@ -17,6 +18,7 @@ const noPipeline: Pipeline = {
 };
 
 const testConfig: Config = loadConfig({
+  ...TEST_AUTH_ENV,
   NODE_ENV: "test",
   FIRESTORE_NAMESPACE: "test-local",
   REPO: "memory",
@@ -33,7 +35,7 @@ describe("GET /api/me", () => {
     const repo = new InMemoryRepo();
     await seedUser(repo, DEMO_UID);
 
-    const res = await request(appWith(repo)).get("/api/me");
+    const res = await request(appWith(repo)).get("/api/me").set("Cookie", authCookie());
 
     expect(res.status).toBe(200);
     const me = meResponseSchema.parse(res.body);
@@ -44,7 +46,9 @@ describe("GET /api/me", () => {
   });
 
   it("answers 404 in the shared error shape when no user exists", async () => {
-    const res = await request(appWith(new InMemoryRepo())).get("/api/me");
+    const res = await request(appWith(new InMemoryRepo()))
+      .get("/api/me")
+      .set("Cookie", authCookie());
 
     expect(res.status).toBe(404);
     expect(errorResponseSchema.parse(res.body).error.code).toBe("user_not_found");
@@ -59,7 +63,7 @@ describe("GET /api/me", () => {
       settings: {},
     });
 
-    const res = await request(appWith(repo)).get("/api/me");
+    const res = await request(appWith(repo)).get("/api/me").set("Cookie", authCookie());
 
     expect(res.status).toBe(500);
     expect(res.body).toEqual({

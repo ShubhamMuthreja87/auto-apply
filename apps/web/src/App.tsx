@@ -11,20 +11,36 @@ import { RunPanel } from "./run/RunPanel";
 import { AppliedJobsPage } from "./pages/AppliedJobsPage";
 import { ScannedJobsPage } from "./pages/ScannedJobsPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { LoginPage } from "./pages/LoginPage";
+import { AuthProvider } from "./auth/AuthProvider";
+import { RequireAuth } from "./auth/RequireAuth";
 
+/**
+ * Login is the only page outside the gate (D26); every other path goes
+ * through `RequireAuth` to the shell and its views.
+ */
 export function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <AppShell>
+      <AuthProvider>
         <Routes>
-          <Route path="/" element={<RunPanel />} />
-          <Route path="/applied" element={<AppliedJobsPage />} />
-          <Route path="/scanned" element={<ScannedJobsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="*" element={<RequireAuth>{shell}</RequireAuth>} />
         </Routes>
-      </AppShell>
+      </AuthProvider>
     </ThemeProvider>
   );
 }
+
+const shell = (
+  <AppShell>
+    <Routes>
+      <Route path="/" element={<RunPanel />} />
+      <Route path="/applied" element={<AppliedJobsPage />} />
+      <Route path="/scanned" element={<ScannedJobsPage />} />
+      <Route path="/settings" element={<SettingsPage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  </AppShell>
+);

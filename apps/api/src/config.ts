@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { repoKindSchema } from "@auto-apply/shared";
 import { AI_ENV_KEYS, aiEnvSchema } from "./ai/ai-env.js";
+import { AUTH_ENV_KEYS, authEnvSchema } from "./auth/auth-env.js";
 
 /** An env var that may be absent or blank; blank counts as unset. */
 const optionalString = z
@@ -10,8 +11,8 @@ const optionalString = z
 
 /**
  * Environment is parsed once, at startup, and the process fails fast if it is
- * invalid (CODING_STANDARDS, General). The AI vars come from `ai/ai-env.ts`;
- * a later ticket adds the auth vars.
+ * invalid (CODING_STANDARDS, General). The AI vars come from `ai/ai-env.ts`,
+ * the auth vars (required, no defaults) from `auth/auth-env.ts`.
  */
 const envSchema = z
   .object({
@@ -39,7 +40,8 @@ const envSchema = z
     // document (compensation is never seeded); unset means the block is inactive.
     SALARY_FLOOR_LPA: optionalString.pipe(z.coerce.number().positive().optional()),
   })
-  .merge(aiEnvSchema);
+  .merge(aiEnvSchema)
+  .merge(authEnvSchema);
 
 export type Config = z.infer<typeof envSchema>;
 
@@ -54,7 +56,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     GOOGLE_APPLICATION_CREDENTIALS: env.GOOGLE_APPLICATION_CREDENTIALS,
     JOB_SOURCE: env.JOB_SOURCE,
     SALARY_FLOOR_LPA: env.SALARY_FLOOR_LPA,
-    ...Object.fromEntries(AI_ENV_KEYS.map((key) => [key, env[key]])),
+    ...Object.fromEntries([...AI_ENV_KEYS, ...AUTH_ENV_KEYS].map((key) => [key, env[key]])),
   });
 
   // The `prod` namespace is only ever used on the server (CODING_STANDARDS,
