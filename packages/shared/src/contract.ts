@@ -66,3 +66,122 @@ export const healthResponseSchema = z.object({
   time: z.string(),
 });
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
+
+/* -------------------------------------------------------------------------- *
+ * Firestore documents (D14) and the identities built from them.
+ *
+ * These shapes travel to the browser over SSE as run and evaluation snapshots
+ * (D21), so they live in the contract. Product-rich fields — the rubric inside
+ * preferences (D6), the per-criterion evidence and built Greenhouse payload on
+ * an Evaluation (D7, D18) — are owned by later tickets; this ticket fixes
+ * identity, status and funnel, enough for the persistence port and its tests.
+ * -------------------------------------------------------------------------- */
+
+/** The ATS boards discovery reads from (D2). */
+export const atsSchema = z.enum(["greenhouse", "lever", "ashby"]);
+export type Ats = z.infer<typeof atsSchema>;
+
+/**
+ * A single job as returned by an ATS board, normalised into our own shape
+ * (GLOSSARY: Posting). The unit of discovery.
+ */
+export const postingSchema = z.object({
+  ats: atsSchema,
+  board: z.string(),
+  jobId: z.string(),
+  title: z.string(),
+  company: z.string(),
+  location: z.string(),
+  descriptionText: z.string(),
+  applyUrl: z.string().url(),
+});
+export type Posting = z.infer<typeof postingSchema>;
+
+/**
+ * The stable identity of a Posting across the several URLs an ATS exposes for
+ * it (GLOSSARY: Job Key, D14): `${ats}:${board}:${jobId}`. It is both the
+ * Evaluation document id (within its Run) and the Seen key.
+ */
+export function jobKey(posting: Pick<Posting, "ats" | "board" | "jobId">): string {
+  return `${posting.ats}:${posting.board}:${posting.jobId}`;
+}
+
+/**
+ * The single user document (D13): profile, the preferences rubric (D6) and
+ * settings. The detailed shapes of these three are owned by later tickets, so
+ * here they are open records — the persistence port and its tests do not pin
+ * down product fields yet.
+ */
+export const userDocSchema = z.object({
+  uid: z.string(),
+  profile: z.record(z.string(), z.unknown()),
+  preferences: z.record(z.string(), z.unknown()),
+  settings: z.record(z.string(), z.unknown()),
+});
+export type UserDoc = z.infer<typeof userDocSchema>;
+
+/**
+ * Per-run funnel counts (D16). They are only ever incremented, never
+ * read-modify-written (CODING_STANDARDS landmine: lost updates); the Firestore
+ * adapter maps increments to `FieldValue.increment`.
+ */
+export const runFunnelSchema = z.object({
+  discovered: z.number().int().nonnegative(),
+  evaluated: z.number().int().nonnegative(),
+  blocked: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+  held: z.number().int().nonnegative(),
+  submitted: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+});
+export type RunFunnel = z.infer<typeof runFunnelSchema>;
+
+/** A fresh, all-zero funnel for a newly created Run. */
+export function emptyFunnel(): RunFunnel {
+  return { discovered: 0, evaluated: 0, blocked: 0, skipped: 0, held: 0, submitted: 0, failed: 0 };
+}
+
+/**
+ * One unattended pass of the pipeline (GLOSSARY: Run). `reason` is set when a
+ * run ends `failed` (D16); timestamps are ISO-8601 strings.
+ */
+export const runSchema = z.object({
+  runId: z.string(),
+  uid: z.string(),
+  status: runStatusSchema,
+  funnel: runFunnelSchema,
+  reason: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type Run = z.infer<typeof runSchema>;
+
+/**
+ * A Run is active until it reaches a terminal status. This drives the
+ * one-active-run-per-user rule (D17) that `createRun` enforces as a future 409.
+ */
+export function isRunActive(status: RunStatus): boolean {
+  return status !== "completed" && status !== "failed";
+}
+
+/** The outcome the rubric assigns a Posting (GLOSSARY: Verdict, D8). */
+export const verdictSchema = z.enum(["APPLY_NOW", "APPLY", "STRETCH", "BLOCKED"]);
+export type Verdict = z.infer<typeof verdictSchema>;
+
+/**
+ * The per-run record of what we decided about one Posting (GLOSSARY:
+ * Evaluation), stored as one document under its Run. Per-criterion evidence and
+ * the built Greenhouse payload are added by the scoring and submit tickets.
+ */
+export const evaluationSchema = z.object({
+  jobKey: z.string(),
+  runId: z.string(),
+  posting: postingSchema,
+  status: evaluationStatusSchema,
+  verdict: verdictSchema.nullable(),
+  score: z.number().nullable(),
+  reason: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type Evaluation = z.infer<typeof evaluationSchema>;
