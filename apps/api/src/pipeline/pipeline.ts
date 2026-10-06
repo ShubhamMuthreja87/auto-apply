@@ -4,26 +4,48 @@
  * source, and news-up nothing itself (spec, Pipeline). Tests drive it with
  * fakes and an instant `delay`; production passes real timers.
  *
- * Ticket 05 is the skeleton: it walks the Run through `discovering →
- * evaluating → applying → completed` over whatever `Discovery` returns (real
- * ATS boards since ticket 06),
- * marking every Posting `skipped` because there is no evaluator yet. Later
- * tickets replace the evaluating and applying stages with real work.
+ * A Run: load the user → discover Postings → pull them through a pool of
+ * `MAX_IN_FLIGHT` workers (D17). Each pulled Posting is persisted as `queued`,
+ * moves to `evaluating`, and then, cheapest first:
+ *   1. Seen in an earlier Run → `skipped: seen` (D15), before any spend.
+ *   2. Screening in code (D7) → `blocked` by a hard block, or `skipped` for a
+ *      title out of target, with a reason; no AI tokens spent.
+ *   3. Otherwise it takes one of the Run's `MAX_AI_EVALS` evaluation slots and
+ *      goes to the `JobEvaluator`; with no slot left it is `skipped: limit`.
+ * Once every slot is taken the pool stops pulling, and Postings never pulled
+ * are not persisted. Seen-skips and screening outcomes take no slot.
+ *
+ * Scoring the evaluator's judgements into a Verdict is ticket 08: until then
+ * an evaluated Posting ends `skipped` with {@link AWAITING_SCORING_REASON}.
+ *
+ * Every status change goes through the transition table (`transitions.ts`).
  */
 import {
+  MAX_AI_EVALS,
+  MAX_IN_FLIGHT,
+  SKIP_REASONS,
   emptyFunnel,
   jobKey,
+  type EvaluationDelta,
+  type EvaluationStatus,
   type Posting,
   type Repo,
   type Run,
+  type RunFunnel,
+  type RunStatus,
   type User,
 } from "@auto-apply/shared";
+import { screenPosting, type ScreeningOptions } from "../evaluation/screen.js";
 import { logger } from "../logger.js";
-import type { Discovery } from "./ports.js";
+import type { Discovery, JobEvaluator } from "./ports.js";
+import { assertEvaluationTransition, assertRunTransition } from "./transitions.js";
 
 export interface PipelineDeps {
   repo: Repo;
   discovery: Discovery;
+  evaluator: JobEvaluator;
+  /** Parameters for screening that do not live in the user document (the salary floor). */
+  screening?: ScreeningOptions;
   clock: () => Date;
   /** Paces the stages so the live view is watchable; instant in tests. */
   delay: (ms: number) => Promise<void>;
@@ -55,21 +77,36 @@ export interface Pipeline {
   startRun(uid: string): Promise<StartedRun>;
 }
 
-/** Pause between skeleton stages, so a demo can watch the statuses move. */
+/** Pause per stage and per Posting, so a demo can watch the statuses move. */
 const STEP_MS = 500;
 
-const SKELETON_REASON = "skeleton pipeline: no evaluator yet";
+/** Interim outcome of an evaluated Posting until scoring lands (ticket 08). */
+export const AWAITING_SCORING_REASON = "Passed screening; scoring is not built yet";
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
 export function buildPipeline(deps: PipelineDeps): Pipeline {
-  const { repo, discovery, clock, delay, newRunId, loadUser } = deps;
+  const { repo, discovery, evaluator, screening = {}, clock, delay, newRunId, loadUser } = deps;
 
-  async function runStages(runId: string, uid: string): Promise<void> {
+  /** The Run's current status, kept beside the store so every move is checked. */
+  function runMachine(runId: string) {
+    let status: RunStatus = "discovering";
+    return {
+      get status() {
+        return status;
+      },
+      async move(to: RunStatus, reason?: string): Promise<void> {
+        assertRunTransition(status, to);
+        await repo.patchRun(runId, reason === undefined ? { status: to } : { status: to, reason });
+        status = to;
+      },
+    };
+  }
+
+  async function runStages(runId: string, uid: string, run: ReturnType<typeof runMachine>) {
     // A missing or invalid user document fails the Run before any discovery.
-    // Hard blocks and the rubric (tickets 07, 08) will read from it.
     const user = await loadUser(uid);
     logger.info("run_user_loaded", {
       runId,
@@ -78,21 +115,109 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
     });
     await delay(STEP_MS);
     const postings = await discovery.discover();
-    for (const posting of postings) await recordQueued(runId, posting);
     await repo.patchRun(runId, { funnelIncrements: { discovered: postings.length } });
 
-    await repo.patchRun(runId, { status: "evaluating" });
-    for (const posting of postings) {
-      const key = jobKey(posting);
-      await repo.patchEvaluation(runId, key, { status: "evaluating" });
-      await delay(STEP_MS);
-      await repo.patchEvaluation(runId, key, { status: "skipped", reason: SKELETON_REASON });
-      await repo.patchRun(runId, { funnelIncrements: { evaluated: 1, skipped: 1 } });
+    await run.move("evaluating");
+    await evaluateAll(runId, user, postings);
+
+    await run.move("applying");
+    await delay(STEP_MS);
+    await run.move("completed");
+  }
+
+  /**
+   * The pool: `MAX_IN_FLIGHT` workers pull Postings in discovery order until
+   * none are left or every AI-evaluation slot is taken. Slots are counted
+   * synchronously, so the cap holds however the workers interleave.
+   */
+  async function evaluateAll(runId: string, user: User, postings: readonly Posting[]) {
+    let next = 0;
+    let slotsTaken = 0;
+    const slots = {
+      take(): boolean {
+        if (slotsTaken >= MAX_AI_EVALS) return false;
+        slotsTaken++;
+        return true;
+      },
+    };
+    const pull = (): Posting | undefined =>
+      slotsTaken < MAX_AI_EVALS && next < postings.length ? postings[next++] : undefined;
+
+    async function worker(): Promise<void> {
+      for (let posting = pull(); posting; posting = pull()) {
+        await evaluateOne(runId, user, posting, slots);
+      }
+    }
+    await Promise.all(Array.from({ length: MAX_IN_FLIGHT }, worker));
+    logger.info("run_evaluated", {
+      runId,
+      discovered: postings.length,
+      pulled: next,
+      aiEvaluations: slotsTaken,
+    });
+  }
+
+  async function evaluateOne(
+    runId: string,
+    user: User,
+    posting: Posting,
+    slots: { take(): boolean },
+  ): Promise<void> {
+    const key = jobKey(posting);
+    const current: { status: EvaluationStatus } = { status: "queued" };
+    async function move(to: EvaluationStatus, delta: EvaluationDelta = {}) {
+      assertEvaluationTransition(current.status, to);
+      await repo.patchEvaluation(runId, key, { ...delta, status: to });
+      current.status = to;
+    }
+    async function finish(
+      to: EvaluationStatus,
+      reason: string,
+      counted: keyof RunFunnel,
+      options: { markSeen: boolean; evaluated?: boolean },
+    ) {
+      await move(to, { reason });
+      if (options.markSeen) await repo.markSeen(key);
+      await repo.patchRun(runId, {
+        funnelIncrements: { [counted]: 1, ...(options.evaluated ? { evaluated: 1 } : {}) },
+      });
     }
 
-    await repo.patchRun(runId, { status: "applying" });
-    await delay(STEP_MS);
-    await repo.patchRun(runId, { status: "completed" });
+    await recordQueued(runId, posting);
+    try {
+      await move("evaluating");
+      await delay(STEP_MS);
+
+      if (await repo.isSeen(key)) {
+        return await finish("skipped", SKIP_REASONS.seen, "skipped", { markSeen: false });
+      }
+
+      const screened = screenPosting(posting, user.preferences, screening);
+      if (screened.outcome === "blocked") {
+        return await finish("blocked", screened.reason, "blocked", { markSeen: true });
+      }
+      if (screened.outcome === "skipped") {
+        return await finish("skipped", screened.reason, "skipped", { markSeen: true });
+      }
+
+      if (!slots.take()) {
+        // Not marked Seen: it was never evaluated, so a later Run considers it.
+        return await finish("skipped", SKIP_REASONS.limit, "skipped", { markSeen: false });
+      }
+      const judgements = await evaluator.evaluate(posting, user.preferences.fitCriteria);
+      logger.info("posting_evaluated", { runId, jobKey: key, judgements: judgements.length });
+      await finish("skipped", AWAITING_SCORING_REASON, "skipped", {
+        markSeen: true,
+        evaluated: true,
+      });
+    } catch (err) {
+      // One Posting's failure never fails the Run (CODING_STANDARDS: never
+      // swallow errors — it becomes a `failed` Evaluation with its reason).
+      if (current.status !== "evaluating") throw err;
+      const reason = messageOf(err);
+      logger.error("posting_failed", { runId, jobKey: key, reason });
+      await finish("failed", reason, "failed", { markSeen: false });
+    }
   }
 
   /** Writes the Posting's Evaluation in its first status, `queued`. */
@@ -112,23 +237,20 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
   }
 
   /** A crash inside the Run fails the Run with its reason; it never escapes. */
-  async function fail(runId: string, err: unknown): Promise<void> {
+  async function fail(runId: string, run: ReturnType<typeof runMachine>, err: unknown) {
     const reason = messageOf(err);
-    logger.error("run_failed", { runId, reason });
+    logger.error("run_failed", { runId, reason, wasStatus: run.status });
     try {
-      await repo.patchRun(runId, { status: "failed", reason });
-    } catch (patchErr) {
-      logger.error("run_fail_not_recorded", {
-        runId,
-        error: messageOf(patchErr),
-      });
+      await run.move("failed", reason);
+    } catch (moveErr) {
+      logger.error("run_fail_not_recorded", { runId, error: messageOf(moveErr) });
     }
   }
 
   return {
     async startRun(uid) {
       const now = clock().toISOString();
-      const run: Run = {
+      const created: Run = {
         runId: newRunId(),
         uid,
         status: "discovering",
@@ -137,9 +259,12 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
         createdAt: now,
         updatedAt: now,
       };
-      await repo.createRun(run);
-      const finished = runStages(run.runId, uid).catch((err: unknown) => fail(run.runId, err));
-      return { runId: run.runId, finished };
+      await repo.createRun(created);
+      const run = runMachine(created.runId);
+      const finished = runStages(created.runId, uid, run).catch((err: unknown) =>
+        fail(created.runId, run, err),
+      );
+      return { runId: created.runId, finished };
     },
   };
 }

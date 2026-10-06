@@ -10,7 +10,13 @@ import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
-import type { Ats, Evaluation, PostingSource } from "@auto-apply/shared";
+import {
+  MAX_AI_EVALS,
+  SKIP_REASONS,
+  type Ats,
+  type Evaluation,
+  type PostingSource,
+} from "@auto-apply/shared";
 import { StatusChip, VerdictChip } from "../ui/StatusChip";
 
 const atsLabels: Record<Ats, string> = {
@@ -45,6 +51,18 @@ function SourceLabel({ source }: { source: PostingSource }) {
       sx={{ ml: 1 }}
     />
   );
+}
+
+/** The fixed skip reasons in words; every other reason is already written for people. */
+const skipReasonText: Record<string, string> = {
+  [SKIP_REASONS.seen]: "Seen in an earlier run",
+  [SKIP_REASONS.limit]: `Run limit reached (${MAX_AI_EVALS} evaluations per run)`,
+  [SKIP_REASONS.stretch]: "Stretch or below",
+};
+
+function reasonText({ status, reason }: Pick<Evaluation, "status" | "reason">): string {
+  if (reason === null) return "—";
+  return (status === "skipped" ? skipReasonText[reason] : undefined) ?? reason;
 }
 
 export function EvaluationsTable({ evaluations }: { evaluations: Evaluation[] }) {
@@ -84,7 +102,8 @@ export function EvaluationsTable({ evaluations }: { evaluations: Evaluation[] })
               <TableCell>
                 <StatusChip status={status} />
               </TableCell>
-              <TableCell sx={{ color: "text.secondary", minWidth: 200 }}>{reason ?? "—"}</TableCell>
+              <TableCell sx={{ color: "text.secondary", minWidth: 200 }}>{reasonText({ status, reason })}
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
