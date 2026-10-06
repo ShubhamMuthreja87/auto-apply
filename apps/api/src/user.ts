@@ -4,7 +4,15 @@
  * module reads Firestore directly; the composition root hands `loadUser` to
  * the pipeline and the routes.
  */
-import { userSchema, type Repo, type User } from "@auto-apply/shared";
+import { z } from "zod";
+import {
+  UserMissingError,
+  applicationSettingsSchema,
+  userSchema,
+  type Repo,
+  type UpdateMeRequest,
+  type User,
+} from "@auto-apply/shared";
 import { SEED_USER } from "./seed-user.js";
 
 /**
@@ -53,4 +61,38 @@ export async function loadUser(repo: Repo, uid: string): Promise<User> {
     );
   }
   return parsed.data;
+}
+
+const storedAlwaysUserOnlySchema = z.object({
+  settings: applicationSettingsSchema.pick({ alwaysUserOnly: true }),
+});
+
+/**
+ * Saves the user's edits to profile, preferences and settings (ticket 17) and
+ * returns the stored result. Never seeds: a missing document stays missing
+ * ({@link UserNotFoundError}). `alwaysUserOnly` is not editable (D10), so the
+ * stored list is kept — or the seed's, if the stored document lost it.
+ */
+export async function saveUserEdits(
+  repo: Repo,
+  uid: string,
+  edits: UpdateMeRequest,
+): Promise<User> {
+  const stored = await repo.getUser(uid);
+  if (!stored) throw new UserNotFoundError(uid);
+  const kept = storedAlwaysUserOnlySchema.safeParse(stored);
+  const alwaysUserOnly = kept.success
+    ? kept.data.settings.alwaysUserOnly
+    : SEED_USER.settings.alwaysUserOnly;
+  try {
+    await repo.updateUser(uid, {
+      profile: edits.profile,
+      preferences: edits.preferences,
+      settings: { ...edits.settings, alwaysUserOnly },
+    });
+  } catch (err) {
+    if (err instanceof UserMissingError) throw new UserNotFoundError(uid);
+    throw err;
+  }
+  return loadUser(repo, uid);
 }

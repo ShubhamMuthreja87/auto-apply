@@ -18,10 +18,13 @@ import {
   retrySubmitResponseSchema,
   runsListResponseSchema,
   sessionResponseSchema,
+  updateMeResponseSchema,
   type Evaluation,
   type LoginRequest,
   type MeResponse,
   type Run,
+  type UpdateMeRequest,
+  type UpdateMeResponse,
 } from "@auto-apply/shared";
 
 /** A non-2xx answer, carrying the contract's error code when there is one. */
@@ -110,6 +113,19 @@ export async function retrySubmit(runId: string, jobKey: string): Promise<Evalua
 export async function getMe(): Promise<MeResponse> {
   const res = await apiFetch(`/api/me`);
   return meResponseSchema.parse(await readJson(res));
+}
+
+/**
+ * `PUT /api/me`: saves edits to profile, preferences and settings and returns
+ * the stored document; an `ApiError` with code `invalid_request` on 400.
+ */
+export async function updateMe(edits: UpdateMeRequest): Promise<UpdateMeResponse> {
+  const res = await apiFetch(`/api/me`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(edits),
+  });
+  return updateMeResponseSchema.parse(await readJson(res));
 }
 
 /**

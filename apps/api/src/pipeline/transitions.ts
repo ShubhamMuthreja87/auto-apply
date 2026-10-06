@@ -30,10 +30,11 @@ const runMoves: Record<RunStatus, readonly RunStatus[]> = {
 
 /**
  * Evaluation: queued → evaluating → blocked | skipped | held | applying | failed;
- * applying → submitted (simulated) | failed.
+ * applying → submitted (simulated) | failed. `queued → failed` is only taken by
+ * startup recovery, for a job its interrupted Run never reached.
  */
 const evaluationMoves: Record<EvaluationStatus, readonly EvaluationStatus[]> = {
-  queued: ["evaluating"],
+  queued: ["evaluating", "failed"],
   evaluating: ["blocked", "skipped", "held", "applying", "failed"],
   blocked: [],
   skipped: [],

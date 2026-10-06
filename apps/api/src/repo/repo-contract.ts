@@ -17,6 +17,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ActiveRunExistsError,
+  UserMissingError,
   emptyFunnel,
   jobKey,
   type CriterionEvidence,
@@ -206,6 +207,42 @@ export function describeRepoContract(
         await repo.seedUserIfMissing("user-1", aUser({ profile: { title: "Overwritten" } }));
         const user = await repo.getUser("user-1");
         expect(user?.profile).toEqual({ title: "Staff" });
+      });
+
+      it("replaces profile, preferences and settings of an existing user, keeping the uid", async () => {
+        await repo.seedUserIfMissing(
+          "user-1",
+          aUser({ profile: { title: "Staff", city: "Pune" }, settings: { notice: 30 } }),
+        );
+        await repo.updateUser("user-1", {
+          profile: { title: "EM" },
+          preferences: { region: "India" },
+          settings: { notice: 60 },
+        });
+        expect(await repo.getUser("user-1")).toEqual({
+          uid: "user-1",
+          profile: { title: "EM" },
+          preferences: { region: "India" },
+          settings: { notice: 60 },
+        });
+      });
+
+      it("rejects an update for a missing user and creates nothing", async () => {
+        await expect(
+          repo.updateUser("user-1", { profile: {}, preferences: {}, settings: {} }),
+        ).rejects.toBeInstanceOf(UserMissingError);
+        expect(await repo.getUser("user-1")).toBeNull();
+      });
+
+      it("keeps an edited user on a later seed (D13)", async () => {
+        await repo.seedUserIfMissing("user-1", aUser({ profile: { title: "Staff" } }));
+        await repo.updateUser("user-1", {
+          profile: { title: "EM" },
+          preferences: {},
+          settings: {},
+        });
+        await repo.seedUserIfMissing("user-1", aUser({ profile: { title: "Staff" } }));
+        expect((await repo.getUser("user-1"))?.profile).toEqual({ title: "EM" });
       });
     });
 
