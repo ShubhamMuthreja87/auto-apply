@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import request from "supertest";
 import { healthResponseSchema } from "@auto-apply/shared";
 import { createApp } from "./app.js";
-import type { Config } from "./config.js";
+import { loadConfig, type Config } from "./config.js";
 import { InMemoryRepo } from "./repo/in-memory-repo.js";
 import type { Pipeline } from "./pipeline/pipeline.js";
 
@@ -10,21 +10,24 @@ const noPipeline: Pipeline = {
   startRun: () => Promise.reject(new Error("not used by these tests")),
 };
 
-const testConfig: Config = {
+const testConfig: Config = loadConfig({
   NODE_ENV: "test",
-  PORT: 3001,
   FIRESTORE_NAMESPACE: "test-local",
   REPO: "memory",
   CORS_ORIGIN: "http://localhost:5173",
   JOB_SOURCE: "fixtures",
-};
+});
 
 describe("API", () => {
-  const app = createApp(testConfig, {
-    repo: new InMemoryRepo(),
-    kind: "memory",
-    close: async () => {},
-  }, noPipeline);
+  const app = createApp(
+    testConfig,
+    {
+      repo: new InMemoryRepo(),
+      kind: "memory",
+      close: async () => {},
+    },
+    noPipeline,
+  );
 
   it("GET /api/health returns a contract-valid payload", async () => {
     const res = await request(app).get("/api/health");

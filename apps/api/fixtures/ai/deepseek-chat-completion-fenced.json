@@ -1,0 +1,26 @@
+{
+  "id": "9b2e44c1-0f7a-4d55-8a6e-71c3d2e9f014",
+  "object": "chat.completion",
+  "created": 1791288042,
+  "model": "deepseek-chat",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "```json\n{\"judgements\":[{\"criterionId\":\"stack_primary\",\"met\":true,\"evidence\":\"Our stack is TypeScript, Node.js and React\"},{\"criterionId\":\"startup\",\"met\":false,\"evidence\":\"\"}]}\n```"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1180,
+    "completion_tokens": 70,
+    "total_tokens": 1250,
+    "prompt_tokens_details": { "cached_tokens": 0 },
+    "prompt_cache_hit_tokens": 0,
+    "prompt_cache_miss_tokens": 1180
+  },
+  "system_fingerprint": "fp_3a5770e1b4_prod0820_fp8_kvcache"
+}

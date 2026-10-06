@@ -227,6 +227,12 @@ export function RunPanel() {
       {run && reason && (
         <Alert severity={run.status === "failed" ? "error" : "info"}>{reason}</Alert>
       )}
+      {run?.scoring === "fallback" && (
+        <Alert severity="warning">
+          Fallback scoring: no AI key is configured, so this run judges every job with the keyword
+          matcher instead of the AI.
+        </Alert>
+      )}
 
       {!runId ? (
         checking ? (

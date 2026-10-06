@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import request from "supertest";
 import { errorResponseSchema, meResponseSchema } from "@auto-apply/shared";
 import { createApp } from "./app.js";
-import type { Config } from "./config.js";
+import { loadConfig, type Config } from "./config.js";
 import { InMemoryRepo } from "./repo/in-memory-repo.js";
 import type { Pipeline } from "./pipeline/pipeline.js";
 import { DEMO_UID, seedUser } from "./user.js";
@@ -15,14 +15,13 @@ const noPipeline: Pipeline = {
   startRun: () => Promise.reject(new Error("not used by these tests")),
 };
 
-const testConfig: Config = {
+const testConfig: Config = loadConfig({
   NODE_ENV: "test",
-  PORT: 3001,
   FIRESTORE_NAMESPACE: "test-local",
   REPO: "memory",
   CORS_ORIGIN: "http://localhost:5173",
   JOB_SOURCE: "fixtures",
-};
+});
 
 function appWith(repo: InMemoryRepo) {
   return createApp(testConfig, { repo, kind: "memory", close: async () => {} }, noPipeline);

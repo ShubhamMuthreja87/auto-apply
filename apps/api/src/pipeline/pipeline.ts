@@ -38,6 +38,7 @@ import {
   type Run,
   type RunFunnel,
   type RunStatus,
+  type ScoredBy,
   type User,
 } from "@auto-apply/shared";
 import { aiCriteria, buildRubric, judgeInCode } from "../evaluation/rubric.js";
@@ -51,6 +52,12 @@ export interface PipelineDeps {
   repo: Repo;
   discovery: Discovery;
   evaluator: JobEvaluator;
+  /**
+   * How Runs score, recorded on each Run so the UI can say so (D24):
+   * `fallback` when no AI key is configured and `evaluator` is the keyword
+   * matcher for the whole Run. Omitted, the Run does not record it.
+   */
+  scoringMode?: ScoredBy;
   /** Parameters for screening that do not live in the user document (the salary floor). */
   screening?: ScreeningOptions;
   clock: () => Date;
@@ -98,7 +105,17 @@ function messageOf(err: unknown): string {
 }
 
 export function buildPipeline(deps: PipelineDeps): Pipeline {
-  const { repo, discovery, evaluator, screening = {}, clock, delay, newRunId, loadUser } = deps;
+  const {
+    repo,
+    discovery,
+    evaluator,
+    scoringMode,
+    screening = {},
+    clock,
+    delay,
+    newRunId,
+    loadUser,
+  } = deps;
 
   /** The Run's current status, kept beside the store so every move is checked. */
   function runMachine(runId: string) {
@@ -299,6 +316,7 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
         status: "discovering",
         funnel: emptyFunnel(),
         reason: null,
+        ...(scoringMode ? { scoring: scoringMode } : {}),
         createdAt: now,
         updatedAt: now,
       };

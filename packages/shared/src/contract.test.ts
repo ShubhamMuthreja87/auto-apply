@@ -11,6 +11,7 @@ import {
   APPLY_NOW_MIN_FIT,
   FIT_CAP,
   evaluationSchema,
+  runSchema,
 } from "./index.js";
 
 describe("contract", () => {
@@ -86,5 +87,28 @@ describe("contract", () => {
       updatedAt: "t",
     };
     expect(evaluationSchema.parse(stored)).toMatchObject({ evidence: [], scoredBy: null });
+  });
+
+  it("reads a Run with or without its scoring mode, and only ai or fallback (D24)", () => {
+    const stored = {
+      runId: "run-1",
+      uid: "u",
+      status: "completed",
+      funnel: {
+        discovered: 0,
+        evaluated: 0,
+        blocked: 0,
+        skipped: 0,
+        held: 0,
+        submitted: 0,
+        failed: 0,
+      },
+      reason: null,
+      createdAt: "t",
+      updatedAt: "t",
+    };
+    expect(runSchema.parse(stored).scoring).toBeUndefined();
+    expect(runSchema.parse({ ...stored, scoring: "fallback" }).scoring).toBe("fallback");
+    expect(() => runSchema.parse({ ...stored, scoring: "guess" })).toThrow();
   });
 });
