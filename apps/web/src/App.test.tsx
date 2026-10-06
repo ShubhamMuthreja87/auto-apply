@@ -22,6 +22,7 @@ describe("<App />", () => {
           status: "ok",
           service: "auto-apply-api",
           namespace: "dev",
+          repo: "memory",
           time: new Date().toISOString(),
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
@@ -33,6 +34,8 @@ describe("<App />", () => {
 
     await waitFor(() => expect(screen.getByText("dev")).toBeInTheDocument());
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    // ADR-0004: an in-memory store is called out, never mistaken for persistence.
+    expect(screen.getByText(/in-memory \(not persisted\)/i)).toBeInTheDocument();
   });
 
   it("shows an error state when the API responds with a failure", async () => {

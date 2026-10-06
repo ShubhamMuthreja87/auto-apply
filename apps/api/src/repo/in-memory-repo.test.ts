@@ -19,11 +19,17 @@ describe("InMemoryRepo beyond the contract", () => {
       updatedAt: now,
     });
     const statuses: string[] = [];
-    const unsub = repo.watchRun("run-1", (run) => statuses.push(run.status));
+    const errors: Error[] = [];
+    const unsub = repo.watchRun(
+      "run-1",
+      (run) => statuses.push(run.status),
+      (error) => errors.push(error),
+    );
     await new Promise((resolve) => setTimeout(resolve, 0));
     await repo.patchRun("run-1", { status: "evaluating" });
     await repo.patchRun("run-1", { status: "applying" });
     expect(statuses).toEqual(["discovering", "evaluating", "applying"]);
+    expect(errors).toEqual([]);
     unsub();
   });
 });

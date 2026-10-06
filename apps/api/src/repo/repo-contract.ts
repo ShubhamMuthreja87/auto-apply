@@ -24,6 +24,8 @@ import {
   type Posting,
   type Repo,
   type Run,
+  type RunStatus,
+  type EvaluationStatus,
   type UserDoc,
 } from "@auto-apply/shared";
 
@@ -129,8 +131,18 @@ export function describeRepoContract(
       teardown = harness.teardown;
     });
 
+    // Healthy subscriptions must never report an error; the tests that expect
+    // one pass their own handler instead of this one.
+    let unexpectedErrors: Error[] = [];
+    const recordUnexpected = (error: Error) => unexpectedErrors.push(error);
+
     afterEach(async () => {
-      await teardown?.();
+      try {
+        expect(unexpectedErrors.map((e) => e.message)).toEqual([]);
+      } finally {
+        unexpectedErrors = [];
+        await teardown?.();
+      }
     });
 
     describe("users", () => {
@@ -223,7 +235,7 @@ export function describeRepoContract(
       it("delivers the initial snapshot asynchronously, never synchronously", async () => {
         await repo.createRun(aRun());
         const seen: Run[] = [];
-        const unsub = repo.watchRun("run-1", (run) => seen.push(run));
+        const unsub = repo.watchRun("run-1", (run) => seen.push(run), recordUnexpected);
         expect(seen).toHaveLength(0);
         await eventually(() => expect(seen).toHaveLength(1));
         expect(seen[0]?.status).toBe("discovering");
@@ -233,7 +245,7 @@ export function describeRepoContract(
       it("echoes later writes back in write order, ending on the latest", async () => {
         await repo.createRun(aRun());
         const statuses: string[] = [];
-        const unsub = repo.watchRun("run-1", (run) => statuses.push(run.status));
+        const unsub = repo.watchRun("run-1", (run) => statuses.push(run.status), recordUnexpected);
         await eventually(() => expect(statuses).toEqual(["discovering"]));
         statuses.length = 0;
         await repo.patchRun("run-1", { status: "evaluating" });
@@ -247,7 +259,7 @@ export function describeRepoContract(
       it("never delivers a stale state after a write that races the initial snapshot", async () => {
         await repo.createRun(aRun());
         const statuses: string[] = [];
-        const unsub = repo.watchRun("run-1", (run) => statuses.push(run.status));
+        const unsub = repo.watchRun("run-1", (run) => statuses.push(run.status), recordUnexpected);
         // Lands before (in memory: always; Firestore: usually) the initial snapshot.
         await repo.patchRun("run-1", { status: "evaluating" });
         await eventually(() => expect(statuses.at(-1)).toBe("evaluating"));
@@ -258,12 +270,35 @@ export function describeRepoContract(
       it("stops delivering after unsubscribe", async () => {
         await repo.createRun(aRun());
         const statuses: string[] = [];
-        const unsub = repo.watchRun("run-1", (run) => statuses.push(run.status));
+        const unsub = repo.watchRun("run-1", (run) => statuses.push(run.status), recordUnexpected);
         await eventually(() => expect(statuses).toEqual(["discovering"]));
         unsub();
         await repo.patchRun("run-1", { status: "evaluating" });
         await settle();
         expect(statuses).toEqual(["discovering"]);
+      });
+    });
+
+    describe("watchRun errors (ADR-0003)", () => {
+      it("reports an invalid run to onError instead of delivering it, then keeps going", async () => {
+        await repo.createRun(aRun());
+        const statuses: string[] = [];
+        const errors: Error[] = [];
+        const unsub = repo.watchRun(
+          "run-1",
+          (run) => statuses.push(run.status),
+          (error) => errors.push(error),
+        );
+        await eventually(() => expect(statuses).toEqual(["discovering"]));
+        // A write that breaks the contract shape (a corrupted document).
+        await repo.patchRun("run-1", { status: "exploded" as RunStatus });
+        await eventually(() => expect(errors).toHaveLength(1));
+        expect(errors[0]).toBeInstanceOf(Error);
+        expect(statuses).toEqual(["discovering"]);
+        // The subscription survives a bad document.
+        await repo.patchRun("run-1", { status: "evaluating" });
+        await eventually(() => expect(statuses.at(-1)).toBe("evaluating"));
+        unsub();
       });
     });
 
@@ -275,7 +310,7 @@ export function describeRepoContract(
         await repo.putEvaluation("run-1", anEvaluation(p1));
         await repo.putEvaluation("run-1", anEvaluation(p2));
         const changes: EvaluationChange[] = [];
-        const unsub = repo.watchEvaluations("run-1", (change) => changes.push(change));
+        const unsub = repo.watchEvaluations("run-1", (change) => changes.push(change), recordUnexpected);
         expect(changes).toHaveLength(0);
         await eventually(() => expect(changes).toHaveLength(2));
         expect(changes.map((c) => c.type)).toEqual(["added", "added"]);
@@ -287,7 +322,7 @@ export function describeRepoContract(
         await repo.createRun(aRun());
         const posting = aPosting("1");
         const changes: EvaluationChange[] = [];
-        const unsub = repo.watchEvaluations("run-1", (change) => changes.push(change));
+        const unsub = repo.watchEvaluations("run-1", (change) => changes.push(change), recordUnexpected);
         await settle();
         await repo.putEvaluation("run-1", anEvaluation(posting));
         await repo.patchEvaluation("run-1", jobKey(posting), { status: "evaluating" });
@@ -312,7 +347,7 @@ export function describeRepoContract(
       it("stops delivering after unsubscribe (no listener leak)", async () => {
         await repo.createRun(aRun());
         const changes: EvaluationChange[] = [];
-        const unsub = repo.watchEvaluations("run-1", (change) => changes.push(change));
+        const unsub = repo.watchEvaluations("run-1", (change) => changes.push(change), recordUnexpected);
         await settle();
         unsub();
         await repo.putEvaluation("run-1", anEvaluation(aPosting("1")));
@@ -324,11 +359,34 @@ export function describeRepoContract(
         await repo.createRun(aRun());
         await repo.createRun(aRun({ runId: "run-2", uid: "user-2" }));
         const changes: EvaluationChange[] = [];
-        const unsub = repo.watchEvaluations("run-1", (change) => changes.push(change));
+        const unsub = repo.watchEvaluations("run-1", (change) => changes.push(change), recordUnexpected);
         await settle();
         await repo.putEvaluation("run-2", { ...anEvaluation(aPosting("9")), runId: "run-2" });
         await settle();
         expect(changes).toHaveLength(0);
+        unsub();
+      });
+
+      it("reports an invalid evaluation to onError instead of delivering it, then keeps going", async () => {
+        await repo.createRun(aRun());
+        const posting = aPosting("1");
+        const changes: EvaluationChange[] = [];
+        const errors: Error[] = [];
+        const unsub = repo.watchEvaluations(
+          "run-1",
+          (change) => changes.push(change),
+          (error) => errors.push(error),
+        );
+        await settle();
+        await repo.putEvaluation("run-1", anEvaluation(posting));
+        await eventually(() => expect(changes).toHaveLength(1));
+        await repo.patchEvaluation("run-1", jobKey(posting), {
+          status: "exploded" as EvaluationStatus,
+        });
+        await eventually(() => expect(errors).toHaveLength(1));
+        expect(changes.map((c) => c.evaluation.status)).toEqual(["queued"]);
+        await repo.patchEvaluation("run-1", jobKey(posting), { status: "evaluating" });
+        await eventually(() => expect(changes.at(-1)?.evaluation.status).toBe("evaluating"));
         unsub();
       });
     });

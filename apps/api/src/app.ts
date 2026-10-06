@@ -6,6 +6,7 @@ import {
   type HealthResponse,
 } from "@auto-apply/shared";
 import type { Config } from "./config.js";
+import type { Persistence } from "./repo/create-repo.js";
 import { logger } from "./logger.js";
 
 /**
@@ -13,7 +14,7 @@ import { logger } from "./logger.js";
  * with Supertest without opening a socket. Routes stay thin: later tickets add
  * the run routes and the SSE stream here.
  */
-export function createApp(config: Config) {
+export function createApp(config: Config, persistence: Persistence) {
   const app = express();
 
   // Behind nginx in production (CLAUDE.md, Deployment).
@@ -30,6 +31,7 @@ export function createApp(config: Config) {
       status: "ok",
       service: "auto-apply-api",
       namespace: config.FIRESTORE_NAMESPACE,
+      repo: persistence.kind,
       time: new Date().toISOString(),
     };
     res.json(healthResponseSchema.parse(body));

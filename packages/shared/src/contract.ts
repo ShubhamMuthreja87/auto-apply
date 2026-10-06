@@ -58,11 +58,23 @@ export const errorResponseSchema = z.object({
 });
 export type ErrorResponse = z.infer<typeof errorResponseSchema>;
 
-/** Health-check payload for the walking skeleton (`GET /api/health`). */
+/**
+ * Which `Repo` implementation the API is running on. `memory` is only ever
+ * chosen explicitly and loses everything on restart (ADR-0004).
+ */
+export const repoKindSchema = z.enum(["firestore", "memory"]);
+export type RepoKind = z.infer<typeof repoKindSchema>;
+
+/**
+ * Health-check payload (`GET /api/health`). It names the active repository and
+ * namespace so an in-memory demo is never mistaken for a persistent one
+ * (ADR-0004).
+ */
 export const healthResponseSchema = z.object({
   status: z.literal("ok"),
   service: z.string(),
   namespace: z.string(),
+  repo: repoKindSchema,
   time: z.string(),
 });
 export type HealthResponse = z.infer<typeof healthResponseSchema>;

@@ -4,15 +4,13 @@ import { logger } from "./logger.js";
 import { createRepo } from "./repo/create-repo.js";
 
 // Env and the Firestore credential are both validated here, once; anything
-// invalid stops the boot. The run routes take `persistence.repo` in ticket 05.
+// invalid stops the boot. The run routes use `persistence.repo` from ticket 05.
 const config = loadConfig();
 const persistence = createRepo(config);
-const app = createApp(config);
+const app = createApp(config, persistence);
 
 if (persistence.kind === "memory") {
-  logger.warn("persistence_in_memory", {
-    reason: "no Firestore credential configured; data is lost on restart",
-  });
+  logger.warn("persistence_in_memory", { reason: "REPO=memory; data is lost on restart" });
 }
 
 app.listen(config.PORT, () => {

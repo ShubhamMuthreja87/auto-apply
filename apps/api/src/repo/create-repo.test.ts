@@ -16,12 +16,11 @@ const key = JSON.stringify({
   client_email: "api@auto-apply-test.iam.gserviceaccount.com",
 });
 
-describe("createRepo", () => {
-  it("uses the in-memory repo in development when no credential is configured", async () => {
-    const persistence = createRepo(loadConfig({ NODE_ENV: "development" }));
-    expect(persistence.kind).toBe("memory");
-    expect(persistence.repo).toBeInstanceOf(InMemoryRepo);
-    await persistence.close();
+describe("createRepo (ADR-0004: no silent fallback)", () => {
+  it("refuses to start without a credential when REPO is not set", () => {
+    expect(() => createRepo(loadConfig({ NODE_ENV: "development" }))).toThrow(
+      /credential.*REPO=memory/is,
+    );
   });
 
   it("refuses to start in production without a credential", () => {
@@ -30,7 +29,22 @@ describe("createRepo", () => {
     ).toThrow(/credential/i);
   });
 
-  it("fails fast on a malformed credential instead of falling back to memory", () => {
+  it("uses the in-memory repo only when REPO=memory is set explicitly", async () => {
+    const persistence = createRepo(loadConfig({ NODE_ENV: "development", REPO: "memory" }));
+    expect(persistence.kind).toBe("memory");
+    expect(persistence.repo).toBeInstanceOf(InMemoryRepo);
+    await persistence.close();
+  });
+
+  it("honours REPO=memory even when a credential is configured", async () => {
+    const persistence = createRepo(
+      loadConfig({ NODE_ENV: "development", REPO: "memory", FIREBASE_SERVICE_ACCOUNT_JSON: key }),
+    );
+    expect(persistence.kind).toBe("memory");
+    await persistence.close();
+  });
+
+  it("fails fast on a malformed credential", () => {
     expect(() =>
       createRepo(loadConfig({ NODE_ENV: "development", FIREBASE_SERVICE_ACCOUNT_JSON: "{}" })),
     ).toThrow(/FIREBASE_SERVICE_ACCOUNT_JSON/);

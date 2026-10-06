@@ -3,15 +3,21 @@ import request from "supertest";
 import { healthResponseSchema } from "@auto-apply/shared";
 import { createApp } from "./app.js";
 import type { Config } from "./config.js";
+import { InMemoryRepo } from "./repo/in-memory-repo.js";
 
 const testConfig: Config = {
   NODE_ENV: "test",
   PORT: 3001,
   FIRESTORE_NAMESPACE: "test-local",
+  REPO: "memory",
 };
 
 describe("API", () => {
-  const app = createApp(testConfig);
+  const app = createApp(testConfig, {
+    repo: new InMemoryRepo(),
+    kind: "memory",
+    close: async () => {},
+  });
 
   it("GET /api/health returns a contract-valid payload", async () => {
     const res = await request(app).get("/api/health");
@@ -20,6 +26,8 @@ describe("API", () => {
     expect(parsed.status).toBe("ok");
     expect(parsed.service).toBe("auto-apply-api");
     expect(parsed.namespace).toBe("test-local");
+    // ADR-0004: health says which repository is active.
+    expect(parsed.repo).toBe("memory");
   });
 
   it("returns the shared JSON error shape for unknown routes", async () => {

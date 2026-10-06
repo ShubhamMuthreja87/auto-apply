@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { repoKindSchema } from "@auto-apply/shared";
 
 /** An env var that may be absent or blank; blank counts as unset. */
 const optionalString = z
@@ -20,6 +21,8 @@ const envSchema = z.object({
     .string()
     .regex(/^[A-Za-z0-9-]+$/, "must be letters, digits and dashes only")
     .default("dev"),
+  // Firestore unless the in-memory twin is asked for explicitly (ADR-0004).
+  REPO: repoKindSchema.default("firestore"),
   // Read by `loadCredential`; inline JSON wins over the key-file path.
   FIREBASE_SERVICE_ACCOUNT_JSON: optionalString,
   GOOGLE_APPLICATION_CREDENTIALS: optionalString,
@@ -32,6 +35,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     NODE_ENV: env.NODE_ENV,
     PORT: env.PORT,
     FIRESTORE_NAMESPACE: env.FIRESTORE_NAMESPACE,
+    REPO: env.REPO,
     FIREBASE_SERVICE_ACCOUNT_JSON: env.FIREBASE_SERVICE_ACCOUNT_JSON,
     GOOGLE_APPLICATION_CREDENTIALS: env.GOOGLE_APPLICATION_CREDENTIALS,
   });
@@ -40,6 +44,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   // Namespace isolation).
   if (config.FIRESTORE_NAMESPACE === "prod" && config.NODE_ENV !== "production") {
     throw new Error("Refusing to start: FIRESTORE_NAMESPACE=prod requires NODE_ENV=production");
+  }
+
+  // In-memory data dies with the process; never in production (ADR-0004).
+  if (config.REPO === "memory" && config.NODE_ENV === "production") {
+    throw new Error("Refusing to start: REPO=memory is not allowed with NODE_ENV=production");
   }
 
   return config;

@@ -8,7 +8,9 @@
  */
 import {
   ActiveRunExistsError,
+  evaluationSchema,
   isRunActive,
+  runSchema,
   type EvaluationChange,
   type Evaluation,
   type EvaluationDelta,
@@ -16,9 +18,11 @@ import {
   type Run,
   type RunDelta,
   type RunFunnel,
+  type SubscriptionErrorHandler,
   type Unsubscribe,
   type UserDoc,
 } from "@auto-apply/shared";
+import type { z } from "zod";
 
 /**
  * A live subscriber. `ready` flips true once its initial snapshot has been
@@ -28,11 +32,22 @@ import {
  */
 interface Listener<T> {
   readonly cb: (value: T) => void;
+  readonly onError: SubscriptionErrorHandler;
   ready: boolean;
 }
 
 function clone<T>(value: T): T {
   return structuredClone(value);
+}
+
+/**
+ * Validates a stored document on its way to a subscriber, as the Firestore
+ * adapter does on read: one that breaks the contract becomes an `Error` for
+ * `onError` instead of a callback, and the subscription keeps going (ADR-0003).
+ */
+function validate<T>(schema: z.ZodType<T>, value: unknown, label: string): T | Error {
+  const parsed = schema.safeParse(structuredClone(value));
+  return parsed.success ? parsed.data : new Error(`invalid ${label}: ${parsed.error.message}`);
 }
 
 export class InMemoryRepo implements Repo {
@@ -107,21 +122,25 @@ export class InMemoryRepo implements Repo {
     this.seen.add(jobKey);
   }
 
-  watchRun(runId: string, cb: (run: Run) => void): Unsubscribe {
-    const listener: Listener<Run> = { cb, ready: false };
+  watchRun(runId: string, cb: (run: Run) => void, onError: SubscriptionErrorHandler): Unsubscribe {
+    const listener: Listener<Run> = { cb, onError, ready: false };
     const set = this.runListeners.get(runId) ?? new Set<Listener<Run>>();
     set.add(listener);
     this.runListeners.set(runId, set);
     queueMicrotask(() => {
       const run = this.runs.get(runId);
-      if (run) listener.cb(clone(run));
+      if (run) deliverRun(listener, run);
       listener.ready = true;
     });
     return () => set.delete(listener);
   }
 
-  watchEvaluations(runId: string, cb: (change: EvaluationChange) => void): Unsubscribe {
-    const listener: Listener<EvaluationChange> = { cb, ready: false };
+  watchEvaluations(
+    runId: string,
+    cb: (change: EvaluationChange) => void,
+    onError: SubscriptionErrorHandler,
+  ): Unsubscribe {
+    const listener: Listener<EvaluationChange> = { cb, onError, ready: false };
     const set = this.evalListeners.get(runId) ?? new Set<Listener<EvaluationChange>>();
     set.add(listener);
     this.evalListeners.set(runId, set);
@@ -129,7 +148,7 @@ export class InMemoryRepo implements Repo {
       const byKey = this.evaluations.get(runId);
       if (byKey) {
         for (const evaluation of byKey.values()) {
-          listener.cb({ type: "added", evaluation: clone(evaluation) });
+          deliverEvaluation(listener, { type: "added", evaluation });
         }
       }
       listener.ready = true;
@@ -149,7 +168,7 @@ export class InMemoryRepo implements Repo {
     const set = this.runListeners.get(runId);
     if (!run || !set) return;
     for (const listener of set) {
-      if (listener.ready) listener.cb(clone(run));
+      if (listener.ready) deliverRun(listener, run);
     }
   }
 
@@ -157,7 +176,20 @@ export class InMemoryRepo implements Repo {
     const set = this.evalListeners.get(runId);
     if (!set) return;
     for (const listener of set) {
-      if (listener.ready) listener.cb({ type: change.type, evaluation: clone(change.evaluation) });
+      if (listener.ready) deliverEvaluation(listener, change);
     }
   }
+}
+
+function deliverRun(listener: Listener<Run>, run: Run): void {
+  const valid = validate(runSchema, run, `run ${run.runId}`);
+  if (valid instanceof Error) listener.onError(valid);
+  else listener.cb(valid);
+}
+
+function deliverEvaluation(listener: Listener<EvaluationChange>, change: EvaluationChange): void {
+  const { evaluation } = change;
+  const valid = validate(evaluationSchema, evaluation, `evaluation ${evaluation.jobKey}`);
+  if (valid instanceof Error) listener.onError(valid);
+  else listener.cb({ type: change.type, evaluation: valid });
 }

@@ -55,6 +55,10 @@ export function App() {
           <dd>{state.health.service}</dd>
           <dt>Namespace</dt>
           <dd>{state.health.namespace}</dd>
+          <dt>Storage</dt>
+          <dd>
+            {state.health.repo === "memory" ? "In-memory (not persisted)" : "Firestore"}
+          </dd>
         </dl>
       )}
     </main>

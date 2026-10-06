@@ -44,4 +44,22 @@ describe("loadConfig", () => {
     expect(config.FIREBASE_SERVICE_ACCOUNT_JSON).toBeUndefined();
     expect(config.GOOGLE_APPLICATION_CREDENTIALS).toBeUndefined();
   });
+
+  it("defaults to the Firestore repository", () => {
+    expect(loadConfig({}).REPO).toBe("firestore");
+  });
+
+  it("accepts REPO=memory outside production", () => {
+    expect(loadConfig({ REPO: "memory" }).REPO).toBe("memory");
+  });
+
+  it("refuses REPO=memory in production (it would lose every run on restart)", () => {
+    expect(() => loadConfig({ NODE_ENV: "production", REPO: "memory" })).toThrow(
+      /REPO=memory is not allowed with NODE_ENV=production/,
+    );
+  });
+
+  it("rejects an unknown REPO value", () => {
+    expect(() => loadConfig({ REPO: "postgres" })).toThrow();
+  });
 });

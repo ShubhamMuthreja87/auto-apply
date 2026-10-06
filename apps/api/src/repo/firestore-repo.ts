@@ -25,11 +25,11 @@ import {
   type Repo,
   type Run,
   type RunDelta,
+  type SubscriptionErrorHandler,
   type Unsubscribe,
   type UserDoc,
 } from "@auto-apply/shared";
 import { nsDoc } from "../firestore/firestore.js";
-import { logger } from "../logger.js";
 
 /** gRPC status for a `create()` on a document that already exists. */
 const ALREADY_EXISTS = 6;
@@ -39,26 +39,19 @@ interface Snapshot {
   ref: { path: string };
 }
 
-/** Validates a document read against the contract; throws on a bad shape. */
-function parse<T>(schema: z.ZodType<T>, snap: Snapshot): T {
+/** Validates a document read against the contract (ADR-0003: never trusted). */
+function validate<T>(schema: z.ZodType<T>, snap: Snapshot): T | Error {
   const parsed = schema.safeParse(snap.data());
-  if (!parsed.success) {
-    throw new Error(`invalid document at ${snap.ref.path}: ${parsed.error.message}`);
-  }
-  return parsed.data;
+  return parsed.success
+    ? parsed.data
+    : new Error(`invalid document at ${snap.ref.path}: ${parsed.error.message}`);
 }
 
-/**
- * The listener-side twin of {@link parse}: a callback has no caller to throw
- * to, so a bad document is logged and dropped rather than crashing the SDK.
- */
-function parseOrLog<T>(schema: z.ZodType<T>, snap: Snapshot): T | null {
-  try {
-    return parse(schema, snap);
-  } catch (err) {
-    logger.error("watch_invalid_document", { error: (err as Error).message });
-    return null;
-  }
+/** For direct reads: a bad document rejects the caller's promise. */
+function parse<T>(schema: z.ZodType<T>, snap: Snapshot): T {
+  const valid = validate(schema, snap);
+  if (valid instanceof Error) throw valid;
+  return valid;
 }
 
 /** The user's active Run among their runs, if any (D17). */
@@ -133,30 +126,37 @@ export class FirestoreRepo implements Repo {
     await this.seen().doc(jobKey).set({ seenAt: new Date().toISOString() });
   }
 
-  watchRun(runId: string, cb: (run: Run) => void): Unsubscribe {
-    const ref = this.runs().doc(runId);
-    return ref.onSnapshot(
-      (snap) => {
+  // In both watches, a bad document goes to `onError` and the listener keeps
+  // running; a listener failure (Firestore's error callback) ends it, and
+  // `onError` is the subscriber's only signal (ADR-0003).
+  watchRun(runId: string, cb: (run: Run) => void, onError: SubscriptionErrorHandler): Unsubscribe {
+    return this.runs()
+      .doc(runId)
+      .onSnapshot((snap) => {
         if (!snap.exists) return;
-        const run = parseOrLog(runSchema, snap);
-        if (run) cb(run);
-      },
-      (err) => logger.error("watch_run_failed", { path: ref.path, error: err.message }),
-    );
+        const run = validate(runSchema, snap);
+        if (run instanceof Error) onError(run);
+        else cb(run);
+      }, onError);
   }
 
-  watchEvaluations(runId: string, cb: (change: EvaluationChange) => void): Unsubscribe {
+  watchEvaluations(
+    runId: string,
+    cb: (change: EvaluationChange) => void,
+    onError: SubscriptionErrorHandler,
+  ): Unsubscribe {
     // Ordered by creation so the initial snapshot replays evaluations in the
     // order they were added (Firestore breaks ties by document id).
     const query = this.jobs(runId).orderBy("createdAt");
     return query.onSnapshot(
       (snap) => {
         for (const change of snap.docChanges()) {
-          const evaluation = parseOrLog(evaluationSchema, change.doc);
-          if (evaluation) cb({ type: change.type, evaluation });
+          const evaluation = validate(evaluationSchema, change.doc);
+          if (evaluation instanceof Error) onError(evaluation);
+          else cb({ type: change.type, evaluation });
         }
       },
-      (err) => logger.error("watch_evaluations_failed", { runId, error: err.message }),
+      onError,
     );
   }
 

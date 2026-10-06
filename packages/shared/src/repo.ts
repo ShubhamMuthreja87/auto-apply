@@ -22,6 +22,14 @@ import type {
 export type Unsubscribe = () => void;
 
 /**
+ * Receives what a subscription cannot deliver (ADR-0003): a stored document
+ * that fails contract validation (skipped; the subscription keeps going) or a
+ * listener failure in the backend (the subscription ends). Never silent — the
+ * SSE stream turns it into an error event.
+ */
+export type SubscriptionErrorHandler = (error: Error) => void;
+
+/**
  * A forward-only patch to a Run. `funnelIncrements` are *added* to the current
  * counts — never an overwrite — so the Firestore adapter can map them to
  * `FieldValue.increment` (CODING_STANDARDS landmine: lost updates). `updatedAt`
@@ -66,11 +74,12 @@ export class ActiveRunExistsError extends Error {
 
 /**
  * The persistence contract. Writes echo back to live subscribers; each `watch*`
- * delivers an initial snapshot asynchronously (never synchronously), then
- * callbacks for later matching writes, in write order. Like Firestore's
- * `onSnapshot`, a backend may coalesce rapid writes into one callback, but it
- * never delivers a stale state after a newer one and the last callback always
- * reflects the latest write. (The in-memory twin delivers one per write.)
+ * is state-based (ADR-0003): an initial snapshot asynchronously (never
+ * synchronously), then callbacks for later matching writes, in write order.
+ * Like Firestore's `onSnapshot`, a backend may coalesce rapid writes into one
+ * callback, but it never delivers a stale state after a newer one and the last
+ * callback always reflects the latest write — so consumers render the latest
+ * state and never count callbacks. Errors go to `onError`.
  */
 export interface Repo {
   getUser(uid: string): Promise<UserDoc | null>;
@@ -89,6 +98,10 @@ export interface Repo {
   isSeen(jobKey: string): Promise<boolean>;
   markSeen(jobKey: string): Promise<void>;
 
-  watchRun(runId: string, cb: (run: Run) => void): Unsubscribe;
-  watchEvaluations(runId: string, cb: (change: EvaluationChange) => void): Unsubscribe;
+  watchRun(runId: string, cb: (run: Run) => void, onError: SubscriptionErrorHandler): Unsubscribe;
+  watchEvaluations(
+    runId: string,
+    cb: (change: EvaluationChange) => void,
+    onError: SubscriptionErrorHandler,
+  ): Unsubscribe;
 }

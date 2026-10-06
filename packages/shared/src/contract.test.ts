@@ -40,8 +40,17 @@ describe("contract", () => {
   });
 
   it("validates the health payload", () => {
-    const ok = { status: "ok", service: "auto-apply-api", namespace: "dev", time: "t" };
+    const ok = {
+      status: "ok",
+      service: "auto-apply-api",
+      namespace: "dev",
+      repo: "firestore",
+      time: "t",
+    };
     expect(() => healthResponseSchema.parse(ok)).not.toThrow();
     expect(() => healthResponseSchema.parse({ ...ok, status: "down" })).toThrow();
+    expect(() => healthResponseSchema.parse({ ...ok, repo: "postgres" })).toThrow();
+    const { repo: _repo, ...withoutRepo } = ok;
+    expect(() => healthResponseSchema.parse(withoutRepo)).toThrow();
   });
 });
