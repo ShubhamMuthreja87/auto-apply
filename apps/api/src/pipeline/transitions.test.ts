@@ -25,6 +25,7 @@ const legalRunMoves: ReadonlyArray<[RunStatus, RunStatus]> = [
 /** Every legal forward Evaluation move (D16). Retry is its own, explicit edge (below). */
 const legalEvaluationMoves: ReadonlyArray<[EvaluationStatus, EvaluationStatus]> = [
   ["queued", "evaluating"],
+  ["queued", "failed"], // startup recovery only: the interrupted Run never reached it
   ["evaluating", "blocked"],
   ["evaluating", "skipped"],
   ["evaluating", "held"],
