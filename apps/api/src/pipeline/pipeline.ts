@@ -17,7 +17,8 @@
  *
  *   4. Scoring in code (D7, D8): the title tier is judged in code, the rest
  *      by the evaluator; `score.ts` sums the weights into a fit score and a
- *      Verdict, stored with every criterion's evidence. The Verdict drives
+ *      Verdict, then the language gate caps the Verdict of IC titles
+ *      (`language-gate.ts`), stored with every criterion's evidence. The Verdict drives
  *      the outcome: APPLY → `held: below_auto_threshold`; STRETCH →
  *      `skipped: stretch`; APPLY NOW → fill the form.
  *   5. Form fill (D5, D9–D12, `forms/fill-form.ts`): the Greenhouse form is
@@ -56,6 +57,7 @@ import {
   type User,
 } from "@auto-apply/shared";
 import { aiCriteria, buildRubric, judgeInCode } from "../evaluation/rubric.js";
+import { applyLanguageGate, languageGateQuestions } from "../evaluation/language-gate.js";
 import { scoreJudgements } from "../evaluation/score.js";
 import { screenPosting, type ScreeningOptions } from "../evaluation/screen.js";
 import { fillForm } from "../forms/fill-form.js";
@@ -420,14 +422,20 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
         return await finish("skipped", SKIP_REASONS.limit, "skipped", { markSeen: false });
       }
       const rubric = buildRubric(user.preferences);
-      const toJudge = aiCriteria(rubric);
+      // The rubric's AI-side criteria, plus the language gate's zero-weight
+      // questions about the primary stack (one call per Posting either way).
+      const toJudge = [...aiCriteria(rubric), ...languageGateQuestions(user.preferences)];
       const { scoredBy, judgements } = await evaluator.evaluate(posting, toJudge);
       // Only answers to what was asked count; code owns the title tier.
       const asked = new Set(toJudge.map((c) => c.id));
-      const scored = scoreJudgements(rubric, [
-        ...judgeInCode(rubric, posting.title),
-        ...judgements.filter((j) => asked.has(j.criterionId)),
-      ]);
+      const answered = judgements.filter((j) => asked.has(j.criterionId));
+      // The fit score first, then the language gate caps its Verdict.
+      const scored = applyLanguageGate(
+        user.preferences,
+        posting,
+        scoreJudgements(rubric, [...judgeInCode(rubric, posting.title), ...answered]),
+        answered,
+      );
       logger.info("posting_scored", {
         runId,
         jobKey: key,

@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { postingSchema } from "@auto-apply/shared";
 import { BOARDS, DEMO_BOARD, boardsFor } from "./boards.js";
-import { greenhouseJobSource } from "./greenhouse.js";
+import { greenhouseJobSource, parseGreenhouseBoard } from "./greenhouse.js";
 import { readBoardFixture } from "./fixtures.js";
 import { recordedFetch } from "./recorded-fetch.js";
 
@@ -69,6 +69,65 @@ describe("Greenhouse adapter", () => {
     const source = greenhouseJobSource({ fetch, timeoutMs: 1000 });
 
     await expect(source.discover("stripe")).rejects.toThrow();
+  });
+
+  it("normalises a partial job leniently instead of failing the whole board (null fallbacks)", () => {
+    // Recorded shape of a real Greenhouse job, with the fields Greenhouse
+    // sometimes sends as null or leaves out.
+    const complete = {
+      id: 8113337,
+      internal_job_id: 3456,
+      title: "ARG Engineering Manager",
+      absolute_url: "https://stripe.com/jobs/search?gh_jid=8113337",
+      updated_at: "2026-09-30T10:00:00-04:00",
+      requisition_id: "R1",
+      location: { name: "US - Remote" },
+      company_name: "Stripe",
+      content: "&lt;p&gt;Lead a team.&lt;/p&gt;",
+      departments: [{ id: 1, name: "Engineering" }],
+      offices: [],
+      metadata: null,
+    };
+    const partial = {
+      id: 8113338,
+      title: "Staff Engineer",
+      absolute_url: null,
+      updated_at: null,
+      location: { name: null },
+      company_name: null,
+      content: null,
+      departments: null,
+      metadata: null,
+    };
+    const noLocation = {
+      id: "8113339",
+      title: "Senior Software Engineer",
+      absolute_url: "https://stripe.com/jobs/search?gh_jid=8113339",
+      location: null,
+    };
+    const noTitle = { id: 1, title: "  ", absolute_url: "https://x.example/1" };
+    const noId = { title: "Engineering Manager" };
+
+    const postings = parseGreenhouseBoard(
+      "stripe",
+      { jobs: [complete, partial, noLocation, noTitle, noId, "garbage"] },
+      "live",
+    );
+
+    expect(postings.map((p) => p.jobId)).toEqual(["8113337", "8113338", "8113339"]);
+    for (const posting of postings) expect(postingSchema.parse(posting)).toEqual(posting);
+    expect(postings.find((p) => p.jobId === "8113338")).toMatchObject({
+      title: "Staff Engineer",
+      company: "stripe",
+      location: "",
+      descriptionText: "",
+      applyUrl: "https://boards.greenhouse.io/stripe/jobs/8113338",
+      remote: false,
+    });
+    expect(postings.find((p) => p.jobId === "8113339")).toMatchObject({
+      location: "",
+      descriptionText: "",
+    });
   });
 
   it("gives up after the timeout", async () => {

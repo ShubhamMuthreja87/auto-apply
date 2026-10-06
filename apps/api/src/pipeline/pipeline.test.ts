@@ -878,6 +878,46 @@ describe("scoring and Verdict (D7, D8)", () => {
   });
 });
 
+describe("missing posting data never blocks, costs or earns points, or crashes (null fallbacks)", () => {
+  const sparse = (jobId: string, overrides: Partial<Posting>): Posting => ({
+    ...aPosting(jobId),
+    title: "Engineering Manager",
+    ...overrides,
+  });
+
+  it.each<[string, Partial<Posting>]>([
+    ["no location", { location: "", remote: false }],
+    ["no description", { descriptionText: "" }],
+    ["no salary, size or stack stated", { descriptionText: "Lead a team." }],
+    ["no company name beyond the board", { company: "acme" }],
+    ["nothing but a title", { location: "", descriptionText: "", company: "acme", remote: false }],
+    ["an IC title with nothing else", { title: "Staff Engineer", location: "", descriptionText: "" }],
+  ])("%s → scored on what is stated, not blocked or failed", async (_case, overrides) => {
+    const repo = new InMemoryRepo();
+    const pipeline = buildPipeline(
+      deps({
+        repo,
+        discovery: { discover: async () => [sparse("1", overrides)] },
+        evaluator: keywordMatcher,
+      }),
+    );
+
+    const { runId, finished } = await pipeline.startRun("user-1");
+    await finished;
+
+    expect((await repo.getRun(runId))?.status).toBe("completed");
+    const [evaluation] = await repo.listEvaluations(runId);
+    expect(evaluation?.status).not.toBe("blocked");
+    expect(evaluation?.status).not.toBe("failed");
+    expect(evaluation?.verdict).not.toBe("BLOCKED");
+    // Only the code-judged title can score: nothing unstated earns or costs points.
+    const scoring = evaluation?.evidence.filter((e) => e.points !== 0) ?? [];
+    expect(scoring.every((e) => e.judgedBy === "code")).toBe(true);
+    // No stack stated: the language gate does not cap.
+    expect(evaluation?.evidence.some((e) => e.criterionId.startsWith("gate:"))).toBe(false);
+  });
+});
+
 describe("form fill for APPLY NOW (D5, D9–D11)", () => {
   /** An APPLY NOW Posting (manager title + stack + startup + real-time = 8) on `board`. */
   function applyNow(board: string, jobId: string, title = "Engineering Manager"): Posting {

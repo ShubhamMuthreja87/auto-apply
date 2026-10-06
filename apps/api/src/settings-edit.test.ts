@@ -322,6 +322,51 @@ describe("edits drive the next Run and form fill", () => {
     expect(after.score).toBe((before.score ?? 0) - 3);
   });
 
+  it("the language gate caps the next Run's Verdict, and a Settings edit to it takes effect", async () => {
+    const repo = await seeded();
+    let n = 0;
+    const pythonLead = {
+      ...acmeManager,
+      title: "Lead Python Engineer",
+      descriptionText:
+        "Hands-on role at a startup building real-time IoT with React and TypeScript, shipping LLM features.",
+    };
+    const pipeline = buildPipeline({
+      repo,
+      discovery: { discover: async () => [{ ...pythonLead, jobId: String(++n) }] },
+      evaluator: keywordMatcher,
+      forms: greenhouseForms({ fetch, timeoutMs: 1_000, mode: "fixtures" }),
+      submitter: simulatedSubmitter({ clock: () => new Date(), delay: async () => {} }),
+      clock: () => new Date(),
+      delay: async () => {},
+      newRunId: () => `run-${n}`,
+      loadUser: (uid) => loadUser(repo, uid),
+    });
+
+    const before = await runOnce(repo, pipeline);
+    expect(before.score).toBeGreaterThanOrEqual(7);
+    expect(before.verdict).toBe("APPLY");
+    expect(before.evidence.find((e) => e.criterionId === "gate:python_primary_ic")).toMatchObject({
+      met: true,
+      evidence: "Lead Python Engineer",
+    });
+
+    const res = await request(appWith(repo, pipeline))
+      .put("/api/me")
+      .set("Cookie", authCookie())
+      .send(
+        edits((body) => {
+          const python = body.preferences.languageGate.find((r) => r.id === "python_primary_ic");
+          if (python) python.cap = "STRETCH";
+        }),
+      );
+    expect(res.status).toBe(200);
+
+    const after = await runOnce(repo, pipeline);
+    expect(after.verdict).toBe("STRETCH");
+    expect(after.status).toBe("skipped");
+  });
+
   it("edited profile and settings change how form fields resolve (D9)", async () => {
     const repo = await seeded();
     await request(appWith(repo))

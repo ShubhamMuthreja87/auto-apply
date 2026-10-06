@@ -135,6 +135,16 @@ describe("AI evaluator (adapter seam, injected fetch)", () => {
     for (const value of pii) expect(sent).not.toContain(value);
   });
 
+  it("tells the model that missing data is unknown, and marks absent fields as not stated", async () => {
+    const { evaluator, fake } = evaluatorWith([await readAiFixture("deepseek-chat-completion")]);
+    await evaluator.evaluate({ ...posting, location: "", descriptionText: "" }, criteria);
+
+    const { system, user } = promptsOf(fake);
+    expect(system).toMatch(/not stated.*unknown/i);
+    expect(user).toContain("Location: (not stated)");
+    expect(user).toContain("(no description provided)");
+  });
+
   it("does not count a 'met' whose quote is not in the posting", async () => {
     const invented = completion(
       JSON.stringify({

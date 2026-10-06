@@ -72,7 +72,7 @@ describe("keywordMatcher (D24 fallback)", () => {
     expect(realtime?.evidence).toContain("Real time telemetry");
     expect(description).toContain(realtime?.evidence.replace(/^…|…$/g, ""));
     expect(startup?.evidence).toContain("scale-up");
-    // A criterion with no keywords is never met by the matcher, and has no quote.
+    // No stated experience: unknown, so not met, and no quote.
     expect(band?.evidence).toBe("");
   });
 
@@ -95,6 +95,85 @@ describe("keywordMatcher (D24 fallback)", () => {
     );
 
     expect(judgements[0]?.met).toBe(false);
+  });
+});
+
+describe("keywordMatcher: the seeded criteria with no terms of their own (D8 gaps)", () => {
+  const seeded = SEED_USER.preferences.fitCriteria;
+  const byId = (id: string) => {
+    const criterion = seeded.find((c) => c.id === id);
+    if (!criterion) throw new Error(`no seeded criterion ${id}`);
+    return criterion;
+  };
+
+  async function judge(id: string, overrides: Partial<Posting>) {
+    const { judgements } = await keywordMatcher.evaluate(aPosting(overrides), [byId(id)]);
+    return judgements[0];
+  }
+
+  it.each<[string, string, Partial<Posting>, boolean]>([
+    // -2 IC in a stack he does not use: the prompt's NOT list, named in an IC title.
+    ["ic_unused_stack", "a Java IC title", { title: "Senior Java Developer" }, true],
+    ["ic_unused_stack", "a Go IC title", { title: "Backend Engineer (Go)" }, true],
+    ["ic_unused_stack", "a Golang IC title", { title: "Golang Engineer" }, true],
+    ["ic_unused_stack", "a .NET IC title", { title: "Senior .NET Engineer" }, true],
+    ["ic_unused_stack", "an Angular IC title", { title: "Angular Frontend Engineer" }, true],
+    ["ic_unused_stack", "JavaScript is not Java", { title: "Senior JavaScript Engineer" }, false],
+    ["ic_unused_stack", "a manager title is not IC", { title: "Engineering Manager, Java" }, false],
+    [
+      "ic_unused_stack",
+      "the stack only mentioned in passing",
+      { title: "Senior Engineer", descriptionText: "Nice to have: Kubernetes, Go." },
+      false,
+    ],
+    ["ic_unused_stack", "nothing stated", { title: "Software Engineer" }, false],
+    // -1 pure people management.
+    [
+      "pure_people_management",
+      "no coding stated",
+      { descriptionText: "This is a non-hands-on role focused on people management." },
+      true,
+    ],
+    [
+      "pure_people_management",
+      "will not write code",
+      { descriptionText: "You will not be writing code day to day." },
+      true,
+    ],
+    [
+      "pure_people_management",
+      "a hands-on manager",
+      { descriptionText: "A hands-on manager who still codes." },
+      false,
+    ],
+    ["pure_people_management", "nothing stated", { descriptionText: "" }, false],
+    // +1 experience band within 5-9 years.
+    ["experience_band", "5+ years", { descriptionText: "- 5+ years of experience" }, true],
+    ["experience_band", "a 6-9 range", { descriptionText: "6-9 years of experience" }, true],
+    ["experience_band", "3+ years", { descriptionText: "3+ years of experience" }, false],
+    ["experience_band", "no years stated", { descriptionText: "Lead a team." }, false],
+    // +1 partial stack overlap.
+    [
+      "stack_partial",
+      "a working-knowledge stack",
+      { descriptionText: "Our services run on Python and PostgreSQL." },
+      true,
+    ],
+    ["stack_partial", "no stack stated", { descriptionText: "Lead a team." }, false],
+  ])("%s: %s → met %s", async (id, _case, overrides, met) => {
+    const judgement = await judge(id, overrides);
+    expect(judgement?.met).toBe(met);
+    if (met) expect(judgement?.evidence).not.toBe("");
+    else expect(judgement?.evidence).toBe("");
+  });
+
+  it("a user's own terms for such a criterion replace the defaults", async () => {
+    const custom = { ...byId("pure_people_management"), terms: ["org design"] };
+    const { judgements } = await keywordMatcher.evaluate(
+      aPosting({ descriptionText: "You will not be writing code. You will own org design." }),
+      [custom],
+    );
+    expect(judgements[0]?.evidence).toContain("org design");
   });
 });
 
