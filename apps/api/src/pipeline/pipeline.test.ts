@@ -20,8 +20,13 @@ import { createChatClient } from "../ai/chat-client.js";
 import { completion, readAiFixture, scriptedFetch } from "../ai/scripted-fetch.js";
 import { InMemoryRepo } from "../repo/in-memory-repo.js";
 import { greenhouseForms } from "../forms/greenhouse-forms.js";
-import { FORM_READY_REASON, buildPipeline, type PipelineDeps } from "./pipeline.js";
+import { EvaluationNotFoundError, buildPipeline, type PipelineDeps } from "./pipeline.js";
+import { IllegalTransitionError } from "./transitions.js";
+import { simulatedSubmitter } from "../submit/simulated-submitter.js";
+import { boardsFor } from "../discovery/boards.js";
 import type {
+  Application,
+  ApplicationSubmitter,
   Discovery,
   FormField,
   FreeTextAnswerer,
@@ -85,6 +90,37 @@ function recordingEvaluator() {
   return { evaluator, judged };
 }
 
+/**
+ * A fake submitter that records every call and builds a minimal payload from
+ * the answers, failing only when the pipeline asks it to (D19).
+ */
+function recordingSubmitter() {
+  const calls: Array<{ application: Application; simulateFailure: boolean }> = [];
+  const submitter: ApplicationSubmitter = {
+    submit: async (application, { simulateFailure }) => {
+      calls.push({ application, simulateFailure });
+      const { posting } = application;
+      return {
+        outcome: simulateFailure ? "failed" : "submitted",
+        submission: {
+          ats: posting.ats,
+          endpoint: `https://boards-api.greenhouse.io/v1/boards/${posting.board}/jobs/${posting.jobId}`,
+          method: "POST",
+          sent: false,
+          formUrl: application.formUrl,
+          payload: Object.fromEntries(
+            application.answers.map((a) => [a.id, typeof a.value === "string" ? a.value : ""]),
+          ),
+          answers: application.answers,
+          attempt: application.attempt,
+          builtAt: "2026-10-06T12:00:00.000Z",
+        },
+      };
+    },
+  };
+  return { submitter, calls };
+}
+
 /** A `delay` that holds every step until the test releases it. */
 function gatedDelay() {
   let release: () => void = () => {};
@@ -105,6 +141,7 @@ function deps(overrides: Partial<PipelineDeps> = {}): PipelineDeps {
     discovery: twoPostings,
     evaluator: recordingEvaluator().evaluator,
     forms: completeForm,
+    submitter: recordingSubmitter().submitter,
     clock: () => new Date("2026-10-06T12:00:00.000Z"),
     delay: async () => {},
     newRunId: () => `run-${++n}`,
@@ -596,11 +633,12 @@ describe("scoring and Verdict (D7, D8)", () => {
     await finished;
 
     const byJob = new Map((await evaluationsOf(repo, runId)).map((e) => [e.posting.jobId, e]));
+    // Its form is complete, so it is submitted; the Run's first submit fails on purpose (D19).
     expect(byJob.get("now")).toMatchObject({
       verdict: "APPLY_NOW",
       score: 8,
-      status: "held",
-      reason: FORM_READY_REASON,
+      status: "failed",
+      reason: "simulated",
       scoredBy: "ai",
     });
     expect(byJob.get("apply")).toMatchObject({
@@ -617,8 +655,9 @@ describe("scoring and Verdict (D7, D8)", () => {
     });
     expect((await repo.getRun(runId))?.funnel).toMatchObject({
       evaluated: 3,
-      held: 2,
+      held: 1,
       skipped: 1,
+      failed: 1,
     });
   });
 
@@ -758,7 +797,8 @@ describe("scoring and Verdict (D7, D8)", () => {
       verdict: "APPLY_NOW",
       score: 10,
       scoredBy: "fallback",
-      status: "held",
+      status: "failed",
+      reason: "simulated",
     });
     const startup = evaluation?.evidence.find((e) => e.criterionId === "startup");
     expect(startup?.evidence).toContain("fast-growing startup");
@@ -876,17 +916,18 @@ describe("form fill for APPLY NOW (D5, D9–D11)", () => {
     return { evaluation, run: await repo.getRun(runId) };
   }
 
-  it("holds a fully resolved form for the simulated submit, with nothing missing", async () => {
+  it("sends a fully resolved form to the simulated submit, with nothing missing", async () => {
     const { evaluation, run } = await runOne(applyNow("acme", "1"), { forms: completeForm });
 
     expect(evaluation).toMatchObject({
       verdict: "APPLY_NOW",
       score: 8,
-      status: "held",
-      reason: FORM_READY_REASON,
+      status: "failed",
+      reason: "simulated",
       missingFields: [],
     });
-    expect(run?.funnel).toMatchObject({ held: 1, evaluated: 1 });
+    expect(evaluation?.submission?.answers.map((a) => a.id)).toEqual(["first_name", "email"]);
+    expect(run?.funnel).toMatchObject({ held: 0, failed: 1, evaluated: 1 });
   });
 
   it("holds Anthropic's recorded form as needs_you, listing what only the user can answer (D10, D11)", async () => {
@@ -934,7 +975,10 @@ describe("form fill for APPLY NOW (D5, D9–D11)", () => {
 
     const { evaluation } = await runOne(applyNow("acme", "1"), { forms, answerer });
 
-    expect(evaluation).toMatchObject({ status: "held", reason: FORM_READY_REASON });
+    expect(evaluation).toMatchObject({ status: "failed", reason: "simulated" });
+    expect(evaluation?.submission?.answers).toContainEqual(
+      expect.objectContaining({ id: "essay", source: "ai", value: "I lead teams that ship." }),
+    );
     expect(requests).toHaveLength(1);
     expect(requests[0]?.framing).toBe("EM");
     expect(requests[0]?.questions.map((q) => q.fieldId)).toEqual(["essay"]);
@@ -1006,5 +1050,289 @@ describe("form fill for APPLY NOW (D5, D9–D11)", () => {
     });
     expect(run).toMatchObject({ status: "completed" });
     expect(run?.funnel).toMatchObject({ failed: 1 });
+  });
+});
+describe("simulated submit and Retry (D18, D19)", () => {
+  /** An APPLY NOW Posting: manager title + stack + startup + real-time = 8. */
+  const applyNowPosting = (jobId: string): Posting => ({
+    ...aPosting(jobId),
+    ...inIndia,
+    title: "Engineering Manager",
+  });
+  const evaluatorFor = (...jobIds: string[]) =>
+    cannedEvaluator(
+      Object.fromEntries(
+        jobIds.map((id) => [id, ["stack_primary", "startup", "realtime_data"]]),
+      ),
+    );
+
+  async function runApplyNow(
+    jobIds: string[],
+    overrides: Partial<PipelineDeps> = {},
+  ) {
+    const repo = new InMemoryRepo();
+    const fake = recordingSubmitter();
+    const pipeline = buildPipeline(
+      deps({
+        repo,
+        discovery: { discover: async () => jobIds.map(applyNowPosting) },
+        evaluator: evaluatorFor(...jobIds),
+        submitter: fake.submitter,
+        ...overrides,
+      }),
+    );
+    const { runId, finished } = await pipeline.startRun("user-1");
+    await finished;
+    return { repo, runId, pipeline, calls: fake.calls };
+  }
+
+  it("stores the real Greenhouse payload under the form's field ids, never sent", async () => {
+    const forms = formOf([
+      textField("first_name", "First Name"),
+      textField("email", "Email"),
+      {
+        ...textField(
+          "question_7",
+          "Will you now or in the future require visa sponsorship?",
+        ),
+        type: "select",
+        options: [
+          { label: "Yes", value: 1 },
+          { label: "No", value: 0 },
+        ],
+      },
+      {
+        ...textField(
+          "question_9[]",
+          "Which countries do you anticipate working in?",
+        ),
+        type: "multiselect",
+        options: [
+          { label: "India", value: 101 },
+          { label: "United States", value: 102 },
+        ],
+      },
+      textField("question_10", "Anything else?", false),
+    ]);
+    const submitter = simulatedSubmitter({
+      clock: () => new Date("2026-10-06T12:00:00.000Z"),
+      delay: async () => {},
+    });
+
+    const { repo, runId } = await runApplyNow(["1"], { forms, submitter });
+
+    const [evaluation] = await evaluationsOf(repo, runId);
+    expect(evaluation?.submission).toMatchObject({
+      endpoint: "https://boards-api.greenhouse.io/v1/boards/acme/jobs/1",
+      method: "POST",
+      sent: false,
+      formUrl: "https://job-boards.greenhouse.io/acme/jobs/1",
+      attempt: 1,
+    });
+    // Real ids, real option values; the unanswered optional field is left out.
+    expect(evaluation?.submission?.payload).toEqual({
+      first_name: "Shubham",
+      email: "shubham@muthreja.com",
+      question_7: 0,
+      "question_9[]": [101],
+    });
+  });
+
+  it("fails the Run's first submit on purpose, then submits the rest, in discovery order", async () => {
+    const { repo, runId, calls } = await runApplyNow(["1", "2", "3"]);
+
+    expect(
+      calls.map((c) => [c.application.posting.jobId, c.simulateFailure]),
+    ).toEqual([
+      ["1", true],
+      ["2", false],
+      ["3", false],
+    ]);
+    expect(outcomes(await evaluationsOf(repo, runId))).toEqual({
+      "1": "failed: simulated",
+      "2": "submitted: ",
+      "3": "submitted: ",
+    });
+    expect((await repo.getRun(runId))?.funnel).toMatchObject({
+      evaluated: 3,
+      submitted: 2,
+      failed: 1,
+      held: 0,
+    });
+  });
+
+  it("streams each job evaluating → applying → its submit outcome, in the Run's applying stage", async () => {
+    const repo = new InMemoryRepo();
+    const jobStatuses: string[] = [];
+    let runStatusAtSubmit: string | undefined;
+    const fake = recordingSubmitter();
+    const submitter: ApplicationSubmitter = {
+      submit: async (application, options) => {
+        runStatusAtSubmit = (await repo.getRun("run-1"))?.status;
+        return fake.submitter.submit(application, options);
+      },
+    };
+    const pipeline = buildPipeline(
+      deps({
+        repo,
+        discovery: { discover: async () => [applyNowPosting("1")] },
+        evaluator: evaluatorFor("1"),
+        submitter,
+      }),
+    );
+    const { runId, finished } = await pipeline.startRun("user-1");
+    const unsub = repo.watchEvaluations(
+      runId,
+      (batch) => {
+        for (const { evaluation } of batch) {
+          if (jobStatuses.at(-1) !== evaluation.status)
+            jobStatuses.push(evaluation.status);
+        }
+      },
+      () => {},
+    );
+    await finished;
+    await vi.waitFor(() => expect(jobStatuses.at(-1)).toBe("failed"));
+    unsub();
+
+    expect(jobStatuses.slice(-3)).toEqual(["evaluating", "applying", "failed"]);
+    expect(runStatusAtSubmit).toBe("applying");
+  });
+
+  it("Retry rebuilds the payload from the stored answers and submits (D19)", async () => {
+    const { repo, runId, pipeline, calls } = await runApplyNow(["1"]);
+    const [failed] = await evaluationsOf(repo, runId);
+
+    const retried = await pipeline.retrySubmit(runId, "greenhouse:acme:1");
+
+    expect(retried).toMatchObject({ status: "submitted", reason: null });
+    expect(retried.submission).toMatchObject({ attempt: 2, sent: false });
+    expect(retried.submission?.payload).toEqual(failed?.submission?.payload);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]?.simulateFailure).toBe(false);
+    expect(calls[1]?.application.answers).toEqual(failed?.submission?.answers);
+    expect((await repo.getRun(runId))?.funnel).toMatchObject({
+      submitted: 1,
+      failed: 0,
+    });
+  });
+
+  it("allows Retry only on a simulated failure", async () => {
+    const { runId, pipeline } = await runApplyNow(["1"]);
+    await pipeline.retrySubmit(runId, "greenhouse:acme:1");
+
+    await expect(
+      pipeline.retrySubmit(runId, "greenhouse:acme:1"),
+    ).rejects.toBeInstanceOf(IllegalTransitionError);
+    await expect(
+      pipeline.retrySubmit(runId, "greenhouse:acme:404"),
+    ).rejects.toBeInstanceOf(EvaluationNotFoundError);
+
+    const unreadable: GreenhouseForms = {
+      fetchSchema: async () => {
+        throw new Error("Application form unavailable");
+      },
+    };
+    const other = await runApplyNow(["1"], { forms: unreadable });
+    await expect(
+      other.pipeline.retrySubmit(other.runId, "greenhouse:acme:1"),
+    ).rejects.toBeInstanceOf(IllegalTransitionError);
+  });
+
+  it("submits once when Retry is clicked twice at the same time", async () => {
+    const { runId, pipeline, calls } = await runApplyNow(["1"]);
+
+    const results = await Promise.allSettled([
+      pipeline.retrySubmit(runId, "greenhouse:acme:1"),
+      pipeline.retrySubmit(runId, "greenhouse:acme:1"),
+    ]);
+
+    expect(results.map((r) => r.status).sort()).toEqual([
+      "fulfilled",
+      "rejected",
+    ]);
+    expect(calls).toHaveLength(2); // the Run's submit, and one Retry
+  });
+
+  it("fails just that job, with the reason, when the submitter throws", async () => {
+    const submitter: ApplicationSubmitter = {
+      submit: async () => {
+        throw new Error("payload could not be built");
+      },
+    };
+
+    const { repo, runId } = await runApplyNow(["1"], { submitter });
+
+    expect(outcomes(await evaluationsOf(repo, runId))).toEqual({
+      "1": "failed: payload could not be built",
+    });
+    expect(await repo.getRun(runId)).toMatchObject({ status: "completed" });
+  });
+
+  it("in fixtures mode, takes the synthetic demo job to failed: simulated, then submitted after Retry", async () => {
+    const repo = new InMemoryRepo();
+    const noNetwork: typeof fetch = () =>
+      Promise.reject(new Error("network used in fixtures mode"));
+    const pipeline = buildPipeline(
+      deps({
+        repo,
+        discovery: createDiscovery({
+          sources: [
+            greenhouseJobSource({ fetch: noNetwork, timeoutMs: 1_000 }),
+          ],
+          boards: boardsFor("fixtures"),
+          readFixture: readBoardFixture,
+          mode: "fixtures",
+        }),
+        evaluator: keywordMatcher,
+        scoringMode: "fallback",
+        forms: greenhouseForms({
+          fetch: noNetwork,
+          timeoutMs: 1_000,
+          mode: "fixtures",
+        }),
+        submitter: simulatedSubmitter({
+          clock: () => new Date("2026-10-06T12:00:00.000Z"),
+          delay: async () => {},
+        }),
+      }),
+    );
+
+    const { runId, finished } = await pipeline.startRun("user-1");
+    await finished;
+
+    const demo = (await evaluationsOf(repo, runId)).filter((e) =>
+      e.posting.board.startsWith("demo-"),
+    );
+    expect(demo).toHaveLength(1);
+    const [job] = demo;
+    expect(job).toMatchObject({
+      verdict: "APPLY_NOW",
+      scoredBy: "fallback",
+      status: "failed",
+      reason: "simulated",
+      missingFields: [],
+    });
+    expect(job?.posting).toMatchObject({
+      source: "fixture",
+      company: "Demo Co (synthetic)",
+    });
+    expect(job?.submission).toMatchObject({ sent: false, attempt: 1 });
+    expect(job?.submission?.payload).toMatchObject({
+      first_name: "Shubham",
+      last_name: "Muthreja",
+      email: "shubham@muthreja.com",
+    });
+
+    const retried = await pipeline.retrySubmit(runId, job?.jobKey ?? "");
+
+    expect(retried).toMatchObject({
+      status: "submitted",
+      submission: { attempt: 2, sent: false },
+    });
+    expect((await repo.getRun(runId))?.funnel).toMatchObject({
+      submitted: 1,
+      failed: 0,
+    });
   });
 });

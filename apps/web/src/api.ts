@@ -9,6 +9,7 @@ import {
   errorResponseSchema,
   evaluationsListResponseSchema,
   meResponseSchema,
+  retrySubmitResponseSchema,
   runsListResponseSchema,
   type Evaluation,
   type MeResponse,
@@ -64,6 +65,19 @@ export async function listEvaluations(runId: string | null): Promise<Evaluation[
   const query = runId === null ? "" : `?runId=${encodeURIComponent(runId)}`;
   const res = await fetch(`${API_URL}/api/evaluations${query}`, { credentials: "include" });
   return evaluationsListResponseSchema.parse(await readJson(res)).evaluations;
+}
+
+/**
+ * `POST /api/runs/:runId/jobs/:jobKey/retry`: Retry of a simulated failure
+ * (D19); resolves with the Evaluation, now submitted (simulated). An
+ * `ApiError` with code `not_retryable` (409) for anything else.
+ */
+export async function retrySubmit(runId: string, jobKey: string): Promise<Evaluation> {
+  const res = await fetch(
+    `${API_URL}/api/runs/${encodeURIComponent(runId)}/jobs/${encodeURIComponent(jobKey)}/retry`,
+    { method: "POST", credentials: "include" },
+  );
+  return retrySubmitResponseSchema.parse(await readJson(res)).evaluation;
 }
 
 /** `GET /api/me`: the user document (profile, preferences, settings). */

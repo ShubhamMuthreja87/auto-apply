@@ -12,6 +12,7 @@ import {
   FIT_CAP,
   evaluationSchema,
   runSchema,
+  simulatedSubmissionSchema,
 } from "./index.js";
 
 describe("contract", () => {
@@ -90,6 +91,7 @@ describe("contract", () => {
       evidence: [],
       scoredBy: null,
       missingFields: [],
+      submission: null,
     });
   });
 
@@ -114,5 +116,23 @@ describe("contract", () => {
     expect(runSchema.parse(stored).scoring).toBeUndefined();
     expect(runSchema.parse({ ...stored, scoring: "fallback" }).scoring).toBe("fallback");
     expect(() => runSchema.parse({ ...stored, scoring: "guess" })).toThrow();
+  });
+
+  it("only ever stores a submission as not sent (D18)", () => {
+    const submission = {
+      ats: "greenhouse",
+      endpoint: "https://boards-api.greenhouse.io/v1/boards/acme/jobs/1",
+      method: "POST",
+      sent: false,
+      formUrl: "https://job-boards.greenhouse.io/acme/jobs/1",
+      payload: { first_name: "Ada", question_1: 7, "question_2[]": [1, 2] },
+      answers: [
+        { id: "first_name", label: "First Name", type: "text", source: "profile", value: "Ada" },
+      ],
+      attempt: 1,
+      builtAt: "t",
+    };
+    expect(simulatedSubmissionSchema.parse(submission).payload).toEqual(submission.payload);
+    expect(() => simulatedSubmissionSchema.parse({ ...submission, sent: true })).toThrow();
   });
 });
