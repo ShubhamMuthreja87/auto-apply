@@ -99,7 +99,7 @@ How to run each suite:
 
 - **Everything except end-to-end**: `npm test` (or `npm run verify`). Per workspace: `npm -w @auto-apply/api test`, `npm -w @auto-apply/web test`, `npm -w @auto-apply/shared test`.
 - **The Firestore integration suite** (`apps/api/src/repo/firestore-repo.test.ts`) is credential-gated: it runs inside `npm test` when `GOOGLE_APPLICATION_CREDENTIALS` or `FIREBASE_SERVICE_ACCOUNT_JSON` is set, in the shell or in `apps/api/.env`, and is skipped otherwise. It uses a fresh `test-<random>` namespace and deletes it afterwards.
-- **End-to-end**: one Playwright happy path in a deterministic mode (`JOB_SOURCE=fixtures`, no AI key). It is ticket 16 and not in this branch yet.
+- **End-to-end**: `npm run test:e2e` (not part of `npm run verify`; about 30 s). One Playwright happy path (`e2e/happy-path.spec.ts`): log in, press Auto-apply, watch the Run stream to Completed, see the demo job's "Simulated failure (demo)", Retry it on Applied jobs, see "Submitted (simulated)". `playwright.config.ts` starts the API from source and the Vite dev server (so `/api` and the stream go through the dev proxy, same origin as production) in a deterministic mode: `JOB_SOURCE=fixtures` (no network; includes the labelled synthetic "Demo Co (synthetic)" board), `REPO=memory`, `FIRESTORE_NAMESPACE=test-e2e`, and `AI_API_KEY` forced empty even if the shell exports one. It never reads `apps/api/.env`. The login is a fixed, non-secret e2e-only value (`e2e/credentials.ts`), hashed when the config loads. Ports 3001 and 5173 must be free: the run never reuses a running dev server. It needs Playwright's Chromium (`npx playwright install chromium` once); to use a Chromium already on the machine instead, set `E2E_CHROMIUM_PATH` to its executable.
 
 ## Production
 
