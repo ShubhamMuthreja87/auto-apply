@@ -96,9 +96,13 @@ export interface Repo {
   getRun(runId: string): Promise<Run | null>;
   getActiveRun(uid: string): Promise<Run | null>;
   patchRun(runId: string, delta: RunDelta): Promise<void>;
+  /** The user's Runs, newest first (by `createdAt`); for the Scanned jobs view. */
+  listRuns(uid: string): Promise<Run[]>;
 
   putEvaluation(runId: string, evaluation: Evaluation): Promise<void>;
   patchEvaluation(runId: string, jobKey: string, delta: EvaluationDelta): Promise<void>;
+  /** A Run's Evaluations in the order they were added (by `createdAt`); `[]` for an unknown Run. */
+  listEvaluations(runId: string): Promise<Evaluation[]>;
 
   /** Seen spans Runs so dedupe survives across them (GLOSSARY: Seen, D15). */
   isSeen(jobKey: string): Promise<boolean>;

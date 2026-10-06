@@ -504,6 +504,19 @@ export type CreateRunResponse = z.infer<typeof createRunResponseSchema>;
 export const activeRunResponseSchema = z.object({ run: runSchema.nullable() });
 export type ActiveRunResponse = z.infer<typeof activeRunResponseSchema>;
 
+/** `GET /api/runs`: the user's Runs, newest first (Scanned jobs, ticket 12). */
+export const runsListResponseSchema = z.object({ runs: z.array(runSchema) });
+export type RunsListResponse = z.infer<typeof runsListResponseSchema>;
+
+/**
+ * `GET /api/evaluations[?runId=]`: stored Evaluations with their Verdict,
+ * reason and per-criterion evidence (Scanned jobs, ticket 12). With `runId`,
+ * that Run's in the order they were added; without, every Run's, newest Run
+ * first.
+ */
+export const evaluationsListResponseSchema = z.object({ evaluations: z.array(evaluationSchema) });
+export type EvaluationsListResponse = z.infer<typeof evaluationsListResponseSchema>;
+
 /**
  * Named events on `GET /api/runs/:runId/events` (D21). Every connect starts
  * with one `snapshot`, then `run` / `eval` deltas carrying full documents, never

@@ -9,6 +9,8 @@ import { theme } from "./theme";
 import { AppShell } from "./shell/AppShell";
 import { RunPanel } from "./run/RunPanel";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { ScannedJobsPage } from "./pages/ScannedJobsPage";
+import { SettingsPage } from "./pages/SettingsPage";
 
 export function App() {
   return (
@@ -26,24 +28,8 @@ export function App() {
               />
             }
           />
-          <Route
-            path="/scanned"
-            element={
-              <PlaceholderPage
-                title="Scanned jobs"
-                description="Every job evaluated across runs, with its verdict and reason, will be listed here."
-              />
-            }
-          />
-          <Route
-            path="/settings"
-            element={
-              <PlaceholderPage
-                title="Settings"
-                description="The profile, preferences and settings that drive matching will be shown here."
-              />
-            }
-          />
+          <Route path="/scanned" element={<ScannedJobsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AppShell>

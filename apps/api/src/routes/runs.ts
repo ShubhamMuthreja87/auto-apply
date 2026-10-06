@@ -17,7 +17,8 @@ import { DEMO_UID } from "../user.js";
 import { streamRun } from "./run-stream.js";
 
 /** Run ids are UUIDs; anything else never names a Run (and never a Firestore path). */
-const runParamsSchema = z.object({ runId: z.string().regex(/^[A-Za-z0-9-]{1,64}$/) });
+export const runIdSchema = z.string().regex(/^[A-Za-z0-9-]{1,64}$/);
+const runParamsSchema = z.object({ runId: runIdSchema });
 
 function sendError(res: Response, status: number, code: string, message: string): void {
   res.status(status).json(errorResponseSchema.parse({ error: { code, message } }));
