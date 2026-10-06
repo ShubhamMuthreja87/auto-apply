@@ -48,6 +48,11 @@ export async function getActiveRun(): Promise<Run | null> {
   return activeRunResponseSchema.parse(await readJson(res)).run;
 }
 
+/** A caught error's message, for showing to the user. */
+export function messageOf(err: unknown): string {
+  return err instanceof Error ? err.message : "Unknown error";
+}
+
 export function runEventsUrl(runId: string): string {
   return `${API_URL}/api/runs/${encodeURIComponent(runId)}/events`;
 }

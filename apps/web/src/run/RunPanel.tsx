@@ -4,24 +4,23 @@
  * a new Run and stays disabled while one is active (the API's 409 backs it up).
  */
 import { useEffect, useState } from "react";
-import { isRunActive, type RunFunnel, type RunStatus } from "@auto-apply/shared";
-import { ApiError, getActiveRun, startRun } from "../api";
-import { useRunStream, type Connection } from "./useRunStream";
-
-const statusLabels: Record<RunStatus, string> = {
-  discovering: "Discovering",
-  evaluating: "Evaluating",
-  applying: "Applying",
-  completed: "Completed",
-  failed: "Failed",
-};
-
-const connectionLabels: Record<Connection, string> = {
-  connecting: "Connecting…",
-  live: "Live",
-  reconnecting: "Reconnecting…",
-  closed: "Closed",
-};
+import Alert from "@mui/material/Alert";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Card from "@mui/material/Card";
+import CardContent from "@mui/material/CardContent";
+import CircularProgress from "@mui/material/CircularProgress";
+import LinearProgress from "@mui/material/LinearProgress";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import BoltIcon from "@mui/icons-material/Bolt";
+import TravelExploreIcon from "@mui/icons-material/TravelExplore";
+import { isRunActive, type Run, type RunFunnel, type RunStatus } from "@auto-apply/shared";
+import { ApiError, getActiveRun, messageOf, startRun } from "../api";
+import { ConnectionIndicator } from "../ui/ConnectionIndicator";
+import { StatusChip } from "../ui/StatusChip";
+import { EvaluationsTable } from "./EvaluationsTable";
+import { useRunStream } from "./useRunStream";
 
 const funnelLabels: [keyof RunFunnel, string][] = [
   ["discovered", "Discovered"],
@@ -33,9 +32,57 @@ const funnelLabels: [keyof RunFunnel, string][] = [
   ["failed", "Failed"],
 ];
 
-function messageOf(err: unknown): string {
-  return err instanceof Error ? err.message : "Unknown error";
+/**
+ * How far through its discovered jobs the Run is, as a percentage; `null`
+ * while discovering, when the total is not known yet.
+ */
+function progressOf(run: Run): number | null {
+  if (!isRunActive(run.status)) return 100;
+  if (run.status === "discovering") return null;
+  const { discovered, blocked, skipped, held, submitted, failed } = run.funnel;
+  if (discovered === 0) return 0;
+  return Math.min(
+    100,
+    Math.round(((blocked + skipped + held + submitted + failed) / discovered) * 100),
+  );
 }
+
+function InlineLoading({ label }: { label: string }) {
+  return (
+    <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", color: "text.secondary" }}>
+      <CircularProgress size={16} color="inherit" aria-hidden="true" />
+      <Typography variant="body2">{label}</Typography>
+    </Stack>
+  );
+}
+
+function NoRunsYet() {
+  return (
+    <Card>
+      <CardContent sx={{ py: 7, textAlign: "center" }}>
+        <TravelExploreIcon
+          sx={{ fontSize: 40, color: "text.disabled", mb: 1 }}
+          aria-hidden="true"
+        />
+        <Typography variant="h3" gutterBottom>
+          No runs yet
+        </Typography>
+        <Typography color="text.secondary" sx={{ maxWidth: 460, mx: "auto" }}>
+          Press Auto-apply to discover jobs, score each one against your profile and build the
+          applications. Nothing is ever sent to an employer.
+        </Typography>
+      </CardContent>
+    </Card>
+  );
+}
+
+const progressColors: Record<RunStatus, "primary" | "success" | "error"> = {
+  discovering: "primary",
+  evaluating: "primary",
+  applying: "primary",
+  completed: "success",
+  failed: "error",
+};
 
 export function RunPanel() {
   const [runId, setRunId] = useState<string | null>(null);
@@ -88,57 +135,145 @@ export function RunPanel() {
   // Waiting for the first snapshot counts as active, so a double click cannot
   // slip in between POST and stream.
   const runActive = run ? isRunActive(run.status) : runId !== null;
+  const progress = run ? progressOf(run) : null;
 
   return (
-    <section aria-label="Auto-apply">
-      <button type="button" onClick={onAutoApply} disabled={checking || starting || runActive}>
-        {starting ? "Starting…" : "Auto-apply"}
-      </button>
-      <p>Submissions are simulated: payloads are built and stored, never sent.</p>
+    <Stack component="section" aria-label="Auto-apply" spacing={3}>
+      <Card>
+        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={2}
+            sx={{ justifyContent: "space-between", alignItems: { sm: "center" } }}
+          >
+            <Box>
+              <Typography variant="h1" gutterBottom>
+                Auto-apply
+              </Typography>
+              <Typography color="text.secondary">
+                Find matching jobs, score them against your profile and prepare applications.
+              </Typography>
+            </Box>
+            <Button
+              variant="contained"
+              size="large"
+              onClick={onAutoApply}
+              disabled={checking || starting || runActive}
+              startIcon={
+                starting ? (
+                  <CircularProgress size={16} color="inherit" aria-hidden="true" />
+                ) : (
+                  <BoltIcon />
+                )
+              }
+              sx={{ flexShrink: 0, px: 3 }}
+            >
+              {starting ? "Starting…" : "Auto-apply"}
+            </Button>
+          </Stack>
 
-      {startError && <p role="alert">{startError}</p>}
-      {stream.error && <p role="alert">Stream error: {stream.error}</p>}
-
-      {runId && (
-        <div>
-          <p>Connection: {connectionLabels[stream.connection]}</p>
-          {!run ? (
-            <p role="status">Loading run…</p>
-          ) : (
-            <>
-              <dl>
-                <dt>Status</dt>
-                <dd>{statusLabels[run.status]}</dd>
-                {run.reason && (
-                  <>
-                    <dt>Reason</dt>
-                    <dd>{run.reason}</dd>
-                  </>
-                )}
-                {funnelLabels.map(([key, label]) => (
-                  <div key={key}>
-                    <dt>{label}</dt>
-                    <dd>{run.funnel[key]}</dd>
-                  </div>
-                ))}
-              </dl>
-              {stream.evaluations.length === 0 ? (
-                <p>No jobs yet.</p>
-              ) : (
-                <ul>
-                  {stream.evaluations.map((evaluation) => (
-                    <li key={evaluation.jobKey}>
-                      <strong>{evaluation.posting.title}</strong> at {evaluation.posting.company}:{" "}
-                      <span>{evaluation.status}</span>
-                      {evaluation.reason && <span> ({evaluation.reason})</span>}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
+          {runId && (
+            <Box sx={{ mt: 3 }}>
+              <Stack
+                direction="row"
+                spacing={2}
+                sx={{ justifyContent: "space-between", alignItems: "center", mb: 1.5 }}
+              >
+                <Box component="dl" sx={{ display: "flex", alignItems: "center", gap: 1, m: 0 }}>
+                  <Typography component="dt" variant="body2" color="text.secondary">
+                    Status
+                  </Typography>
+                  <Box component="dd" sx={{ m: 0 }}>
+                    {run ? <StatusChip status={run.status} /> : "—"}
+                  </Box>
+                </Box>
+                <ConnectionIndicator connection={stream.connection} />
+              </Stack>
+              <LinearProgress
+                aria-label="Run progress"
+                variant={progress === null ? "indeterminate" : "determinate"}
+                value={progress ?? undefined}
+                color={run ? progressColors[run.status] : "primary"}
+                sx={{ height: 6, borderRadius: 3 }}
+              />
+            </Box>
           )}
-        </div>
+        </CardContent>
+      </Card>
+
+      {startError && <Alert severity="error">{startError}</Alert>}
+      {stream.error && <Alert severity="error">Stream error: {stream.error}</Alert>}
+      {run?.reason && (
+        <Alert severity={run.status === "failed" ? "error" : "info"}>{run.reason}</Alert>
       )}
-    </section>
+
+      {!runId ? (
+        checking ? (
+          <InlineLoading label="Checking for an active run…" />
+        ) : (
+          <NoRunsYet />
+        )
+      ) : !run ? (
+        <InlineLoading label="Loading run…" />
+      ) : (
+        <>
+          <Box
+            component="dl"
+            aria-label="Funnel"
+            sx={{
+              m: 0,
+              display: "grid",
+              gap: 1.5,
+              gridTemplateColumns: {
+                xs: "repeat(2, 1fr)",
+                sm: "repeat(4, 1fr)",
+                md: "repeat(7, 1fr)",
+              },
+            }}
+          >
+            {funnelLabels.map(([key, label]) => (
+              <Card
+                key={key}
+                sx={{
+                  px: 2,
+                  py: 1.5,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Typography component="dt" variant="caption" color="text.secondary">
+                  {label}
+                </Typography>
+                <Typography
+                  component="dd"
+                  sx={{
+                    m: 0,
+                    fontSize: "1.5rem",
+                    fontWeight: 600,
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {run.funnel[key]}
+                </Typography>
+              </Card>
+            ))}
+          </Box>
+
+          <Card>
+            <Box sx={{ px: { xs: 2, sm: 3 }, pt: 2, pb: 1 }}>
+              <Typography variant="h2">Jobs</Typography>
+            </Box>
+            {stream.evaluations.length === 0 ? (
+              <Typography color="text.secondary" sx={{ px: { xs: 2, sm: 3 }, pb: 3 }}>
+                No jobs yet.
+              </Typography>
+            ) : (
+              <EvaluationsTable evaluations={stream.evaluations} />
+            )}
+          </Card>
+        </>
+      )}
+    </Stack>
   );
 }

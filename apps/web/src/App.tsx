@@ -1,65 +1,52 @@
-import { useEffect, useState } from "react";
-import { healthResponseSchema, type HealthResponse } from "@auto-apply/shared";
-import { API_URL } from "./api";
+/**
+ * The themed shell and the routed views (D20). The router itself is provided
+ * by the caller (`BrowserRouter` in `main.tsx`, `MemoryRouter` in tests).
+ */
+import { Navigate, Route, Routes } from "react-router-dom";
+import CssBaseline from "@mui/material/CssBaseline";
+import { ThemeProvider } from "@mui/material/styles";
+import { theme } from "./theme";
+import { AppShell } from "./shell/AppShell";
 import { RunPanel } from "./run/RunPanel";
-
-type State =
-  | { kind: "loading" }
-  | { kind: "error"; message: string }
-  | { kind: "ready"; health: HealthResponse };
+import { PlaceholderPage } from "./pages/PlaceholderPage";
 
 export function App() {
-  const [state, setState] = useState<State>({ kind: "loading" });
-
-  useEffect(() => {
-    let cancelled = false;
-
-    fetch(`${API_URL}/api/health`)
-      .then(async (res) => {
-        if (!res.ok) {
-          throw new Error(`API responded ${res.status}`);
-        }
-        return healthResponseSchema.parse(await res.json());
-      })
-      .then((health) => {
-        if (!cancelled) {
-          setState({ kind: "ready", health });
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setState({
-            kind: "error",
-            message: err instanceof Error ? err.message : "Unknown error",
-          });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   return (
-    <main>
-      <h1>AI Auto-Apply</h1>
-      <RunPanel />
-      {state.kind === "loading" && <p role="status">Checking API…</p>}
-      {state.kind === "error" && <p role="alert">Could not reach the API: {state.message}</p>}
-      {state.kind === "ready" && (
-        <dl>
-          <dt>API status</dt>
-          <dd>{state.health.status}</dd>
-          <dt>Service</dt>
-          <dd>{state.health.service}</dd>
-          <dt>Namespace</dt>
-          <dd>{state.health.namespace}</dd>
-          <dt>Storage</dt>
-          <dd>
-            {state.health.repo === "memory" ? "In-memory (not persisted)" : "Firestore"}
-          </dd>
-        </dl>
-      )}
-    </main>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <AppShell>
+        <Routes>
+          <Route path="/" element={<RunPanel />} />
+          <Route
+            path="/applied"
+            element={
+              <PlaceholderPage
+                title="Applied jobs"
+                description="Each simulated submission and the payload built for it will be listed here."
+              />
+            }
+          />
+          <Route
+            path="/scanned"
+            element={
+              <PlaceholderPage
+                title="Scanned jobs"
+                description="Every job evaluated across runs, with its verdict and reason, will be listed here."
+              />
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <PlaceholderPage
+                title="Settings"
+                description="The profile, preferences and settings that drive matching will be shown here."
+              />
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AppShell>
+    </ThemeProvider>
   );
 }

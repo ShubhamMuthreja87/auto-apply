@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { emptyFunnel, type Evaluation, type Run, type RunFunnel } from "@auto-apply/shared";
 import { FakeEventSource } from "../test/fake-event-source";
@@ -69,6 +69,16 @@ function valueOf(label: string | RegExp): string | null {
   return term.nextElementSibling?.textContent ?? null;
 }
 
+/** The body rows of the jobs table. */
+function jobRows(): HTMLElement[] {
+  const table = screen.getByRole("table", { name: /jobs/i });
+  return within(table).getAllByRole("row").slice(1);
+}
+
+function connection(): string | null {
+  return screen.getByTestId("connection").textContent;
+}
+
 beforeEach(() => {
   FakeEventSource.instances = [];
   vi.stubGlobal("EventSource", FakeEventSource);
@@ -80,6 +90,74 @@ afterEach(() => {
 });
 
 describe("<RunPanel />", () => {
+  it("shows an empty state before the first Run", async () => {
+    fakeApi();
+    render(<RunPanel />);
+
+    expect(await screen.findByText(/no runs yet/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /auto-apply/i })).toBeEnabled();
+    expect(screen.queryByTestId("connection")).not.toBeInTheDocument();
+  });
+
+  it("lists each job with company, role, source, verdict, score, status and reason", async () => {
+    fakeApi({ active: aRun({ status: "applying" }) });
+    render(<RunPanel />);
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+
+    act(() =>
+      FakeEventSource.latest().emit("snapshot", {
+        run: aRun({ status: "applying" }),
+        evaluations: [
+          anEvaluation("1", {
+            status: "submitted",
+            verdict: "APPLY_NOW",
+            score: 87,
+            reason: "strong match",
+          }),
+        ],
+      }),
+    );
+
+    const table = screen.getByRole("table", { name: /jobs/i });
+    const headers = within(table)
+      .getAllByRole("columnheader")
+      .map((th) => th.textContent);
+    expect(headers).toEqual(["Company", "Role", "Source", "Verdict", "Score", "Status", "Reason"]);
+    const cells = within(jobRows()[0])
+      .getAllByRole("cell")
+      .map((td) => td.textContent);
+    expect(cells).toEqual([
+      "Acme",
+      "Engineer 1",
+      expect.stringMatching(/greenhouse/i),
+      "APPLY NOW",
+      "87",
+      expect.stringMatching(/submitted.*simulated/i),
+      "strong match",
+    ]);
+  });
+
+  it("shows progress through the Run's jobs", async () => {
+    fakeApi({ active: aRun() });
+    render(<RunPanel />);
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+
+    act(() =>
+      FakeEventSource.latest().emit("snapshot", {
+        run: aRun({
+          status: "evaluating",
+          funnel: funnel({ discovered: 4, skipped: 1, blocked: 1 }),
+        }),
+        evaluations: [],
+      }),
+    );
+
+    expect(screen.getByRole("progressbar", { name: /run progress/i })).toHaveAttribute(
+      "aria-valuenow",
+      "50",
+    );
+  });
+
   it("starts a Run on click and opens its stream with credentials", async () => {
     const fetchMock = fakeApi();
     render(<RunPanel />);
@@ -93,7 +171,7 @@ describe("<RunPanel />", () => {
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     expect(FakeEventSource.latest().url).toMatch(/\/api\/runs\/run-1\/events$/);
     expect(FakeEventSource.latest().withCredentials).toBe(true);
-    expect(screen.getByText(/connecting/i)).toBeInTheDocument();
+    expect(connection()).toMatch(/^connecting/i);
   });
 
   it("renders the live Run status and funnel counts as events arrive", async () => {
@@ -105,7 +183,7 @@ describe("<RunPanel />", () => {
 
     act(() => stream.emit("snapshot", { run: aRun(), evaluations: [] }));
     expect(valueOf("Status")).toBe("Discovering");
-    expect(screen.getByText(/live/i)).toBeInTheDocument();
+    expect(connection()).toMatch(/live/i);
 
     act(() => {
       stream.emit("eval", anEvaluation("1"));
@@ -114,9 +192,10 @@ describe("<RunPanel />", () => {
     });
     expect(valueOf("Status")).toBe("Evaluating");
     expect(valueOf("Discovered")).toBe("1");
-    expect(screen.getByText("Engineer 1")).toBeInTheDocument();
-    expect(screen.getByText(/skipped/i, { selector: "li *" })).toBeInTheDocument();
-    expect(screen.getByText(/not a fit/)).toBeInTheDocument();
+    const [row] = jobRows();
+    expect(row).toHaveTextContent("Engineer 1");
+    expect(within(row).getByTestId("status-chip")).toHaveTextContent("Skipped");
+    expect(row).toHaveTextContent(/not a fit/);
   });
 
   it("keeps the button disabled while the Run is active, and closes the stream on done", async () => {
@@ -137,6 +216,7 @@ describe("<RunPanel />", () => {
     expect(valueOf("Status")).toBe("Completed");
     expect(valueOf(/submitted \(simulated\)/i)).toBe("2");
     expect(stream.readyState).toBe(FakeEventSource.CLOSED);
+    expect(connection()).toMatch(/closed/i);
     expect(button).toBeEnabled();
   });
 
@@ -155,7 +235,7 @@ describe("<RunPanel />", () => {
 
     expect(valueOf("Status")).toBe("Evaluating");
     expect(valueOf("Evaluated")).toBe("1");
-    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(jobRows()).toHaveLength(2);
   });
 
   it("shows reconnecting when the connection drops, and re-renders from the next snapshot", async () => {
@@ -166,7 +246,7 @@ describe("<RunPanel />", () => {
     act(() => stream.emit("snapshot", { run: aRun(), evaluations: [anEvaluation("1")] }));
 
     act(() => stream.drop());
-    expect(screen.getByText(/reconnecting/i)).toBeInTheDocument();
+    expect(connection()).toMatch(/reconnecting/i);
 
     act(() =>
       stream.emit("snapshot", {
@@ -175,7 +255,7 @@ describe("<RunPanel />", () => {
       }),
     );
     expect(valueOf("Status")).toBe("Applying");
-    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(jobRows()).toHaveLength(2);
   });
 
   it("attaches to the already-active Run when the API answers 409", async () => {

@@ -20,6 +20,9 @@ This is the up-front allow-list the grilling produced. Anything on it may be ins
 ### `apps/web`
 - **react**, **react-dom** — UI.
 - **react-router-dom** — the routed pages: login, live run, Applied jobs, Scanned jobs, Settings (D20, D26).
+- **@mui/material**, **@emotion/react**, **@emotion/styled** — the UI kit and its styling engine (ticket 05b, human-approved): one theme, plus accessible Table, Chip, Card and progress components, so a minimal UI looks designed without hand-rolled CSS.
+- **@mui/icons-material** — the handful of icons in the shell and status chips.
+- **@fontsource/inter** — Inter, self-hosted and bundled by Vite, so the page makes no requests to a font CDN.
 
 ## Dev / build / test
 - **typescript** — strict everywhere; also the api/shared production build (`tsc`).
