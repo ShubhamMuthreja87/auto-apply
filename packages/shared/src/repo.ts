@@ -66,8 +66,11 @@ export class ActiveRunExistsError extends Error {
 
 /**
  * The persistence contract. Writes echo back to live subscribers; each `watch*`
- * delivers an initial snapshot on a microtask (never synchronously), then one
- * callback per subsequent matching write, in write order.
+ * delivers an initial snapshot asynchronously (never synchronously), then
+ * callbacks for later matching writes, in write order. Like Firestore's
+ * `onSnapshot`, a backend may coalesce rapid writes into one callback, but it
+ * never delivers a stale state after a newer one and the last callback always
+ * reflects the latest write. (The in-memory twin delivers one per write.)
  */
 export interface Repo {
   getUser(uid: string): Promise<UserDoc | null>;

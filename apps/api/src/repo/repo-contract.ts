@@ -2,13 +2,19 @@
  * The shared `Repo` contract suite. Any implementation must pass it, so the
  * in-memory twin cannot drift from Firestore semantics. Call
  * {@link describeRepoContract} with a factory that returns a fresh, empty repo
- * (and an optional teardown) — ticket 02 runs it against the in-memory repo,
- * ticket 03 drops in the Firestore adapter in a disposable `test-*` namespace.
+ * (and an optional teardown); it runs against the in-memory repo and, when
+ * credentials are present, the Firestore adapter in a disposable `test-*`
+ * namespace.
+ *
+ * Live updates are asserted the way a real `onSnapshot` delivers them: they
+ * arrive *eventually* (polled), in write order, and a backend may coalesce
+ * rapid writes into one callback — but never deliver a stale state after a
+ * newer one, and the last callback always reflects the latest write.
  *
  * This file imports Vitest, so it is test support, not product code: it is
  * excluded from the API build and never imported outside a `*.test.ts`.
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ActiveRunExistsError,
   emptyFunnel,
@@ -26,9 +32,31 @@ export interface RepoHarness {
   teardown?: () => Promise<void> | void;
 }
 
-/** Lets every microtask (and the current macrotask) drain before we assert. */
-function flush(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
+export interface RepoContractOptions {
+  /** Per-test timeout; a networked backend needs more than Vitest's 5 s. */
+  testTimeoutMs?: number;
+  /**
+   * How long to wait for deliveries that must *not* happen (after unsubscribe,
+   * from another run). Long enough for the backend's listener round trip.
+   */
+  quietMs?: number;
+  /** How long a positive delivery may take before the assertion fails. */
+  deliveryTimeoutMs?: number;
+}
+
+/**
+ * Asserts `actual` is `expected` with some entries possibly coalesced away:
+ * an in-order subsequence that ends on `expected`'s last entry.
+ */
+function expectCoalescedInOrder<T>(actual: readonly T[], expected: readonly T[]): void {
+  expect(actual.at(-1)).toEqual(expected.at(-1));
+  let cursor = 0;
+  for (const value of actual) {
+    while (cursor < expected.length && expected[cursor] !== value) cursor++;
+    expect(cursor, `${JSON.stringify(actual)} is not in the order of ${JSON.stringify(expected)}`)
+      .toBeLessThan(expected.length);
+    cursor++;
+  }
 }
 
 function aUser(overrides: Partial<UserDoc> = {}): UserDoc {
@@ -81,8 +109,17 @@ function anEvaluation(posting: Posting, overrides: Partial<Evaluation> = {}): Ev
 export function describeRepoContract(
   name: string,
   createHarness: () => Promise<RepoHarness> | RepoHarness,
+  options: RepoContractOptions = {},
 ): void {
-  describe(`Repo contract: ${name}`, () => {
+  const { testTimeoutMs = 5_000, quietMs = 20, deliveryTimeoutMs = 1_000 } = options;
+
+  /** Waits out any in-flight delivery before a "nothing arrived" assertion. */
+  const settle = () => new Promise<void>((resolve) => setTimeout(resolve, quietMs));
+  /** Retries `assertion` until it passes or the delivery timeout runs out. */
+  const eventually = (assertion: () => void) =>
+    vi.waitFor(assertion, { timeout: deliveryTimeoutMs, interval: 10 });
+
+  describe(`Repo contract: ${name}`, { timeout: testTimeoutMs }, () => {
     let repo: Repo;
     let teardown: (() => Promise<void> | void) | undefined;
 
@@ -127,6 +164,16 @@ export function describeRepoContract(
         );
       });
 
+      it("lets exactly one of two racing createRun calls win (double click)", async () => {
+        const results = await Promise.allSettled([
+          repo.createRun(aRun({ runId: "run-a" })),
+          repo.createRun(aRun({ runId: "run-b" })),
+        ]);
+        const rejected = results.filter((r) => r.status === "rejected");
+        expect(rejected).toHaveLength(1);
+        expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(ActiveRunExistsError);
+      });
+
       it("allows a new run once the previous one is terminal", async () => {
         await repo.createRun(aRun());
         await repo.patchRun("run-1", { status: "completed" });
@@ -160,41 +207,51 @@ export function describeRepoContract(
         expect(run?.funnel.submitted).toBe(1);
         expect(run?.funnel.blocked).toBe(0);
       });
+
+      it("loses no update when increments race (no read-modify-write)", async () => {
+        await repo.createRun(aRun());
+        await Promise.all(
+          Array.from({ length: 10 }, () =>
+            repo.patchRun("run-1", { funnelIncrements: { evaluated: 1 } }),
+          ),
+        );
+        expect((await repo.getActiveRun("user-1"))?.funnel.evaluated).toBe(10);
+      });
     });
 
     describe("watchRun", () => {
-      it("delivers the initial snapshot on a microtask, not synchronously", async () => {
+      it("delivers the initial snapshot asynchronously, never synchronously", async () => {
         await repo.createRun(aRun());
         const seen: Run[] = [];
         const unsub = repo.watchRun("run-1", (run) => seen.push(run));
         expect(seen).toHaveLength(0);
-        await flush();
-        expect(seen).toHaveLength(1);
+        await eventually(() => expect(seen).toHaveLength(1));
         expect(seen[0]?.status).toBe("discovering");
         unsub();
       });
 
-      it("echoes every later write back in order", async () => {
+      it("echoes later writes back in write order, ending on the latest", async () => {
         await repo.createRun(aRun());
         const statuses: string[] = [];
         const unsub = repo.watchRun("run-1", (run) => statuses.push(run.status));
-        await flush();
+        await eventually(() => expect(statuses).toEqual(["discovering"]));
         statuses.length = 0;
         await repo.patchRun("run-1", { status: "evaluating" });
         await repo.patchRun("run-1", { status: "applying" });
         await repo.patchRun("run-1", { status: "completed" });
-        expect(statuses).toEqual(["evaluating", "applying", "completed"]);
+        await eventually(() => expect(statuses.at(-1)).toBe("completed"));
+        expectCoalescedInOrder(statuses, ["evaluating", "applying", "completed"]);
         unsub();
       });
 
-      it("coalesces writes made before the initial snapshot into it", async () => {
+      it("never delivers a stale state after a write that races the initial snapshot", async () => {
         await repo.createRun(aRun());
         const statuses: string[] = [];
         const unsub = repo.watchRun("run-1", (run) => statuses.push(run.status));
-        // Lands in the synchronous gap before the initial microtask fires.
+        // Lands before (in memory: always; Firestore: usually) the initial snapshot.
         await repo.patchRun("run-1", { status: "evaluating" });
-        await flush();
-        expect(statuses).toEqual(["evaluating"]);
+        await eventually(() => expect(statuses.at(-1)).toBe("evaluating"));
+        expectCoalescedInOrder(statuses, ["discovering", "evaluating"]);
         unsub();
       });
 
@@ -202,10 +259,10 @@ export function describeRepoContract(
         await repo.createRun(aRun());
         const statuses: string[] = [];
         const unsub = repo.watchRun("run-1", (run) => statuses.push(run.status));
-        await flush();
+        await eventually(() => expect(statuses).toEqual(["discovering"]));
         unsub();
         await repo.patchRun("run-1", { status: "evaluating" });
-        await flush();
+        await settle();
         expect(statuses).toEqual(["discovering"]);
       });
     });
@@ -220,7 +277,7 @@ export function describeRepoContract(
         const changes: EvaluationChange[] = [];
         const unsub = repo.watchEvaluations("run-1", (change) => changes.push(change));
         expect(changes).toHaveLength(0);
-        await flush();
+        await eventually(() => expect(changes).toHaveLength(2));
         expect(changes.map((c) => c.type)).toEqual(["added", "added"]);
         expect(changes.map((c) => c.evaluation.jobKey)).toEqual([jobKey(p1), jobKey(p2)]);
         unsub();
@@ -231,7 +288,7 @@ export function describeRepoContract(
         const posting = aPosting("1");
         const changes: EvaluationChange[] = [];
         const unsub = repo.watchEvaluations("run-1", (change) => changes.push(change));
-        await flush();
+        await settle();
         await repo.putEvaluation("run-1", anEvaluation(posting));
         await repo.patchEvaluation("run-1", jobKey(posting), { status: "evaluating" });
         await repo.patchEvaluation("run-1", jobKey(posting), {
@@ -239,13 +296,16 @@ export function describeRepoContract(
           verdict: "APPLY_NOW",
           score: 42,
         });
-        expect(changes.map((c) => c.type)).toEqual(["added", "modified", "modified"]);
-        expect(changes.map((c) => c.evaluation.status)).toEqual([
-          "queued",
-          "evaluating",
-          "submitted",
-        ]);
+        await eventually(() => expect(changes.at(-1)?.evaluation.status).toBe("submitted"));
+        // The first delivery introduces the document; every later one modifies it.
+        expect(changes[0]?.type).toBe("added");
+        expect(changes.slice(1).every((c) => c.type === "modified")).toBe(true);
+        expectCoalescedInOrder(
+          changes.map((c) => c.evaluation.status),
+          ["queued", "evaluating", "submitted"],
+        );
         expect(changes.at(-1)?.evaluation.verdict).toBe("APPLY_NOW");
+        expect(changes.at(-1)?.evaluation.score).toBe(42);
         unsub();
       });
 
@@ -253,10 +313,10 @@ export function describeRepoContract(
         await repo.createRun(aRun());
         const changes: EvaluationChange[] = [];
         const unsub = repo.watchEvaluations("run-1", (change) => changes.push(change));
-        await flush();
+        await settle();
         unsub();
         await repo.putEvaluation("run-1", anEvaluation(aPosting("1")));
-        await flush();
+        await settle();
         expect(changes).toHaveLength(0);
       });
 
@@ -265,9 +325,9 @@ export function describeRepoContract(
         await repo.createRun(aRun({ runId: "run-2", uid: "user-2" }));
         const changes: EvaluationChange[] = [];
         const unsub = repo.watchEvaluations("run-1", (change) => changes.push(change));
-        await flush();
+        await settle();
         await repo.putEvaluation("run-2", { ...anEvaluation(aPosting("9")), runId: "run-2" });
-        await flush();
+        await settle();
         expect(changes).toHaveLength(0);
         unsub();
       });
