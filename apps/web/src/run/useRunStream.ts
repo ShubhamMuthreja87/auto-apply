@@ -34,6 +34,10 @@ const initial: RunStreamState = {
   error: null,
 };
 
+/** Shown when the stream ends without `done`; the view keeps its last state. */
+export const LOST_CONNECTION =
+  "Lost the live connection to the server. Reload the page to reconnect.";
+
 function upsert(evaluations: Evaluation[], next: Evaluation): Evaluation[] {
   const i = evaluations.findIndex((e) => e.jobKey === next.jobKey);
   if (i === -1) return [...evaluations, next];
@@ -102,10 +106,13 @@ export function useRunStream(runId: string | null): RunStreamState {
         );
         return;
       }
-      setState((prev) => ({
-        ...prev,
-        connection: source.readyState === EventSource.CLOSED ? "closed" : "reconnecting",
-      }));
+      // CLOSED means the browser gave up (e.g. the server answered non-200)
+      // and will not retry: say so rather than leave a stale view looking live.
+      setState((prev) =>
+        source.readyState === EventSource.CLOSED
+          ? { ...prev, connection: "closed", error: LOST_CONNECTION }
+          : { ...prev, connection: "reconnecting" },
+      );
     });
 
     return () => source.close();

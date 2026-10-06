@@ -2,6 +2,7 @@
  * The Evaluations of a Run as a table (shown to the user as "Jobs"), one row per Job Key, updated in place
  * as `eval` events arrive.
  */
+import Chip from "@mui/material/Chip";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
@@ -9,7 +10,7 @@ import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
-import type { Ats, Evaluation } from "@auto-apply/shared";
+import type { Ats, Evaluation, PostingSource } from "@auto-apply/shared";
 import { StatusChip, VerdictChip } from "../ui/StatusChip";
 
 const atsLabels: Record<Ats, string> = {
@@ -17,6 +18,34 @@ const atsLabels: Record<Ats, string> = {
   lever: "Lever",
   ashby: "Ashby",
 };
+
+/**
+ * Postings not read live from their board are labelled (D3): `fallback` when
+ * the board failed and its recorded fixtures stood in, `fixture` when the API
+ * runs on recordings by choice.
+ */
+const sourceLabels: Record<Exclude<PostingSource, "live">, { label: string; title: string }> = {
+  fallback: {
+    label: "Fallback",
+    title: "The live board could not be read; these are its recorded jobs.",
+  },
+  fixture: { label: "Fixture", title: "Recorded jobs; the API is not reading live boards." },
+};
+
+function SourceLabel({ source }: { source: PostingSource }) {
+  if (source === "live") return null;
+  const { label, title } = sourceLabels[source];
+  return (
+    <Chip
+      label={label}
+      title={title}
+      size="small"
+      color="warning"
+      variant="outlined"
+      sx={{ ml: 1 }}
+    />
+  );
+}
 
 export function EvaluationsTable({ evaluations }: { evaluations: Evaluation[] }) {
   return (
@@ -44,6 +73,7 @@ export function EvaluationsTable({ evaluations }: { evaluations: Evaluation[] })
                   {" "}
                   · {posting.board}
                 </Typography>
+                <SourceLabel source={posting.source} />
               </TableCell>
               <TableCell>
                 <VerdictChip verdict={verdict} />

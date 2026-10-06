@@ -1,14 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
   ActiveRunExistsError,
+  type Evaluation,
   type Posting,
   type Run,
   type RunStatus,
   type User,
 } from "@auto-apply/shared";
+import { createDiscovery } from "../discovery/discovery.js";
+import { readBoardFixture } from "../discovery/fixtures.js";
+import { greenhouseJobSource } from "../discovery/greenhouse.js";
+import { recordedFetch } from "../discovery/recorded-fetch.js";
 import { InMemoryRepo } from "../repo/in-memory-repo.js";
 import { buildPipeline, type PipelineDeps } from "./pipeline.js";
-import type { JobSource } from "./ports.js";
+import type { Discovery } from "./ports.js";
 import { SEED_USER } from "../seed-user.js";
 import { UserNotFoundError } from "../user.js";
 
@@ -24,10 +29,12 @@ function aPosting(jobId: string): Posting {
     location: "Remote",
     descriptionText: "Build things.",
     applyUrl: `https://boards.greenhouse.io/acme/jobs/${jobId}`,
+    remote: true,
+    source: "live",
   };
 }
 
-const twoPostings: JobSource = { discover: async () => [aPosting("1"), aPosting("2")] };
+const twoPostings: Discovery = { discover: async () => [aPosting("1"), aPosting("2")] };
 
 /** A `delay` that holds every step until the test releases it. */
 function gatedDelay() {
@@ -46,7 +53,7 @@ function deps(overrides: Partial<PipelineDeps> = {}): PipelineDeps {
   let n = 0;
   return {
     repo: new InMemoryRepo(),
-    jobSource: twoPostings,
+    discovery: twoPostings,
     clock: () => new Date("2026-10-06T12:00:00.000Z"),
     delay: async () => {},
     newRunId: () => `run-${++n}`,
@@ -145,12 +152,12 @@ describe("pipeline skeleton", () => {
 
   it("fails the Run with a reason when discovery throws, instead of crashing", async () => {
     const repo = new InMemoryRepo();
-    const broken: JobSource = {
+    const broken: Discovery = {
       discover: async () => {
         throw new Error("board unreachable");
       },
     };
-    const pipeline = buildPipeline(deps({ repo, jobSource: broken }));
+    const pipeline = buildPipeline(deps({ repo, discovery: broken }));
 
     const { runId, finished } = await pipeline.startRun("user-1");
     await finished;
@@ -195,5 +202,48 @@ describe("pipeline skeleton", () => {
     expect(run?.status).toBe("failed");
     expect(run?.reason).toBe("no user document for user-1");
     expect(run?.funnel.discovered).toBe(0);
+  });
+});
+
+describe("pipeline with real discovery over recorded boards", () => {
+  it("queues an Evaluation per discovered Posting, a failed board labelled fallback (D3)", async () => {
+    const repo = new InMemoryRepo();
+    const recorded = recordedFetch({ failing: ["anthropic"] });
+    const discovery = createDiscovery({
+      sources: [greenhouseJobSource({ fetch: recorded.fetch, timeoutMs: 1000 })],
+      boards: [
+        { ats: "greenhouse", board: "stripe" },
+        { ats: "greenhouse", board: "anthropic" },
+      ],
+      readFixture: readBoardFixture,
+      mode: "live",
+    });
+    const pipeline = buildPipeline(deps({ repo, discovery }));
+
+    const { runId, finished } = await pipeline.startRun("user-1");
+    await finished;
+
+    const evaluations = await new Promise<Evaluation[]>((resolve) => {
+      const unsub = repo.watchEvaluations(
+        runId,
+        (batch) => {
+          unsub();
+          resolve(batch.map((c) => c.evaluation));
+        },
+        () => {},
+      );
+    });
+    const sources = new Map(evaluations.map((e) => [e.posting.board, e.posting.source]));
+    expect(sources).toEqual(
+      new Map([
+        ["stripe", "live"],
+        ["anthropic", "fallback"],
+      ]),
+    );
+    expect(evaluations.map((e) => e.jobKey)).toContain("greenhouse:stripe:8113337");
+    const run = await repo.getRun(runId);
+    expect(run?.status).toBe("completed");
+    expect(run?.funnel.discovered).toBe(evaluations.length);
+    expect(recorded.calls.every((c) => c.method === "GET")).toBe(true);
   });
 });

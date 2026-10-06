@@ -29,6 +29,10 @@ const envSchema = z.object({
   // Read by `loadCredential`; inline JSON wins over the key-file path.
   FIREBASE_SERVICE_ACCOUNT_JSON: optionalString,
   GOOGLE_APPLICATION_CREDENTIALS: optionalString,
+  // `live` reads the public ATS boards (D2) with a per-board fixture fallback
+  // (D3); `fixtures` reads only the recorded boards, never the network, for
+  // deterministic end-to-end runs (spec, Testing seam 6).
+  JOB_SOURCE: z.enum(["live", "fixtures"]).default("live"),
   // The salary hard block's floor, in lakhs per annum. Kept out of the user
   // document (compensation is never seeded); unset means the block is inactive.
   SALARY_FLOOR_LPA: optionalString.pipe(z.coerce.number().positive().optional()),
@@ -45,6 +49,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     CORS_ORIGIN: env.CORS_ORIGIN,
     FIREBASE_SERVICE_ACCOUNT_JSON: env.FIREBASE_SERVICE_ACCOUNT_JSON,
     GOOGLE_APPLICATION_CREDENTIALS: env.GOOGLE_APPLICATION_CREDENTIALS,
+    JOB_SOURCE: env.JOB_SOURCE,
     SALARY_FLOOR_LPA: env.SALARY_FLOOR_LPA,
   });
 

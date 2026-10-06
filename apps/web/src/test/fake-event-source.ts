@@ -40,6 +40,12 @@ export class FakeEventSource extends EventTarget {
     this.dispatchEvent(new Event("error"));
   }
 
+  /** The browser gives up on the stream (e.g. a non-200 answer): no retry follows. */
+  fail(): void {
+    this.readyState = FakeEventSource.CLOSED;
+    this.dispatchEvent(new Event("error"));
+  }
+
   close(): void {
     this.readyState = FakeEventSource.CLOSED;
   }

@@ -94,8 +94,20 @@ export const atsSchema = z.enum(["greenhouse", "lever", "ashby"]);
 export type Ats = z.infer<typeof atsSchema>;
 
 /**
+ * Where a Posting's data came from (D3, ticket 06): `live` from the board's
+ * public API; `fallback` from that board's recorded fixtures because the live
+ * call failed; `fixture` from the recordings by choice (the fixtures-only job
+ * source used for deterministic end-to-end runs). The UI labels anything that
+ * is not `live`.
+ */
+export const postingSourceSchema = z.enum(["live", "fallback", "fixture"]);
+export type PostingSource = z.infer<typeof postingSourceSchema>;
+
+/**
  * A single job as returned by an ATS board, normalised into our own shape
- * (GLOSSARY: Posting). The unit of discovery.
+ * (GLOSSARY: Posting). The unit of discovery. `remote` is parsed from the
+ * board's location text; `remote` and `source` default for documents written
+ * before ticket 06.
  */
 export const postingSchema = z.object({
   ats: atsSchema,
@@ -106,6 +118,8 @@ export const postingSchema = z.object({
   location: z.string(),
   descriptionText: z.string(),
   applyUrl: z.string().url(),
+  remote: z.boolean().default(false),
+  source: postingSourceSchema.default("live"),
 });
 export type Posting = z.infer<typeof postingSchema>;
 
@@ -369,6 +383,13 @@ export const runSchema = z.object({
   updatedAt: z.string(),
 });
 export type Run = z.infer<typeof runSchema>;
+
+/**
+ * The `reason` of a Run that a server restart killed mid-flight: on startup
+ * the API fails every Run still active from before boot with it, and the UI
+ * explains it instead of showing a Run stuck forever (spec, Persistence).
+ */
+export const RUN_INTERRUPTED_REASON = "interrupted";
 
 /**
  * A Run is active until it reaches a terminal status. This drives the

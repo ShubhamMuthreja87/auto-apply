@@ -45,7 +45,7 @@ function clone<T>(value: T): T {
  * adapter does on read: one that breaks the contract becomes an `Error` for
  * `onError` instead of a callback, and the subscription keeps going (ADR-0003).
  */
-function validate<T>(schema: z.ZodType<T>, value: unknown, label: string): T | Error {
+function validate<T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>, value: unknown, label: string): T | Error {
   const parsed = schema.safeParse(structuredClone(value));
   return parsed.success ? parsed.data : new Error(`invalid ${label}: ${parsed.error.message}`);
 }

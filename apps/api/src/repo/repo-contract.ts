@@ -91,6 +91,8 @@ function aPosting(jobId = "1"): Posting {
     location: "Remote",
     descriptionText: "Build things.",
     applyUrl: `https://boards.greenhouse.io/acme/jobs/${jobId}`,
+    remote: true,
+    source: "live",
   };
 }
 
