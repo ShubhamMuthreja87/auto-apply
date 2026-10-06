@@ -368,6 +368,59 @@ export const meResponseSchema = userSchema;
 export type MeResponse = z.infer<typeof meResponseSchema>;
 
 /**
+ * The hard block whose floor is the API's `SALARY_FLOOR_LPA`, never the user
+ * document: compensation is always user-only and never stored (ticket 04), so
+ * this rule's `threshold` stays `null`.
+ */
+export const SALARY_FLOOR_RULE_ID = "salary_below_floor";
+
+/**
+ * `PUT /api/me` (ticket 17): the edited profile, preferences and settings,
+ * replacing the stored ones whole. The uid comes from the session, never the
+ * body. `settings.alwaysUserOnly` is not editable (D10): the API keeps the
+ * stored list. Unknown keys are dropped, so nothing outside the contract
+ * (compensation included) is ever stored. Verdict bands must be ordered within
+ * the fit cap.
+ */
+export const updateMeRequestSchema = z
+  .object({
+    profile: userProfileSchema,
+    preferences: userPreferencesSchema,
+    settings: applicationSettingsSchema.omit({ alwaysUserOnly: true }),
+  })
+  .superRefine(({ preferences: p }, ctx) => {
+    const { applyMinFit, applyNowMinFit } = p.verdictBands;
+    if (applyMinFit < 1 || applyMinFit > applyNowMinFit) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["preferences", "verdictBands", "applyMinFit"],
+        message: "APPLY must start between 1 and the APPLY NOW band",
+      });
+    }
+    if (applyNowMinFit > p.fitCap) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["preferences", "verdictBands", "applyNowMinFit"],
+        message: "APPLY NOW cannot start above the fit cap",
+      });
+    }
+    p.hardBlocks.forEach((rule, index) => {
+      if (rule.id === SALARY_FLOOR_RULE_ID && rule.threshold !== null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["preferences", "hardBlocks", index, "threshold"],
+          message: "The salary floor is never stored; it comes from the server",
+        });
+      }
+    });
+  });
+export type UpdateMeRequest = z.infer<typeof updateMeRequestSchema>;
+
+/** `PUT /api/me` → `200`: the user document as stored after the edit. */
+export const updateMeResponseSchema = meResponseSchema;
+export type UpdateMeResponse = z.infer<typeof updateMeResponseSchema>;
+
+/**
  * Per-run funnel counts (D16). They are only ever incremented, never
  * read-modify-written (CODING_STANDARDS landmine: lost updates); the Firestore
  * adapter maps increments to `FieldValue.increment`.
