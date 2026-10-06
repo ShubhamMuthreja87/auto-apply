@@ -7,6 +7,7 @@ import { BOARDS } from "./discovery/boards.js";
 import { createDiscovery } from "./discovery/discovery.js";
 import { readBoardFixture } from "./discovery/fixtures.js";
 import { greenhouseJobSource } from "./discovery/greenhouse.js";
+import { awaitingScoringEvaluator } from "./evaluation/awaiting-scoring-evaluator.js";
 import { recoverInterruptedRuns } from "./runs/recover-interrupted-runs.js";
 import { DEMO_UID, loadUser, seedUser } from "./user.js";
 
@@ -30,6 +31,8 @@ const discovery = createDiscovery({
 const pipeline = buildPipeline({
   repo,
   discovery,
+  evaluator: awaitingScoringEvaluator,
+  screening: { salaryFloorLpa: config.SALARY_FLOOR_LPA },
   clock: () => new Date(),
   delay: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   newRunId: () => crypto.randomUUID(),

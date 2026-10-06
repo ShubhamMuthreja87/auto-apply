@@ -27,6 +27,7 @@ import { InMemoryRepo } from "./repo/in-memory-repo.js";
 import { buildPipeline } from "./pipeline/pipeline.js";
 import type { Discovery } from "./pipeline/ports.js";
 import { SEED_USER } from "./seed-user.js";
+import { awaitingScoringEvaluator } from "./evaluation/awaiting-scoring-evaluator.js";
 
 const testConfig: Config = {
   NODE_ENV: "test",
@@ -109,6 +110,7 @@ function harness(heartbeatMs = 15_000) {
   const pipeline = buildPipeline({
     repo,
     discovery: twoPostings,
+    evaluator: awaitingScoringEvaluator,
     clock: () => new Date(),
     delay: () => gate,
     newRunId: () => `run-${++n}`,

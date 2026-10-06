@@ -14,8 +14,11 @@ export type DiscoveryMode = "live" | "fixtures";
 
 /**
  * Postings kept per board, newest-updated first. A big board lists hundreds of
- * jobs; until the cheap filters land (ticket 07) every discovered Posting
- * becomes a stored Evaluation, so this bounds Firestore writes and Run length.
+ * jobs. The Run's AI-evaluation cap (D17) stops pulling once its slots are
+ * taken, but Seen and hard-blocked Postings take no slot, and for this user
+ * most Postings are blocked by location; without this bound a Run over 15
+ * boards could write thousands of blocked Evaluations. It bounds Firestore
+ * writes and Run length.
  */
 export const MAX_POSTINGS_PER_BOARD = 10;
 

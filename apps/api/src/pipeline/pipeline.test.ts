@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   ActiveRunExistsError,
+  MAX_AI_EVALS,
+  MAX_IN_FLIGHT,
+  jobKey,
   type Evaluation,
   type Posting,
   type Run,
@@ -12,8 +15,8 @@ import { readBoardFixture } from "../discovery/fixtures.js";
 import { greenhouseJobSource } from "../discovery/greenhouse.js";
 import { recordedFetch } from "../discovery/recorded-fetch.js";
 import { InMemoryRepo } from "../repo/in-memory-repo.js";
-import { buildPipeline, type PipelineDeps } from "./pipeline.js";
-import type { Discovery } from "./ports.js";
+import { AWAITING_SCORING_REASON, buildPipeline, type PipelineDeps } from "./pipeline.js";
+import type { Discovery, JobEvaluator } from "./ports.js";
 import { SEED_USER } from "../seed-user.js";
 import { UserNotFoundError } from "../user.js";
 
@@ -36,6 +39,18 @@ function aPosting(jobId: string): Posting {
 
 const twoPostings: Discovery = { discover: async () => [aPosting("1"), aPosting("2")] };
 
+/** An evaluator that records which Postings it was asked to judge. */
+function recordingEvaluator() {
+  const judged: string[] = [];
+  const evaluator: JobEvaluator = {
+    evaluate: async (posting) => {
+      judged.push(posting.jobId);
+      return [];
+    },
+  };
+  return { evaluator, judged };
+}
+
 /** A `delay` that holds every step until the test releases it. */
 function gatedDelay() {
   let release: () => void = () => {};
@@ -54,6 +69,7 @@ function deps(overrides: Partial<PipelineDeps> = {}): PipelineDeps {
   return {
     repo: new InMemoryRepo(),
     discovery: twoPostings,
+    evaluator: recordingEvaluator().evaluator,
     clock: () => new Date("2026-10-06T12:00:00.000Z"),
     delay: async () => {},
     newRunId: () => `run-${++n}`,
@@ -245,5 +261,257 @@ describe("pipeline with real discovery over recorded boards", () => {
     expect(run?.status).toBe("completed");
     expect(run?.funnel.discovered).toBe(evaluations.length);
     expect(recorded.calls.every((c) => c.method === "GET")).toBe(true);
+  });
+});
+/** The Run's Evaluations as they stand now, in the order they were first written. */
+function evaluationsOf(repo: InMemoryRepo, runId: string): Promise<Evaluation[]> {
+  return new Promise<Evaluation[]>((resolve, reject) => {
+    const unsub = repo.watchEvaluations(
+      runId,
+      (batch) => {
+        unsub();
+        resolve(batch.map((c) => c.evaluation));
+      },
+      reject,
+    );
+  });
+}
+
+function outcomes(evaluations: Evaluation[]): Record<string, string> {
+  return Object.fromEntries(
+    evaluations.map((e) => [e.posting.jobId, `${e.status}: ${e.reason ?? ""}`]),
+  );
+}
+
+function postings(count: number, overrides: Partial<Posting> = {}, prefix = ""): Posting[] {
+  return Array.from({ length: count }, (_, i) => ({
+    ...aPosting(`${prefix}${i + 1}`),
+    ...overrides,
+  }));
+}
+
+const onsiteAbroad: Partial<Posting> = {
+  location: "San Francisco, CA",
+  remote: false,
+};
+
+describe("seen-skip (D15)", () => {
+  it("skips Postings evaluated in an earlier Run before any screening or evaluation", async () => {
+    const repo = new InMemoryRepo();
+    const { evaluator, judged } = recordingEvaluator();
+    const discovery: Discovery = {
+      discover: async () => [aPosting("1"), { ...aPosting("2"), ...onsiteAbroad }],
+    };
+    const pipeline = buildPipeline(deps({ repo, evaluator, discovery }));
+
+    const first = await pipeline.startRun("user-1");
+    await first.finished;
+    const second = await pipeline.startRun("user-1");
+    await second.finished;
+
+    const firstOutcomes = outcomes(await evaluationsOf(repo, first.runId));
+    expect(firstOutcomes["1"]).toBe(`skipped: ${AWAITING_SCORING_REASON}`);
+    expect(firstOutcomes["2"]).toMatch(/^blocked: Mandatory onsite .*San Francisco, CA/);
+    // The second Run looks visibly different: both were seen, nothing is re-judged.
+    expect(outcomes(await evaluationsOf(repo, second.runId))).toEqual({
+      "1": "skipped: seen",
+      "2": "skipped: seen",
+    });
+    expect(judged).toEqual(["1"]);
+    const run = await repo.getRun(second.runId);
+    expect(run?.funnel).toMatchObject({
+      discovered: 2,
+      evaluated: 0,
+      skipped: 2,
+      blocked: 0,
+    });
+  });
+
+  it("does not mark a Posting seen when it failed, so a later Run tries again", async () => {
+    const repo = new InMemoryRepo();
+    let calls = 0;
+    const flaky: JobEvaluator = {
+      evaluate: async () => {
+        calls++;
+        if (calls === 1) throw new Error("evaluator unavailable");
+        return [];
+      },
+    };
+    const discovery: Discovery = { discover: async () => [aPosting("1")] };
+    const pipeline = buildPipeline(deps({ repo, evaluator: flaky, discovery }));
+
+    const first = await pipeline.startRun("user-1");
+    await first.finished;
+    const second = await pipeline.startRun("user-1");
+    await second.finished;
+
+    expect(outcomes(await evaluationsOf(repo, first.runId))).toEqual({
+      "1": "failed: evaluator unavailable",
+    });
+    const firstRun = await repo.getRun(first.runId);
+    expect(firstRun?.status).toBe("completed");
+    expect(firstRun?.funnel.failed).toBe(1);
+    expect(outcomes(await evaluationsOf(repo, second.runId))).toEqual({
+      "1": `skipped: ${AWAITING_SCORING_REASON}`,
+    });
+  });
+});
+
+describe("screening before evaluation (D7)", () => {
+  it("blocks or skips in code with a reason, and never asks the evaluator", async () => {
+    const repo = new InMemoryRepo();
+    const { evaluator, judged } = recordingEvaluator();
+    const discovery: Discovery = {
+      discover: async () => [
+        { ...aPosting("abroad"), ...onsiteAbroad },
+        { ...aPosting("bank"), company: "Barclays" },
+        { ...aPosting("intern"), title: "Software Engineer Intern" },
+        {
+          ...aPosting("fit"),
+          title: "Engineering Manager",
+          location: "Bengaluru, India",
+        },
+      ],
+    };
+    const pipeline = buildPipeline(deps({ repo, evaluator, discovery }));
+
+    const { runId, finished } = await pipeline.startRun("user-1");
+    await finished;
+
+    const byJob = outcomes(await evaluationsOf(repo, runId));
+    expect(byJob.abroad).toMatch(/^blocked: .*San Francisco, CA/);
+    expect(byJob.bank).toMatch(/^blocked: .*Barclays/);
+    expect(byJob.intern).toBe("skipped: Title out of target: intern");
+    expect(byJob.fit).toBe(`skipped: ${AWAITING_SCORING_REASON}`);
+    expect(judged).toEqual(["fit"]);
+    expect((await repo.getRun(runId))?.funnel).toMatchObject({
+      discovered: 4,
+      evaluated: 1,
+      blocked: 2,
+      skipped: 2,
+    });
+  });
+
+  it("applies the salary floor from the injected screening options", async () => {
+    const repo = new InMemoryRepo();
+    const lowPay = {
+      ...aPosting("1"),
+      descriptionText: "Compensation: ₹20-30 LPA",
+    };
+    const pipeline = buildPipeline(
+      deps({
+        repo,
+        screening: { salaryFloorLpa: 40 },
+        discovery: { discover: async () => [lowPay] },
+      }),
+    );
+
+    const { runId, finished } = await pipeline.startRun("user-1");
+    await finished;
+
+    expect(outcomes(await evaluationsOf(repo, runId))["1"]).toMatch(/^blocked: .*30 LPA/);
+  });
+});
+
+describe("limits (D17)", () => {
+  it(`keeps at most ${MAX_IN_FLIGHT} Postings in flight and persists only what it has pulled`, async () => {
+    const gated = gatedDelay();
+    const repo = new InMemoryRepo();
+    // The first delay (before discovery) passes; every per-Posting delay waits.
+    let delays = 0;
+    const delay = () => (++delays === 1 ? Promise.resolve() : gated.delay());
+    const discovery: Discovery = { discover: async () => postings(7) };
+    const pipeline = buildPipeline(deps({ repo, discovery, delay }));
+
+    const { runId, finished } = await pipeline.startRun("user-1");
+    await vi.waitFor(async () => {
+      const statuses = (await evaluationsOf(repo, runId)).map((e) => e.status);
+      expect(statuses).toEqual(["evaluating", "evaluating", "evaluating"]);
+    });
+
+    gated.open();
+    await finished;
+    const all = await evaluationsOf(repo, runId);
+    expect(all).toHaveLength(7);
+    expect(all.every((e) => e.status === "skipped")).toBe(true);
+  });
+
+  it("never has more evaluator calls in flight than the cap", async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const evaluator: JobEvaluator = {
+      evaluate: async () => {
+        inFlight++;
+        peak = Math.max(peak, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        inFlight--;
+        return [];
+      },
+    };
+    const discovery: Discovery = { discover: async () => postings(10) };
+    const pipeline = buildPipeline(deps({ evaluator, discovery }));
+
+    const { finished } = await pipeline.startRun("user-1");
+    await finished;
+
+    expect(peak).toBe(MAX_IN_FLIGHT);
+  });
+
+  it(`stops at ${MAX_AI_EVALS} evaluations; seen and screened Postings take no slot`, async () => {
+    const repo = new InMemoryRepo();
+    for (const seen of postings(4, {}, "seen-")) await repo.markSeen(jobKey(seen));
+    const { evaluator, judged } = recordingEvaluator();
+    const discovered = [
+      ...postings(4, {}, "seen-"),
+      ...postings(5, onsiteAbroad, "blocked-"),
+      ...postings(25, {}, "fit-"),
+    ];
+    const discovery: Discovery = { discover: async () => discovered };
+    const pipeline = buildPipeline(deps({ repo, evaluator, discovery }));
+
+    const { runId, finished } = await pipeline.startRun("user-1");
+    await finished;
+
+    expect(judged).toHaveLength(MAX_AI_EVALS);
+    const all = await evaluationsOf(repo, runId);
+    const count = (pattern: RegExp) =>
+      all.filter((e) => pattern.test(`${e.status}: ${e.reason ?? ""}`)).length;
+    expect(count(/^skipped: seen$/)).toBe(4);
+    expect(count(/^blocked: /)).toBe(5);
+    expect(count(new RegExp(`^skipped: ${AWAITING_SCORING_REASON}$`))).toBe(MAX_AI_EVALS);
+    // A Posting already pulled when the last slot went is skipped for the
+    // limit; nothing after that is pulled, so it is never written.
+    const limited = count(/^skipped: limit$/);
+    expect(limited).toBeLessThan(MAX_IN_FLIGHT);
+    expect(all).toHaveLength(4 + 5 + MAX_AI_EVALS + limited);
+    expect(all.length).toBeLessThan(discovered.length);
+    const run = await repo.getRun(runId);
+    expect(run?.status).toBe("completed");
+    expect(run?.funnel).toMatchObject({
+      discovered: discovered.length,
+      evaluated: MAX_AI_EVALS,
+      blocked: 5,
+      skipped: 4 + MAX_AI_EVALS + limited,
+    });
+  });
+
+  it("leaves Postings it did not evaluate unseen, so the next Run evaluates them", async () => {
+    const repo = new InMemoryRepo();
+    const { evaluator, judged } = recordingEvaluator();
+    const discovered = postings(MAX_AI_EVALS + 5);
+    const discovery: Discovery = { discover: async () => discovered };
+    const pipeline = buildPipeline(deps({ repo, evaluator, discovery }));
+
+    await (
+      await pipeline.startRun("user-1")
+    ).finished;
+    const firstJudged = judged.length;
+    await (
+      await pipeline.startRun("user-1")
+    ).finished;
+
+    expect(firstJudged).toBe(MAX_AI_EVALS);
+    expect(judged).toHaveLength(discovered.length);
+    expect(new Set(judged).size).toBe(discovered.length);
   });
 });

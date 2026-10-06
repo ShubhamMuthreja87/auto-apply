@@ -392,6 +392,20 @@ export type Run = z.infer<typeof runSchema>;
 export const RUN_INTERRUPTED_REASON = "interrupted";
 
 /**
+ * Fixed `reason`s of a `skipped` Evaluation (D15, D17, D8), so the API and the
+ * UI agree on them: `seen` — evaluated in an earlier Run, skipped before any
+ * spend; `limit` — the Run's AI-evaluation cap was reached before this Posting
+ * got a slot; `stretch` — the Verdict was STRETCH or below. Blocked and other
+ * skipped Evaluations carry a free-text reason naming the rule and evidence.
+ */
+export const SKIP_REASONS = {
+  seen: "seen",
+  limit: "limit",
+  stretch: "stretch",
+} as const;
+export type SkipReason = (typeof SKIP_REASONS)[keyof typeof SKIP_REASONS];
+
+/**
  * A Run is active until it reaches a terminal status. This drives the
  * one-active-run-per-user rule (D17) that `createRun` enforces as a future 409.
  */

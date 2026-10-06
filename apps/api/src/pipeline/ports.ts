@@ -1,10 +1,9 @@
 /**
  * The pipeline's outward-facing ports (CLAUDE.md, Flow 6). The pipeline depends
  * only on these and on the `Repo`; adapters and test fakes implement them, and
- * `buildPipeline` receives them. The evaluator and submitter ports join as
- * their tickets land.
+ * `buildPipeline` receives them. The submitter port joins with its ticket.
  */
-import type { Ats, Posting } from "@auto-apply/shared";
+import type { Ats, FitCriterion, Posting } from "@auto-apply/shared";
 
 /** One public job board on one ATS, e.g. Greenhouse `stripe` (D2). */
 export interface BoardRef {
@@ -31,4 +30,23 @@ export interface JobSource {
  */
 export interface Discovery {
   discover(): Promise<Posting[]>;
+}
+
+/** One soft criterion judged against a Posting: met or not, with a quote as evidence (D7). */
+export interface CriterionJudgement {
+  criterionId: string;
+  met: boolean;
+  /** A quote from the Posting supporting the judgement. */
+  evidence: string;
+}
+
+/**
+ * Judges a Posting that passed screening against the rubric's criteria (D7):
+ * per-criterion evidence only — no score, no Verdict; code computes those.
+ * Every call counts against the Run's AI-evaluation cap (D17), so the pipeline
+ * calls it at most once per Posting per Run. The AI client (ticket 09) and the
+ * keyword fallback matcher (ticket 08) implement it.
+ */
+export interface JobEvaluator {
+  evaluate(posting: Posting, criteria: readonly FitCriterion[]): Promise<CriterionJudgement[]>;
 }

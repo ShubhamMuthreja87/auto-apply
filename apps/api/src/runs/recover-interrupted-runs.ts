@@ -12,6 +12,7 @@
  */
 import { RUN_INTERRUPTED_REASON, type Repo } from "@auto-apply/shared";
 import { logger } from "../logger.js";
+import { assertRunTransition } from "../pipeline/transitions.js";
 
 /** Fails each user's leftover active Run; resolves to the ids it failed. */
 export async function recoverInterruptedRuns(
@@ -22,6 +23,7 @@ export async function recoverInterruptedRuns(
   for (const uid of uids) {
     const run = await repo.getActiveRun(uid);
     if (!run) continue;
+    assertRunTransition(run.status, "failed");
     await repo.patchRun(run.runId, { status: "failed", reason: RUN_INTERRUPTED_REASON });
     logger.warn("run_interrupted", { runId: run.runId, uid, wasStatus: run.status });
     recovered.push(run.runId);
