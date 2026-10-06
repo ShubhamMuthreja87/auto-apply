@@ -56,7 +56,7 @@ export function onUnauthorized(handler: UnauthorizedHandler): () => void {
 
 /** Every call carries the session cookie; a `401` signs the browser out. */
 async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  const res = await fetch(`${path}`, { ...init, credentials: "include" });
+  const res = await fetch(path, { ...init, credentials: "include" });
   if (res.status === 401) unauthorizedHandler?.();
   return res;
 }
