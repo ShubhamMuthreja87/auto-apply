@@ -16,6 +16,7 @@ import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import { ApiHealth } from "./ApiHealth";
+import { LogoutButton } from "./LogoutButton";
 
 const navItems = [
   { path: "/", label: "Run" },
@@ -40,6 +41,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Typography>
               <Chip label="Prototype" size="small" variant="outlined" />
             </Stack>
+            <Box sx={{ flex: 1 }} />
+            <LogoutButton />
           </Toolbar>
           <Tabs
             value={current}

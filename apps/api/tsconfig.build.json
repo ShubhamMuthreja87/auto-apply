@@ -12,5 +12,10 @@
   },
   "include": ["src"],
   // Test support, not shipped code (repo-contract.ts imports Vitest).
-  "exclude": ["src/**/*.test.ts", "src/repo/repo-contract.ts", "src/discovery/recorded-fetch.ts"]
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/repo/repo-contract.ts",
+    "src/discovery/recorded-fetch.ts",
+    "src/auth/test-auth.ts"
+  ]
 }
