@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "start": "node --env-file-if-exists=.env dist/index.js",
-    "hash-password": "tsx src/hash-password.ts"
+    "hash-password": "tsx src/hash-password.ts",
+    "record:ai": "tsx src/ai/record-ai.ts"
   },
   "dependencies": {
     "@auto-apply/shared": "*",

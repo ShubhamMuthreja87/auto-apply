@@ -17,7 +17,7 @@ import { recordedFetch } from "../discovery/recorded-fetch.js";
 import { keywordMatcher } from "../evaluation/keyword-matcher.js";
 import { createAiEvaluator } from "../ai/ai-evaluator.js";
 import { createChatClient } from "../ai/chat-client.js";
-import { completion, readAiFixture, scriptedFetch } from "../ai/scripted-fetch.js";
+import { cannedEvaluation, completion, scriptedFetch } from "../ai/scripted-fetch.js";
 import { InMemoryRepo } from "../repo/in-memory-repo.js";
 import { greenhouseForms } from "../forms/greenhouse-forms.js";
 import { EvaluationNotFoundError, buildPipeline, type PipelineDeps } from "./pipeline.js";
@@ -850,7 +850,7 @@ describe("scoring and Verdict (D7, D8)", () => {
     }
 
     it("scores from the model's quoted evidence, labelled ai", async () => {
-      const { evaluation, run } = await runWith([await readAiFixture("deepseek-chat-completion")]);
+      const { evaluation, run } = await runWith([cannedEvaluation()]);
 
       expect(run?.scoring).toBe("ai");
       expect(evaluation?.scoredBy).toBe("ai");

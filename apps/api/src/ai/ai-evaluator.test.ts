@@ -4,7 +4,7 @@ import { keywordMatcher } from "../evaluation/keyword-matcher.js";
 import { SEED_USER } from "../seed-user.js";
 import { createAiEvaluator } from "./ai-evaluator.js";
 import { createChatClient } from "./chat-client.js";
-import { HANG, completion, readAiFixture, scriptedFetch } from "./scripted-fetch.js";
+import { HANG, cannedEvaluation, completion, scriptedFetch } from "./scripted-fetch.js";
 
 const posting: Posting = {
   ats: "greenhouse",
@@ -61,7 +61,7 @@ function promptsOf(fake: ReturnType<typeof scriptedFetch>, n = 0) {
 
 describe("AI evaluator (adapter seam, injected fetch)", () => {
   it("returns the model's per-criterion judgements, labelled ai", async () => {
-    const { evaluator } = evaluatorWith([await readAiFixture("deepseek-chat-completion")]);
+    const { evaluator } = evaluatorWith([cannedEvaluation()]);
 
     const result = await evaluator.evaluate(posting, criteria);
 
@@ -79,7 +79,7 @@ describe("AI evaluator (adapter seam, injected fetch)", () => {
   });
 
   it("asks about each criterion by id, label and source, with the posting delimited as untrusted data", async () => {
-    const { evaluator, fake } = evaluatorWith([await readAiFixture("deepseek-chat-completion")]);
+    const { evaluator, fake } = evaluatorWith([cannedEvaluation()]);
     await evaluator.evaluate(posting, criteria);
 
     const { system, user } = promptsOf(fake);
@@ -101,7 +101,7 @@ describe("AI evaluator (adapter seam, injected fetch)", () => {
   });
 
   it("neutralises a posting that tries to close the delimiter and inject instructions", async () => {
-    const { evaluator, fake } = evaluatorWith([await readAiFixture("deepseek-chat-completion")]);
+    const { evaluator, fake } = evaluatorWith([cannedEvaluation()]);
     const hostile: Posting = {
       ...posting,
       descriptionText:
@@ -118,7 +118,7 @@ describe("AI evaluator (adapter seam, injected fetch)", () => {
   });
 
   it("never sends the user's name, contact details or address (D23)", async () => {
-    const { evaluator, fake } = evaluatorWith([await readAiFixture("deepseek-chat-completion")]);
+    const { evaluator, fake } = evaluatorWith([cannedEvaluation()]);
     await evaluator.evaluate(posting, criteria);
 
     const sent = JSON.stringify(fake.calls.map((c) => c.body));
@@ -136,7 +136,7 @@ describe("AI evaluator (adapter seam, injected fetch)", () => {
   });
 
   it("tells the model that missing data is unknown, and marks absent fields as not stated", async () => {
-    const { evaluator, fake } = evaluatorWith([await readAiFixture("deepseek-chat-completion")]);
+    const { evaluator, fake } = evaluatorWith([cannedEvaluation()]);
     await evaluator.evaluate({ ...posting, location: "", descriptionText: "" }, criteria);
 
     const { system, user } = promptsOf(fake);
@@ -196,7 +196,7 @@ describe("AI evaluator (adapter seam, injected fetch)", () => {
   it("uses the second answer when the first was malformed", async () => {
     const { evaluator, fake } = evaluatorWith([
       completion("not json"),
-      await readAiFixture("deepseek-chat-completion"),
+      cannedEvaluation(),
     ]);
     const result = await evaluator.evaluate(posting, criteria);
     expect(fake.calls).toHaveLength(2);

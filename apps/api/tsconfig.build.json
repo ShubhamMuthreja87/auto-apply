@@ -16,6 +16,9 @@
     "src/**/*.test.ts",
     "src/repo/repo-contract.ts",
     "src/discovery/recorded-fetch.ts",
-    "src/auth/test-auth.ts"
+    "src/auth/test-auth.ts",
+    // The one-off AI recording tool and its inputs (`npm run record:ai`).
+    "src/ai/record-ai.ts",
+    "src/ai/recording-inputs.ts"
   ]
 }

@@ -50,7 +50,11 @@ export function scriptedFetch(steps: ScriptStep[]): ScriptedFetch {
   return { fetch: fake as typeof fetch, calls };
 }
 
-/** A canned chat completion in the provider's response envelope. */
+/**
+ * A real provider response body recorded by `record-ai.ts` (see
+ * `apps/api/fixtures/ai/README-recordings.md`), or its request body with
+ * `name` ending in `.request`.
+ */
 export async function readAiFixture(name: string): Promise<unknown> {
   const file = new URL(`../../fixtures/ai/${name}.json`, import.meta.url);
   return JSON.parse(await readFile(file, "utf8")) as unknown;
@@ -67,4 +71,26 @@ export function completion(content: string): unknown {
       { index: 0, message: { role: "assistant", content }, finish_reason: "stop", logprobs: null },
     ],
   };
+}
+
+/** The judgements the canned evaluation answers with, for the synthetic test posting. */
+export const CANNED_JUDGEMENTS = {
+  judgements: [
+    {
+      criterionId: "stack_primary",
+      met: true,
+      evidence: "Our stack is TypeScript, Node.js and React",
+    },
+    { criterionId: "startup", met: false, evidence: "" },
+  ],
+};
+
+/** A hand-written evaluation answer in the provider envelope (not a recording). */
+export function cannedEvaluation(): unknown {
+  return completion(JSON.stringify(CANNED_JUDGEMENTS));
+}
+
+/** The same answer wrapped in a Markdown code fence, as some models reply. */
+export function cannedEvaluationFenced(): unknown {
+  return completion(`\`\`\`json\n${JSON.stringify(CANNED_JUDGEMENTS)}\n\`\`\``);
 }
