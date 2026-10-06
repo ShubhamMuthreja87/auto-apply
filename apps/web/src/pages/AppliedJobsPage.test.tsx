@@ -153,6 +153,9 @@ describe("<AppliedJobsPage />", () => {
     ).toBeNull();
 
     await userEvent.click(within(row).getByRole("button", { name: /retry/i }));
+    await userEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", { name: "Close" }),
+    );
 
     expect(await rowFor("Engineering Manager 1")).toHaveTextContent(/submitted.*simulated/i);
     expect(
@@ -160,6 +163,20 @@ describe("<AppliedJobsPage />", () => {
     ).toBeNull();
     const call = fetchMock.mock.calls.find(([input]) => String(input).endsWith("/retry"));
     expect(String(call?.[0])).toContain("/api/runs/run-1/jobs/greenhouse%3Aacme%3A1/retry");
+  });
+
+  it("opens the payload of a successful Retry straight away (D19)", async () => {
+    fakeApi();
+    render(<AppliedJobsPage />);
+    const row = await rowFor("Engineering Manager 1");
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    await userEvent.click(within(row).getByRole("button", { name: /retry/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("Engineering Manager 1");
+    expect(dialog).toHaveTextContent("attempt 2");
+    expect(dialog).toHaveTextContent("Not sent");
   });
 
   it("shows why a Retry did not work", async () => {

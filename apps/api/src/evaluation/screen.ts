@@ -6,11 +6,13 @@
  * - **Hard blocks** (`preferences.hardBlocks`, in their listed order): the
  *   first rule that fails blocks the Posting with a reason. Code judges only
  *   what it can read reliably — the location text, the company name, the
- *   title, and plainly stated numbers in the description (years of
- *   experience, direct reports, an INR pay range). Rules that need facts the
- *   boards do not expose or judgement over prose (`company_size`,
- *   `staffing_blocked_client`, and any id without a predicate here) are left
- *   to the rubric.
+ *   title, and plainly stated facts in the description (years of experience,
+ *   direct reports, an INR pay range, a stated headcount, a staffing agency
+ *   naming its client). A rule id without a predicate here never blocks.
+ * - **Missing data never blocks** (the author's null-fallback rule): a
+ *   Posting that does not state its location, pay, company size or client
+ *   passes the rule that needs it. "No salary shown is never a reason to
+ *   block."
  * - **Titles out of target** (`preferences.excludedTitles`): skipped, not
  *   blocked, as the author's prompt says. Terms marked "-only" need judgement
  *   and are left to the rubric too.
@@ -72,6 +74,27 @@ const hardBlockPredicates: Record<string, HardBlockPredicate> = {
     return null;
   },
 
+  company_size: ({ posting, preferences, rule }) => {
+    if (rule.threshold === null) return null;
+    // "except strong product companies": never blocked by size.
+    if (isAllowedException(posting.company, preferences)) return null;
+    const headcount = statedHeadcount(posting.descriptionText);
+    if (headcount !== null && headcount >= rule.threshold) {
+      return `${posting.company}: ${headcount.toLocaleString("en-US")} employees stated`;
+    }
+    // Greenhouse exposes no headcount; the blocked lists name known large
+    // non-product companies, so those count too. Anything else is unknown.
+    const listed = blockedCompanyIn(posting.company, preferences);
+    return listed ? `${posting.company}: known large non-product company` : null;
+  },
+
+  staffing_blocked_client: ({ posting, preferences }) => {
+    if (!isStaffingAgency(posting)) return null;
+    // "Staffing agencies are allowed; if they name a blocked client, block."
+    const client = blockedCompanyIn(posting.descriptionText, preferences);
+    return client ? `${posting.company} names blocked client ${client}` : null;
+  },
+
   employment_type: ({ posting, rule }) => firstTermIn(posting.title, rule.terms),
 
   role_family: ({ posting, rule }) => firstTermIn(posting.title, rule.terms),
@@ -115,7 +138,9 @@ function escapeRegExp(text: string): string {
 /**
  * Whether `text` mentions `term` as a whole word or phrase, case-insensitively
  * ("intern" does not match "Internal"); spaces and hyphens in the term match
- * either ("part-time" matches "Part time").
+ * either ("part-time" matches "Part time"). A term of at most two letters
+ * ("EY", "QA", "Go", "AI") must match its exact case, so ordinary words ("go",
+ * "ey") are not mistaken for it.
  */
 export function containsTerm(text: string, term: string): boolean {
   return findTerm(text, term) !== null;
@@ -129,13 +154,70 @@ export function findTerm(text: string, term: string): { index: number; length: n
     .filter(Boolean)
     .map(escapeRegExp);
   if (words.length === 0) return null;
-  const pattern = new RegExp(`(?<![\\p{L}\\p{N}])${words.join("[\\s-]+")}(?![\\p{L}\\p{N}])`, "iu");
+  const letters = term.replace(/[^\p{L}]/gu, "").length;
+  const flags = letters <= 2 ? "u" : "iu";
+  const pattern = new RegExp(
+    `(?<![\\p{L}\\p{N}])${words.join("[\\s-]+")}(?![\\p{L}\\p{N}])`,
+    flags,
+  );
   const match = pattern.exec(text);
   return match ? { index: match.index, length: match[0].length } : null;
 }
 
 function firstTermIn(text: string, terms: readonly string[]): string | null {
   return terms.find((term) => containsTerm(text, term)) ?? null;
+}
+
+/* ------------------------------- companies ------------------------------ */
+
+/** The first company from a blocked category that `text` names, not counting allowed ones. */
+function blockedCompanyIn(text: string, preferences: UserPreferences): string | null {
+  for (const category of preferences.companyBlocks.categories) {
+    const company = category.companies.find(
+      (name) => containsTerm(text, name) && !isAllowedException(name, preferences),
+    );
+    if (company) return company;
+  }
+  return null;
+}
+
+function isAllowedException(company: string, preferences: UserPreferences): boolean {
+  return preferences.companyBlocks.allowedExceptions.companies.some((name) =>
+    containsTerm(company, name),
+  );
+}
+
+/** Words in a company name that mark a staffing or recruiting agency. */
+const agencyName =
+  /\b(staffing|recruit(?:ment|ing|ers?)|talent (?:solutions|partners)|manpower|headhunt\w*|placements?)\b/i;
+/**
+ * How an agency describes itself or its one client. "Our client, X" or "our
+ * client is X" (singular) is agency wording; "our clients include HSBC" is how
+ * a B2B product company talks, so it does not count.
+ */
+const agencyWording =
+  /\b(?:staffing (?:agency|firm|company)|recruitment (?:agency|firm|partner)|recruiting (?:agency|firm)|on behalf of (?:our|a|one of our) clients?|our client(?:,|\s+is\b))/i;
+
+/** Whether the Posting comes from a staffing or recruiting agency, by its name or its own wording. */
+function isStaffingAgency(posting: Posting): boolean {
+  return agencyName.test(posting.company) || agencyWording.test(posting.descriptionText);
+}
+
+const headcountPattern =
+  /(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(k)?\s*\+?\s*(?:full[\s-]?time\s+)?(?:employees|staff|team members|colleagues)\b/gi;
+
+/**
+ * The largest headcount the description states ("50,000+ employees", "12k
+ * employees"), or `null` when it states none. Only employee wording counts,
+ * so "50,000+ businesses" or "2M users" never reads as a size.
+ */
+function statedHeadcount(description: string): number | null {
+  const counts: number[] = [];
+  for (const [, raw = "", thousands] of description.matchAll(headcountPattern)) {
+    const value = Number(raw.replace(/,/g, "")) * (thousands ? 1_000 : 1);
+    if (Number.isFinite(value)) counts.push(value);
+  }
+  return counts.length > 0 ? Math.max(...counts) : null;
 }
 
 /* ------------------------------- location ------------------------------- */
@@ -213,7 +295,7 @@ const experiencePatterns: readonly RegExp[] = [
  * years", "7-10 years" → 7). The lowest one decides, so a "preferred" or
  * secondary figure never blocks on its own. `null` when none is stated.
  */
-function statedExperienceMinimum(description: string): number | null {
+export function statedExperienceMinimum(description: string): number | null {
   const minima: number[] = [];
   for (const line of description.split("\n")) {
     if (!/experience/i.test(line)) continue;

@@ -3,7 +3,7 @@ import type { FitCriterion, Posting } from "@auto-apply/shared";
 import { loadConfig } from "../config.js";
 import { TEST_AUTH_ENV } from "../auth/test-auth.js";
 import { createScoring } from "./scoring.js";
-import { readAiFixture, scriptedFetch } from "./scripted-fetch.js";
+import { cannedEvaluation, scriptedFetch } from "./scripted-fetch.js";
 
 const posting: Posting = {
   ats: "greenhouse",
@@ -41,7 +41,7 @@ describe("createScoring (composition of the AI env, D22/D24)", () => {
   });
 
   it("with a key, scores with the AI at AI_BASE_URL using AI_MODEL", async () => {
-    const fake = scriptedFetch([await readAiFixture("deepseek-chat-completion")]);
+    const fake = scriptedFetch([cannedEvaluation()]);
     const config = loadConfig({
       ...TEST_AUTH_ENV,
       AI_API_KEY: "sk-test",

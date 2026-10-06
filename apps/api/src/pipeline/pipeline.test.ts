@@ -17,7 +17,7 @@ import { recordedFetch } from "../discovery/recorded-fetch.js";
 import { keywordMatcher } from "../evaluation/keyword-matcher.js";
 import { createAiEvaluator } from "../ai/ai-evaluator.js";
 import { createChatClient } from "../ai/chat-client.js";
-import { completion, readAiFixture, scriptedFetch } from "../ai/scripted-fetch.js";
+import { cannedEvaluation, completion, scriptedFetch } from "../ai/scripted-fetch.js";
 import { InMemoryRepo } from "../repo/in-memory-repo.js";
 import { greenhouseForms } from "../forms/greenhouse-forms.js";
 import { EvaluationNotFoundError, buildPipeline, type PipelineDeps } from "./pipeline.js";
@@ -850,7 +850,7 @@ describe("scoring and Verdict (D7, D8)", () => {
     }
 
     it("scores from the model's quoted evidence, labelled ai", async () => {
-      const { evaluation, run } = await runWith([await readAiFixture("deepseek-chat-completion")]);
+      const { evaluation, run } = await runWith([cannedEvaluation()]);
 
       expect(run?.scoring).toBe("ai");
       expect(evaluation?.scoredBy).toBe("ai");
@@ -875,6 +875,49 @@ describe("scoring and Verdict (D7, D8)", () => {
       expect(evaluation?.scoredBy).toBe("fallback");
       expect(evaluation?.evidence.find((e) => e.criterionId === "startup")?.met).toBe(true);
     });
+  });
+});
+
+describe("missing posting data never blocks, costs or earns points, or crashes (null fallbacks)", () => {
+  const sparse = (jobId: string, overrides: Partial<Posting>): Posting => ({
+    ...aPosting(jobId),
+    title: "Engineering Manager",
+    ...overrides,
+  });
+
+  it.each<[string, Partial<Posting>]>([
+    ["no location", { location: "", remote: false }],
+    ["no description", { descriptionText: "" }],
+    ["no salary, size or stack stated", { descriptionText: "Lead a team." }],
+    ["no company name beyond the board", { company: "acme" }],
+    ["nothing but a title", { location: "", descriptionText: "", company: "acme", remote: false }],
+    [
+      "an IC title with nothing else",
+      { title: "Staff Engineer", location: "", descriptionText: "" },
+    ],
+  ])("%s → scored on what is stated, not blocked or failed", async (_case, overrides) => {
+    const repo = new InMemoryRepo();
+    const pipeline = buildPipeline(
+      deps({
+        repo,
+        discovery: { discover: async () => [sparse("1", overrides)] },
+        evaluator: keywordMatcher,
+      }),
+    );
+
+    const { runId, finished } = await pipeline.startRun("user-1");
+    await finished;
+
+    expect((await repo.getRun(runId))?.status).toBe("completed");
+    const [evaluation] = await repo.listEvaluations(runId);
+    expect(evaluation?.status).not.toBe("blocked");
+    expect(evaluation?.status).not.toBe("failed");
+    expect(evaluation?.verdict).not.toBe("BLOCKED");
+    // Only the code-judged title can score: nothing unstated earns or costs points.
+    const scoring = evaluation?.evidence.filter((e) => e.points !== 0) ?? [];
+    expect(scoring.every((e) => e.judgedBy === "code")).toBe(true);
+    // No stack stated: the language gate does not cap.
+    expect(evaluation?.evidence.some((e) => e.criterionId.startsWith("gate:"))).toBe(false);
   });
 });
 
@@ -1061,15 +1104,10 @@ describe("simulated submit and Retry (D18, D19)", () => {
   });
   const evaluatorFor = (...jobIds: string[]) =>
     cannedEvaluator(
-      Object.fromEntries(
-        jobIds.map((id) => [id, ["stack_primary", "startup", "realtime_data"]]),
-      ),
+      Object.fromEntries(jobIds.map((id) => [id, ["stack_primary", "startup", "realtime_data"]])),
     );
 
-  async function runApplyNow(
-    jobIds: string[],
-    overrides: Partial<PipelineDeps> = {},
-  ) {
+  async function runApplyNow(jobIds: string[], overrides: Partial<PipelineDeps> = {}) {
     const repo = new InMemoryRepo();
     const fake = recordingSubmitter();
     const pipeline = buildPipeline(
@@ -1091,10 +1129,7 @@ describe("simulated submit and Retry (D18, D19)", () => {
       textField("first_name", "First Name"),
       textField("email", "Email"),
       {
-        ...textField(
-          "question_7",
-          "Will you now or in the future require visa sponsorship?",
-        ),
+        ...textField("question_7", "Will you now or in the future require visa sponsorship?"),
         type: "select",
         options: [
           { label: "Yes", value: 1 },
@@ -1102,10 +1137,7 @@ describe("simulated submit and Retry (D18, D19)", () => {
         ],
       },
       {
-        ...textField(
-          "question_9[]",
-          "Which countries do you anticipate working in?",
-        ),
+        ...textField("question_9[]", "Which countries do you anticipate working in?"),
         type: "multiselect",
         options: [
           { label: "India", value: 101 },
@@ -1141,9 +1173,7 @@ describe("simulated submit and Retry (D18, D19)", () => {
   it("fails the Run's first submit on purpose, then submits the rest, in discovery order", async () => {
     const { repo, runId, calls } = await runApplyNow(["1", "2", "3"]);
 
-    expect(
-      calls.map((c) => [c.application.posting.jobId, c.simulateFailure]),
-    ).toEqual([
+    expect(calls.map((c) => [c.application.posting.jobId, c.simulateFailure])).toEqual([
       ["1", true],
       ["2", false],
       ["3", false],
@@ -1185,8 +1215,7 @@ describe("simulated submit and Retry (D18, D19)", () => {
       runId,
       (batch) => {
         for (const { evaluation } of batch) {
-          if (jobStatuses.at(-1) !== evaluation.status)
-            jobStatuses.push(evaluation.status);
+          if (jobStatuses.at(-1) !== evaluation.status) jobStatuses.push(evaluation.status);
         }
       },
       () => {},
@@ -1221,12 +1250,12 @@ describe("simulated submit and Retry (D18, D19)", () => {
     const { runId, pipeline } = await runApplyNow(["1"]);
     await pipeline.retrySubmit(runId, "greenhouse:acme:1");
 
-    await expect(
-      pipeline.retrySubmit(runId, "greenhouse:acme:1"),
-    ).rejects.toBeInstanceOf(IllegalTransitionError);
-    await expect(
-      pipeline.retrySubmit(runId, "greenhouse:acme:404"),
-    ).rejects.toBeInstanceOf(EvaluationNotFoundError);
+    await expect(pipeline.retrySubmit(runId, "greenhouse:acme:1")).rejects.toBeInstanceOf(
+      IllegalTransitionError,
+    );
+    await expect(pipeline.retrySubmit(runId, "greenhouse:acme:404")).rejects.toBeInstanceOf(
+      EvaluationNotFoundError,
+    );
 
     const unreadable: GreenhouseForms = {
       fetchSchema: async () => {
@@ -1247,10 +1276,7 @@ describe("simulated submit and Retry (D18, D19)", () => {
       pipeline.retrySubmit(runId, "greenhouse:acme:1"),
     ]);
 
-    expect(results.map((r) => r.status).sort()).toEqual([
-      "fulfilled",
-      "rejected",
-    ]);
+    expect(results.map((r) => r.status).sort()).toEqual(["fulfilled", "rejected"]);
     expect(calls).toHaveLength(2); // the Run's submit, and one Retry
   });
 
@@ -1277,9 +1303,7 @@ describe("simulated submit and Retry (D18, D19)", () => {
       deps({
         repo,
         discovery: createDiscovery({
-          sources: [
-            greenhouseJobSource({ fetch: noNetwork, timeoutMs: 1_000 }),
-          ],
+          sources: [greenhouseJobSource({ fetch: noNetwork, timeoutMs: 1_000 })],
           boards: boardsFor("fixtures"),
           readFixture: readBoardFixture,
           mode: "fixtures",

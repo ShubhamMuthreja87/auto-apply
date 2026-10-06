@@ -19,6 +19,8 @@ import type {
   FormSchema,
   GreenhouseForms,
 } from "../pipeline/ports.js";
+import { messageOf } from "../errors.js";
+import { atsGetJson } from "../ats-get.js";
 
 export function greenhouseFormUrl(board: string, jobId: string): string {
   return `${GREENHOUSE_API}/${encodeURIComponent(board)}/jobs/${encodeURIComponent(jobId)}?questions=true`;
@@ -186,30 +188,13 @@ export interface GreenhouseFormsOptions {
   readRecording?: (job: { board: string; jobId: string }) => Promise<unknown>;
 }
 
-function messageOf(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
 export function greenhouseForms(options: GreenhouseFormsOptions): GreenhouseForms {
   const { fetch, timeoutMs, mode, readRecording = readFormRecording } = options;
 
   async function fetchLive(job: { board: string; jobId: string }): Promise<FormSchema> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch(greenhouseFormUrl(job.board, job.jobId), {
-        method: "GET",
-        headers: { accept: "application/json" },
-        signal: controller.signal,
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return parseGreenhouseForm(job, await res.json(), "live");
-    } catch (err) {
-      if (controller.signal.aborted) throw new Error(`timed out after ${timeoutMs} ms`);
-      throw err;
-    } finally {
-      clearTimeout(timer);
-    }
+    const url = greenhouseFormUrl(job.board, job.jobId);
+    const body = await atsGetJson(fetch, url, timeoutMs, "Greenhouse form");
+    return parseGreenhouseForm(job, body, "live");
   }
 
   async function fromRecording(

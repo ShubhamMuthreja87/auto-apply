@@ -21,8 +21,8 @@ import { UNTRUSTED_DATA_RULE, untrustedBlock } from "./untrusted.js";
 
 /** Description characters sent per Posting; keeps each call's tokens bounded. */
 export const MAX_DESCRIPTION_CHARS = 12_000;
-/** Output tokens per evaluation: ~10 criteria with a short quote each. */
-export const EVALUATION_MAX_TOKENS = 900;
+/** Output tokens per evaluation: ~13 criteria (rubric plus language gate) with a short quote each. */
+export const EVALUATION_MAX_TOKENS = 1_200;
 
 const answerSchema = z.object({
   judgements: z.array(
@@ -39,6 +39,7 @@ const SYSTEM_PROMPT = [
   "For each criterion decide whether the posting clearly meets it.",
   'When it does, set "met": true and copy a short verbatim quote (at most 160 characters) from the posting as "evidence".',
   'When it does not, or the posting does not say, set "met": false and "evidence": "".',
+  "Anything the posting has not stated (location, pay, company size, stack, experience) is unknown: never assume it, and an unknown criterion is not met.",
   "Do not score, rank or recommend; only judge each criterion.",
   UNTRUSTED_DATA_RULE,
   'Reply with JSON only, in this shape: {"judgements":[{"criterionId":"<id>","met":true,"evidence":"<quote>"}]}, one entry per criterion.',
@@ -50,14 +51,18 @@ function userPrompt(posting: Posting, criteria: readonly FitCriterion[]): string
     null,
     2,
   );
+  const text = posting.descriptionText.trim();
   const description =
-    posting.descriptionText.length > MAX_DESCRIPTION_CHARS
-      ? `${posting.descriptionText.slice(0, MAX_DESCRIPTION_CHARS)}…`
-      : posting.descriptionText;
+    text === ""
+      ? "(no description provided)"
+      : text.length > MAX_DESCRIPTION_CHARS
+        ? `${text.slice(0, MAX_DESCRIPTION_CHARS)}…`
+        : text;
+  const stated = (value: string) => value.trim() || "(not stated)";
   const postingText = [
-    `Title: ${posting.title}`,
-    `Company: ${posting.company}`,
-    `Location: ${posting.location}`,
+    `Title: ${stated(posting.title)}`,
+    `Company: ${stated(posting.company)}`,
+    `Location: ${stated(posting.location)}`,
     "",
     description,
   ].join("\n");

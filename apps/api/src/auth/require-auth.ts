@@ -5,8 +5,8 @@
  * GET, so it is checked here at connect; an open stream is not re-checked.
  */
 import type { RequestHandler } from "express";
-import { errorResponseSchema } from "@auto-apply/shared";
 import { AUTH_COOKIE, verifySession } from "./session.js";
+import { sendError } from "../send-error.js";
 
 export function requireAuth(jwtSecret: string): RequestHandler {
   return (req, res, next) => {
@@ -17,11 +17,7 @@ export function requireAuth(jwtSecret: string): RequestHandler {
         : undefined;
     const uid = typeof token === "string" ? verifySession(jwtSecret, token) : null;
     if (uid === null) {
-      res.status(401).json(
-        errorResponseSchema.parse({
-          error: { code: "unauthenticated", message: "Sign in to continue" },
-        }),
-      );
+      sendError(res, 401, "unauthenticated", "Sign in to continue");
       return;
     }
     res.locals.uid = uid;

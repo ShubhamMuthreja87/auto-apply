@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { AiCallError, createChatClient, type ChatClientOptions } from "./chat-client.js";
-import { HANG, completion, readAiFixture, scriptedFetch } from "./scripted-fetch.js";
+import { HANG, cannedEvaluation, cannedEvaluationFenced, completion, scriptedFetch } from "./scripted-fetch.js";
 
-// The fixtures in `apps/api/fixtures/ai` are canned bodies in DeepSeek's
-// documented chat-completion envelope (no real endpoint is ever called).
+// Canned answers in DeepSeek's chat-completion envelope; the real recordings
+// in `apps/api/fixtures/ai` are replayed in `recordings.test.ts`. No real
+// endpoint is ever called.
 
 const judgementsSchema = z.object({
   judgements: z.array(
@@ -45,7 +46,7 @@ const expected = {
 
 describe("chat client (adapter seam, injected fetch)", () => {
   it("POSTs one JSON-mode, token-capped chat completion and returns the validated answer", async () => {
-    const fake = scriptedFetch([await readAiFixture("deepseek-chat-completion")]);
+    const fake = scriptedFetch([cannedEvaluation()]);
 
     const answer = await client(fake.fetch).completeJson(request);
 
@@ -69,27 +70,27 @@ describe("chat client (adapter seam, injected fetch)", () => {
   });
 
   it("tolerates a trailing slash on the base URL", async () => {
-    const fake = scriptedFetch([await readAiFixture("deepseek-chat-completion")]);
+    const fake = scriptedFetch([cannedEvaluation()]);
     await client(fake.fetch, { baseUrl: "https://ai.example.test/v1/" }).completeJson(request);
     expect(fake.calls[0]?.url).toBe("https://ai.example.test/v1/chat/completions");
   });
 
   it("strips Markdown code fences before parsing", async () => {
-    const fake = scriptedFetch([await readAiFixture("deepseek-chat-completion-fenced")]);
+    const fake = scriptedFetch([cannedEvaluationFenced()]);
     await expect(client(fake.fetch).completeJson(request)).resolves.toEqual(expected);
   });
 
   it("retries once after invalid JSON and returns the second answer", async () => {
     const fake = scriptedFetch([
       completion("Sure! Here are the judgements: stack_primary is met."),
-      await readAiFixture("deepseek-chat-completion"),
+      cannedEvaluation(),
     ]);
     await expect(client(fake.fetch).completeJson(request)).resolves.toEqual(expected);
     expect(fake.calls).toHaveLength(2);
   });
 
   it("retries once after a timeout and returns the second answer", async () => {
-    const fake = scriptedFetch([HANG, await readAiFixture("deepseek-chat-completion")]);
+    const fake = scriptedFetch([HANG, cannedEvaluation()]);
     await expect(client(fake.fetch).completeJson(request)).resolves.toEqual(expected);
     expect(fake.calls).toHaveLength(2);
   });
@@ -117,7 +118,7 @@ describe("chat client (adapter seam, injected fetch)", () => {
   it("retries a 5xx or 429 once", async () => {
     const fake = scriptedFetch([
       new Response("busy", { status: 503 }),
-      await readAiFixture("deepseek-chat-completion"),
+      cannedEvaluation(),
     ]);
     await expect(client(fake.fetch).completeJson(request)).resolves.toEqual(expected);
   });

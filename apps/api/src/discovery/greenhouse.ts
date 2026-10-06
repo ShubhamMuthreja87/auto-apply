@@ -6,30 +6,57 @@
 import { z } from "zod";
 import type { Posting, PostingSource } from "@auto-apply/shared";
 import type { JobSource } from "../pipeline/ports.js";
+import { logger } from "../logger.js";
 import { htmlToText, isRemote } from "./normalise.js";
+import { atsGetJson } from "../ats-get.js";
 
 export const GREENHOUSE_API = "https://boards-api.greenhouse.io/v1/boards";
 
-/** Only the fields we use; Greenhouse sends many more. */
+/** Text Greenhouse may send as a string, `null`, or not at all; anything else is unknown. */
+const looseText = z.preprocess((value) => (typeof value === "string" ? value : ""), z.string());
+
+/**
+ * Only the fields we use; Greenhouse sends many more. Lenient by design (the
+ * null-fallback rule): only an id and a title are required, everything else a
+ * job leaves out or sends as `null` becomes empty (unknown), so one partial
+ * job never fails its board's parse and pushes the board onto fallback.
+ */
 const greenhouseJobSchema = z.object({
-  id: z.number().int(),
-  title: z.string(),
-  absolute_url: z.string().url(),
-  updated_at: z.string(),
-  location: z.object({ name: z.string().nullable() }).nullable().optional(),
-  company_name: z.string().nullable().optional(),
-  content: z.string().nullable().optional(),
+  id: z.union([z.number().int(), z.string().regex(/^\d+$/)]),
+  title: z.string().trim().min(1),
+  absolute_url: looseText,
+  updated_at: looseText,
+  location: z.preprocess(
+    (value) => (value !== null && typeof value === "object" ? value : {}),
+    z.object({ name: looseText }),
+  ),
+  company_name: looseText,
+  content: looseText,
 });
 
-const greenhouseBoardSchema = z.object({ jobs: z.array(greenhouseJobSchema) });
+/** The board envelope: a `jobs` array; each job is validated on its own. */
+const greenhouseBoardSchema = z.object({ jobs: z.array(z.unknown()) });
 
 export function greenhouseBoardUrl(board: string): string {
   return `${GREENHOUSE_API}/${encodeURIComponent(board)}/jobs?content=true`;
 }
 
+/** The public job page, when a job does not give its own valid URL. */
+function applyUrlFor(board: string, jobId: string, given: string): string {
+  if (z.string().url().safeParse(given).success) return given;
+  return `https://boards.greenhouse.io/${encodeURIComponent(board)}/jobs/${jobId}`;
+}
+
+/** Sort key for "newest updated first"; an unknown date sorts last. */
+function updatedTime(updatedAt: string): number {
+  const time = Date.parse(updatedAt);
+  return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time;
+}
+
 /**
  * Validates a Greenhouse board response (live or recorded) and normalises it,
- * newest-updated first. Throws if the body is not a Greenhouse board.
+ * newest-updated first. Throws if the body is not a Greenhouse board; a single
+ * job without an id or title is skipped and logged, never fatal.
  */
 export function parseGreenhouseBoard(
   board: string,
@@ -37,19 +64,26 @@ export function parseGreenhouseBoard(
   source: PostingSource,
 ): Posting[] {
   const { jobs } = greenhouseBoardSchema.parse(body);
-  return [...jobs]
-    .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))
+  const valid: z.infer<typeof greenhouseJobSchema>[] = [];
+  jobs.forEach((raw, index) => {
+    const job = greenhouseJobSchema.safeParse(raw);
+    if (job.success) valid.push(job.data);
+    else logger.warn("greenhouse_job_skipped", { board, index, reason: "no usable id or title" });
+  });
+  return valid
+    .sort((a, b) => updatedTime(b.updated_at) - updatedTime(a.updated_at))
     .map((job) => {
-      const location = job.location?.name ?? "";
+      const jobId = String(job.id);
+      const location = job.location.name.trim();
       return {
         ats: "greenhouse",
         board,
-        jobId: String(job.id),
-        title: job.title.trim(),
-        company: job.company_name?.trim() || board,
+        jobId,
+        title: job.title,
+        company: job.company_name.trim() || board,
         location,
-        descriptionText: htmlToText(job.content ?? ""),
-        applyUrl: job.absolute_url,
+        descriptionText: htmlToText(job.content),
+        applyUrl: applyUrlFor(board, jobId, job.absolute_url),
         remote: isRemote(location),
         source,
       };
@@ -66,24 +100,9 @@ export function greenhouseJobSource({ fetch, timeoutMs }: GreenhouseOptions): Jo
   return {
     ats: "greenhouse",
     async discover(board) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const res = await fetch(greenhouseBoardUrl(board), {
-          method: "GET",
-          headers: { accept: "application/json" },
-          signal: controller.signal,
-        });
-        if (!res.ok) throw new Error(`Greenhouse board ${board} answered HTTP ${res.status}`);
-        return parseGreenhouseBoard(board, await res.json(), "live");
-      } catch (err) {
-        if (controller.signal.aborted) {
-          throw new Error(`Greenhouse board ${board} timed out after ${timeoutMs} ms`);
-        }
-        throw err;
-      } finally {
-        clearTimeout(timer);
-      }
+      const what = `Greenhouse board ${board}`;
+      const body = await atsGetJson(fetch, greenhouseBoardUrl(board), timeoutMs, what);
+      return parseGreenhouseBoard(board, body, "live");
     },
   };
 }

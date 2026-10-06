@@ -122,6 +122,130 @@ describe("hard block: company category", () => {
   });
 });
 
+describe("hard block: staffing agency naming a blocked client", () => {
+  it.each<[string, Partial<Posting>, Expected]>([
+    [
+      "an agency hiring for a blocked bank",
+      {
+        company: "Acme Staffing Solutions",
+        descriptionText: "Our client, Goldman Sachs, is hiring an Engineering Manager.",
+      },
+      { blockedBy: "staffing_blocked_client" },
+    ],
+    [
+      "an agency known only from its wording, hiring for an IT services firm",
+      {
+        company: "TalentBridge",
+        descriptionText: "We are a recruitment agency hiring on behalf of Infosys.",
+      },
+      { blockedBy: "staffing_blocked_client" },
+    ],
+    [
+      "an agency with an unnamed client is allowed",
+      {
+        company: "Acme Staffing Solutions",
+        descriptionText: "Our client, a fast-growing fintech startup, is hiring.",
+      },
+      "pass",
+    ],
+    [
+      "an agency naming an allowed product company",
+      { company: "Acme Recruiting", descriptionText: "Our client Razorpay is hiring." },
+      "pass",
+    ],
+    [
+      "a B2B product company naming its bank clients",
+      { company: "Acme Payments", descriptionText: "Our clients include HSBC and Citi." },
+      "pass",
+    ],
+    [
+      "a product company that merely mentions a blocked one",
+      {
+        company: "Acme",
+        descriptionText: "You will integrate with banks such as HSBC and Barclays.",
+      },
+      "pass",
+    ],
+  ])("%s", (_name, overrides, expected) => {
+    expectOutcome(screenPosting(aPosting(overrides), preferences), expected);
+  });
+
+  it("names the agency and the client in the reason", () => {
+    const screening = screenPosting(
+      aPosting({ company: "Acme Staffing", descriptionText: "Our client is Wipro." }),
+      preferences,
+    );
+    expect(screening.outcome === "blocked" && screening.reason).toMatch(/Acme Staffing.*Wipro/);
+  });
+});
+
+describe("hard block: company size (10,000+ employees, unless a strong product company)", () => {
+  it.each<[string, Partial<Posting>, Expected]>([
+    [
+      "a stated headcount above the threshold",
+      { company: "MegaCorp", descriptionText: "Join our 50,000+ employees worldwide." },
+      { blockedBy: "company_size" },
+    ],
+    [
+      "a headcount written in thousands",
+      { company: "MegaCorp", descriptionText: "We are 12k employees across 40 countries." },
+      { blockedBy: "company_size" },
+    ],
+    [
+      "a headcount below the threshold",
+      { company: "Acme", descriptionText: "We are 2,500 employees strong." },
+      "pass",
+    ],
+    [
+      "an allowed strong product company is never blocked by size",
+      { company: "Flipkart", descriptionText: "Join over 30,000 employees at Flipkart." },
+      "pass",
+    ],
+    [
+      "numbers about customers, not employees",
+      { company: "Acme", descriptionText: "Trusted by 50,000+ businesses and 2M users." },
+      "pass",
+    ],
+    ["no size stated is never a block", { company: "Unknown Co", descriptionText: "" }, "pass"],
+  ])("%s", (_name, overrides, expected) => {
+    expectOutcome(screenPosting(aPosting(overrides), preferences), expected);
+  });
+
+  it("blocks a known large non-product company from the blocked lists by size too", () => {
+    const screening = screenPosting(aPosting({ company: "Accenture" }), {
+      ...preferences,
+      hardBlocks: preferences.hardBlocks.filter((rule) => rule.id !== "company_category"),
+    });
+    expect(screening).toMatchObject({ outcome: "blocked", ruleId: "company_size" });
+  });
+});
+
+describe("missing data never blocks (null fallbacks)", () => {
+  it.each<[string, Partial<Posting>]>([
+    ["no location", { location: "" }],
+    ["no description", { descriptionText: "" }],
+    ["no location and no description", { location: "", descriptionText: "" }],
+    ["no salary shown", { descriptionText: "Lead a team. Great benefits." }],
+    ["no company size", { descriptionText: "Lead a product engineering team." }],
+    ["no stack", { descriptionText: "Lead a team of engineers." }],
+    ["no company name beyond the board", { company: "acme" }],
+    ["nothing but a title", { location: "", descriptionText: "", company: "acme" }],
+  ])("%s → not blocked", (_name, overrides) => {
+    for (const options of [{}, { salaryFloorLpa: 40 }]) {
+      expect(screenPosting(aPosting(overrides), preferences, options)).toEqual({ outcome: "pass" });
+    }
+  });
+});
+
+describe("short terms match their exact case", () => {
+  it.each<[string, Partial<Posting>, Expected]>([
+    ["EY as a company", { company: "EY" }, { blockedBy: "company_category" }],
+    ["'ey' inside other text is not EY", { company: "Hey ey Labs" }, "pass"],
+  ])("%s", (_name, overrides, expected) => {
+    expectOutcome(screenPosting(aPosting(overrides), preferences), expected);
+  });
+});
+
 describe("hard block: employment type and role family (from the title)", () => {
   it.each<[string, string, Expected]>([
     ["contract role", "Senior Engineer (Contract)", { blockedBy: "employment_type" }],

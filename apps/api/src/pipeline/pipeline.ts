@@ -5,19 +5,20 @@
  * fakes and an instant `delay`; production passes real timers.
  *
  * A Run: load the user → discover Postings → pull them through a pool of
- * `MAX_IN_FLIGHT` workers (D17). Each pulled Posting is persisted as `queued`,
+ * `LIMITS.maxInFlight` workers (D17). Each pulled Posting is persisted as `queued`,
  * moves to `evaluating`, and then, cheapest first:
  *   1. Seen in an earlier Run → `skipped: seen` (D15), before any spend.
  *   2. Screening in code (D7) → `blocked` by a hard block, or `skipped` for a
  *      title out of target, with a reason; no AI tokens spent.
- *   3. Otherwise it takes one of the Run's `MAX_AI_EVALS` evaluation slots and
+ *   3. Otherwise it takes one of the Run's `LIMITS.maxAiEvals` evaluation slots and
  *      goes to the `JobEvaluator`; with no slot left it is `skipped: limit`.
  * Once every slot is taken the pool stops pulling, and Postings never pulled
  * are not persisted. Seen-skips and screening outcomes take no slot.
  *
  *   4. Scoring in code (D7, D8): the title tier is judged in code, the rest
  *      by the evaluator; `score.ts` sums the weights into a fit score and a
- *      Verdict, stored with every criterion's evidence. The Verdict drives
+ *      Verdict, then the language gate caps the Verdict of IC titles
+ *      (`language-gate.ts`), stored with every criterion's evidence. The Verdict drives
  *      the outcome: APPLY → `held: below_auto_threshold`; STRETCH →
  *      `skipped: stretch`; APPLY NOW → fill the form.
  *   5. Form fill (D5, D9–D12, `forms/fill-form.ts`): the Greenhouse form is
@@ -36,8 +37,7 @@
  */
 import {
   FAILED_REASONS,
-  MAX_AI_EVALS,
-  MAX_IN_FLIGHT,
+  LIMITS,
   HELD_REASONS,
   SKIP_REASONS,
   emptyFunnel,
@@ -56,6 +56,7 @@ import {
   type User,
 } from "@auto-apply/shared";
 import { aiCriteria, buildRubric, judgeInCode } from "../evaluation/rubric.js";
+import { applyLanguageGate, languageGateQuestions } from "../evaluation/language-gate.js";
 import { scoreJudgements } from "../evaluation/score.js";
 import { screenPosting, type ScreeningOptions } from "../evaluation/screen.js";
 import { fillForm } from "../forms/fill-form.js";
@@ -73,7 +74,9 @@ import {
   assertEvaluationTransition,
   assertRetryTransition,
   assertRunTransition,
+  IllegalTransitionError,
 } from "./transitions.js";
+import { messageOf } from "../errors.js";
 
 export interface PipelineDeps {
   repo: Repo;
@@ -176,10 +179,6 @@ function answersOf(resolutions: readonly FieldResolution[]): SubmittedAnswer[] {
 function framingFor(user: User, evidence: readonly CriterionEvidence[]): "EM" | "Staff" {
   const manager = evidence.some((e) => e.criterionId === "title_manager" && e.points > 0);
   return manager ? user.preferences.tierFraming.manager : user.preferences.tierFraming.ic;
-}
-
-function messageOf(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
 
 export function buildPipeline(deps: PipelineDeps): Pipeline {
@@ -288,8 +287,11 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
     const lock = `${runId}/${key}`;
     const evaluation = (await repo.listEvaluations(runId)).find((e) => e.jobKey === key);
     if (!evaluation) throw new EvaluationNotFoundError(runId, key);
-    // A Retry already under way has the Evaluation in `applying`: not retryable.
-    assertRetryTransition(retrying.has(lock) ? { status: "applying", reason: null } : evaluation);
+    // A second Retry while one is under way (a double click) is not retryable.
+    if (retrying.has(lock)) {
+      throw new IllegalTransitionError("evaluation", "applying (retry under way)", "applying");
+    }
+    assertRetryTransition(evaluation);
     const stored = evaluation.submission;
     if (!stored) throw new Error(`No stored submission to retry for ${key}`);
     retrying.add(lock);
@@ -316,7 +318,7 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
   }
 
   /**
-   * The pool: `MAX_IN_FLIGHT` workers pull Postings in discovery order until
+   * The pool: `LIMITS.maxInFlight` workers pull Postings in discovery order until
    * none are left or every AI-evaluation slot is taken. Slots are counted
    * synchronously, so the cap holds however the workers interleave.
    */
@@ -330,13 +332,13 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
     let slotsTaken = 0;
     const slots = {
       take(): boolean {
-        if (slotsTaken >= MAX_AI_EVALS) return false;
+        if (slotsTaken >= LIMITS.maxAiEvals) return false;
         slotsTaken++;
         return true;
       },
     };
     const pull = (): { posting: Posting; order: number } | undefined => {
-      if (slotsTaken >= MAX_AI_EVALS || next >= postings.length) return undefined;
+      if (slotsTaken >= LIMITS.maxAiEvals || next >= postings.length) return undefined;
       const order = next++;
       const posting = postings[order];
       return posting ? { posting, order } : undefined;
@@ -349,7 +351,7 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
         if (application) ready.push({ key: jobKey(posting), order, application });
       }
     }
-    await Promise.all(Array.from({ length: MAX_IN_FLIGHT }, worker));
+    await Promise.all(Array.from({ length: LIMITS.maxInFlight }, worker));
     logger.info("run_evaluated", {
       runId,
       discovered: postings.length,
@@ -420,14 +422,20 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
         return await finish("skipped", SKIP_REASONS.limit, "skipped", { markSeen: false });
       }
       const rubric = buildRubric(user.preferences);
-      const toJudge = aiCriteria(rubric);
+      // The rubric's AI-side criteria, plus the language gate's zero-weight
+      // questions about the primary stack (one call per Posting either way).
+      const toJudge = [...aiCriteria(rubric), ...languageGateQuestions(user.preferences)];
       const { scoredBy, judgements } = await evaluator.evaluate(posting, toJudge);
       // Only answers to what was asked count; code owns the title tier.
       const asked = new Set(toJudge.map((c) => c.id));
-      const scored = scoreJudgements(rubric, [
-        ...judgeInCode(rubric, posting.title),
-        ...judgements.filter((j) => asked.has(j.criterionId)),
-      ]);
+      const answered = judgements.filter((j) => asked.has(j.criterionId));
+      // The fit score first, then the language gate caps its Verdict.
+      const scored = applyLanguageGate(
+        user.preferences,
+        posting,
+        scoreJudgements(rubric, [...judgeInCode(rubric, posting.title), ...answered]),
+        answered,
+      );
       logger.info("posting_scored", {
         runId,
         jobKey: key,

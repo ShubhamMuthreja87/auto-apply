@@ -6,7 +6,6 @@
  */
 import { Router, type NextFunction, type Response } from "express";
 import {
-  errorResponseSchema,
   meResponseSchema,
   updateMeRequestSchema,
   updateMeResponseSchema,
@@ -20,6 +19,7 @@ import {
   UserDocInvalidError,
   UserNotFoundError,
 } from "../user.js";
+import { sendError } from "../send-error.js";
 
 export function meRouter(repo: Repo): Router {
   const router = Router();
@@ -36,17 +36,11 @@ export function meRouter(repo: Repo): Router {
   router.put("/api/me", async (req, res, next) => {
     const edits = updateMeRequestSchema.safeParse(req.body);
     if (!edits.success) {
-      res.status(400).json(
-        errorResponseSchema.parse({
-          error: {
-            code: "invalid_request",
-            // Field paths and our own messages only, never the submitted values.
-            message: edits.error.issues
-              .map((issue) => `${issue.path.join(".") || "body"}: ${issueText(issue)}`)
-              .join("; "),
-          },
-        }),
-      );
+      // Field paths and our own messages only, never the submitted values.
+      const message = edits.error.issues
+        .map((issue) => `${issue.path.join(".") || "body"}: ${issueText(issue)}`)
+        .join("; ");
+      sendError(res, 400, "invalid_request", message);
       return;
     }
     try {
@@ -70,21 +64,13 @@ function issueText(issue: { code: string; message: string }): string {
 
 function sendUserError(err: unknown, res: Response, next: NextFunction): void {
   if (err instanceof UserNotFoundError) {
-    res.status(404).json(
-      errorResponseSchema.parse({
-        error: { code: "user_not_found", message: "No user document" },
-      }),
-    );
+    sendError(res, 404, "user_not_found", "No user document");
     return;
   }
   if (err instanceof UserDocInvalidError) {
     // The issues carry field paths and issue codes only, never stored values.
     logger.error("user_doc_invalid", { uid: err.uid, issues: err.issues });
-    res.status(500).json(
-      errorResponseSchema.parse({
-        error: { code: "user_doc_invalid", message: "The stored user document is invalid" },
-      }),
-    );
+    sendError(res, 500, "user_doc_invalid", "The stored user document is invalid");
     return;
   }
   next(err);

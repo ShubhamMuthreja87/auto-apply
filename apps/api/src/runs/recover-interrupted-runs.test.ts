@@ -14,7 +14,7 @@ import {
   type Run,
 } from "@auto-apply/shared";
 import { InMemoryRepo } from "../repo/in-memory-repo.js";
-import { recoverInterruptedRuns } from "./recover-interrupted-runs.js";
+import { RECOVERY_RUN_WINDOW, recoverInterruptedRuns } from "./recover-interrupted-runs.js";
 
 function aRun(overrides: Partial<Run> = {}): Run {
   return {
@@ -134,5 +134,46 @@ describe("recoverInterruptedRuns", () => {
       held: 1,
       failed: 3,
     });
+  });
+
+  it("fails a Retry a restart cut off after its Run completed, and restores the failed count", async () => {
+    const repo = new InMemoryRepo();
+    // Retry moved the job back to `applying` and its count out of `failed` (D19)…
+    await repo.createRun(
+      aRun({ status: "completed", funnel: { ...emptyFunnel(), discovered: 2, submitted: 1 } }),
+    );
+    await repo.putEvaluation("run-1", anEvaluation("1", "applying"));
+    await repo.putEvaluation("run-1", anEvaluation("2", "submitted"));
+
+    // …and the server restarted before the simulated send finished.
+    const recovered = await recoverInterruptedRuns(repo, ["demo-user"]);
+
+    expect(recovered).toEqual([]);
+    const byKey = new Map((await repo.listEvaluations("run-1")).map((e) => [e.posting.jobId, e]));
+    expect(byKey.get("1")).toMatchObject({ status: "failed", reason: "interrupted" });
+    expect(byKey.get("2")).toMatchObject({ status: "submitted" });
+    expect(await repo.getRun("run-1")).toMatchObject({
+      status: "completed",
+      funnel: { submitted: 1, failed: 1 },
+    });
+  });
+
+  it("only looks at the user's most recent Runs (bounded)", async () => {
+    const repo = new InMemoryRepo();
+    for (let i = 1; i <= RECOVERY_RUN_WINDOW + 1; i++) {
+      const runId = `run-${i}`;
+      await repo.createRun(
+        aRun({ runId, status: "completed", createdAt: `2026-10-0${i}T12:00:00.000Z` }),
+      );
+      await repo.putEvaluation(runId, { ...anEvaluation("1", "applying"), runId });
+    }
+
+    await recoverInterruptedRuns(repo, ["demo-user"]);
+
+    const statusIn = async (runId: string) => (await repo.listEvaluations(runId))[0]?.status;
+    expect(await statusIn("run-1")).toBe("applying");
+    for (let i = 2; i <= RECOVERY_RUN_WINDOW + 1; i++) {
+      expect(await statusIn(`run-${i}`)).toBe("failed");
+    }
   });
 });

@@ -186,18 +186,15 @@ export class FirestoreRepo implements Repo {
     // Ordered by creation so the initial snapshot replays evaluations in the
     // order they were added (Firestore breaks ties by document id).
     const query = this.jobs(runId).orderBy("createdAt");
-    return query.onSnapshot(
-      (snap) => {
-        const changes: EvaluationChange[] = [];
-        for (const change of snap.docChanges()) {
-          const evaluation = validate(evaluationSchema, change.doc);
-          if (evaluation instanceof Error) onError(evaluation);
-          else changes.push({ type: change.type, evaluation });
-        }
-        cb(changes);
-      },
-      onError,
-    );
+    return query.onSnapshot((snap) => {
+      const changes: EvaluationChange[] = [];
+      for (const change of snap.docChanges()) {
+        const evaluation = validate(evaluationSchema, change.doc);
+        if (evaluation instanceof Error) onError(evaluation);
+        else changes.push({ type: change.type, evaluation });
+      }
+      cb(changes);
+    }, onError);
   }
 
   private users(): CollectionReference {

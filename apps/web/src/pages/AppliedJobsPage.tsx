@@ -31,16 +31,9 @@ import {
 } from "@auto-apply/shared";
 import { listEvaluations, messageOf, retrySubmit } from "../api";
 import { useLoad } from "../useLoad";
+import { formatDate } from "../ui/formatDate";
 import { StatusChip } from "../ui/StatusChip";
 import { PostingSourceCell, reasonText } from "../run/evaluationCells";
-
-const dateFormat = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-});
 
 const idOf = (e: Pick<Evaluation, "runId" | "jobKey">) => `${e.runId}/${e.jobKey}`;
 
@@ -143,7 +136,11 @@ function AppliedBody({
                 key={idOf(evaluation)}
                 evaluation={evaluation}
                 onView={() => setViewing(evaluation)}
-                onRetried={onRetried}
+                onRetried={(retried) => {
+                  onRetried(retried);
+                  // D19: "Retry shows the payload and succeeds".
+                  setViewing(retried);
+                }}
               />
             ))}
           </TableBody>
@@ -191,7 +188,7 @@ function AppliedRow({
         {posting.title}
         {submission && (
           <Typography component="div" variant="caption" color="text.secondary">
-            Built {dateFormat.format(new Date(submission.builtAt))} · attempt {submission.attempt}
+            Built {formatDate(submission.builtAt)} · attempt {submission.attempt}
           </Typography>
         )}
       </TableCell>
