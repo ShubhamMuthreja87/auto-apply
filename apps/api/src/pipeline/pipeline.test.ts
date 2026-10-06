@@ -15,6 +15,9 @@ import { readBoardFixture } from "../discovery/fixtures.js";
 import { greenhouseJobSource } from "../discovery/greenhouse.js";
 import { recordedFetch } from "../discovery/recorded-fetch.js";
 import { keywordMatcher } from "../evaluation/keyword-matcher.js";
+import { createAiEvaluator } from "../ai/ai-evaluator.js";
+import { createChatClient } from "../ai/chat-client.js";
+import { completion, readAiFixture, scriptedFetch } from "../ai/scripted-fetch.js";
 import { InMemoryRepo } from "../repo/in-memory-repo.js";
 import { AWAITING_SUBMIT_REASON, buildPipeline, type PipelineDeps } from "./pipeline.js";
 import type { Discovery, JobEvaluator } from "./ports.js";
@@ -561,9 +564,7 @@ describe("scoring and Verdict (D7, D8)", () => {
     const { runId, finished } = await pipeline.startRun("user-1");
     await finished;
 
-    const byJob = new Map(
-      (await evaluationsOf(repo, runId)).map((e) => [e.posting.jobId, e]),
-    );
+    const byJob = new Map((await evaluationsOf(repo, runId)).map((e) => [e.posting.jobId, e]));
     expect(byJob.get("now")).toMatchObject({
       verdict: "APPLY_NOW",
       score: 8,
@@ -593,18 +594,13 @@ describe("scoring and Verdict (D7, D8)", () => {
   it("stores every criterion's evidence, the title tier judged in code", async () => {
     const repo = new InMemoryRepo();
     const discovery: Discovery = {
-      discover: async () => [
-        { ...aPosting("1"), ...inIndia, title: "Engineering Manager" },
-      ],
+      discover: async () => [{ ...aPosting("1"), ...inIndia, title: "Engineering Manager" }],
     };
     const asked: string[][] = [];
     const evaluator: JobEvaluator = {
       evaluate: async (posting, criteria) => {
         asked.push(criteria.map((c) => c.id));
-        return cannedEvaluator({ "1": ["startup"] }).evaluate(
-          posting,
-          criteria,
-        );
+        return cannedEvaluator({ "1": ["startup"] }).evaluate(posting, criteria);
       },
     };
     const pipeline = buildPipeline(deps({ repo, discovery, evaluator }));
@@ -614,9 +610,7 @@ describe("scoring and Verdict (D7, D8)", () => {
 
     const [evaluation] = await evaluationsOf(repo, runId);
     const byId = new Map(evaluation?.evidence.map((e) => [e.criterionId, e]));
-    expect(evaluation?.evidence).toHaveLength(
-      theUser.preferences.fitCriteria.length,
-    );
+    expect(evaluation?.evidence).toHaveLength(theUser.preferences.fitCriteria.length);
     expect(byId.get("title_manager")).toMatchObject({
       judgedBy: "code",
       met: true,
@@ -637,21 +631,15 @@ describe("scoring and Verdict (D7, D8)", () => {
   it("ignores an evaluator's judgement on a criterion code owns", async () => {
     const repo = new InMemoryRepo();
     const discovery: Discovery = {
-      discover: async () => [
-        { ...aPosting("1"), ...inIndia, title: "Software Engineer" },
-      ],
+      discover: async () => [{ ...aPosting("1"), ...inIndia, title: "Software Engineer" }],
     };
     const overreaching: JobEvaluator = {
       evaluate: async () => ({
         scoredBy: "ai",
-        judgements: [
-          { criterionId: "title_manager", met: true, evidence: "trust me" },
-        ],
+        judgements: [{ criterionId: "title_manager", met: true, evidence: "trust me" }],
       }),
     };
-    const pipeline = buildPipeline(
-      deps({ repo, discovery, evaluator: overreaching }),
-    );
+    const pipeline = buildPipeline(deps({ repo, discovery, evaluator: overreaching }));
 
     const { runId, finished } = await pipeline.startRun("user-1");
     await finished;
@@ -681,9 +669,7 @@ describe("scoring and Verdict (D7, D8)", () => {
   it("streams each Verdict live, before the Run finishes", async () => {
     const repo = new InMemoryRepo();
     const discovery: Discovery = {
-      discover: async () => [
-        { ...aPosting("1"), ...inIndia, title: "Engineering Manager" },
-      ],
+      discover: async () => [{ ...aPosting("1"), ...inIndia, title: "Engineering Manager" }],
     };
     const evaluator = cannedEvaluator({ "1": ["stack_primary"] });
     // Discovery and the Posting's step pass; the Run's closing step waits.
@@ -698,8 +684,7 @@ describe("scoring and Verdict (D7, D8)", () => {
       runId,
       (batch) => {
         for (const { evaluation } of batch) {
-          if (evaluation.verdict)
-            scored.push(`${evaluation.status}/${evaluation.verdict}`);
+          if (evaluation.verdict) scored.push(`${evaluation.status}/${evaluation.verdict}`);
         }
       },
       (error) => {
@@ -744,9 +729,80 @@ describe("scoring and Verdict (D7, D8)", () => {
       scoredBy: "fallback",
       status: "held",
     });
-    const startup = evaluation?.evidence.find(
-      (e) => e.criterionId === "startup",
-    );
+    const startup = evaluation?.evidence.find((e) => e.criterionId === "startup");
     expect(startup?.evidence).toContain("fast-growing startup");
+  });
+
+  it("records on the Run that it uses fallback scoring when no AI key is configured (D24)", async () => {
+    const repo = new InMemoryRepo();
+    const pipeline = buildPipeline(
+      deps({ repo, evaluator: keywordMatcher, scoringMode: "fallback" }),
+    );
+    const { runId, finished } = await pipeline.startRun("user-1");
+    expect((await repo.getRun(runId))?.scoring).toBe("fallback");
+    await finished;
+  });
+
+  describe("with the AI evaluator (injected fetch)", () => {
+    const posting: Posting = {
+      ...aPosting("1"),
+      ...inIndia,
+      title: "Engineering Manager",
+      descriptionText:
+        "Join a fast-growing startup. Our stack is TypeScript, Node.js and React, " +
+        "and you will lead a hands-on team.",
+    };
+
+    async function runWith(steps: unknown[]) {
+      const fake = scriptedFetch(steps);
+      const chat = createChatClient({
+        fetch: fake.fetch,
+        baseUrl: "https://ai.example.test",
+        model: "deepseek-chat",
+        apiKey: "sk-test",
+        timeoutMs: 50,
+        maxTokens: 700,
+      });
+      const repo = new InMemoryRepo();
+      const pipeline = buildPipeline(
+        deps({
+          repo,
+          discovery: { discover: async () => [posting] },
+          evaluator: createAiEvaluator({ chat, fallback: keywordMatcher }),
+          scoringMode: "ai",
+        }),
+      );
+      const { runId, finished } = await pipeline.startRun("user-1");
+      await finished;
+      const [evaluation] = await evaluationsOf(repo, runId);
+      return { evaluation, run: await repo.getRun(runId), fake };
+    }
+
+    it("scores from the model's quoted evidence, labelled ai", async () => {
+      const { evaluation, run } = await runWith([await readAiFixture("deepseek-chat-completion")]);
+
+      expect(run?.scoring).toBe("ai");
+      expect(evaluation?.scoredBy).toBe("ai");
+      const stack = evaluation?.evidence.find((e) => e.criterionId === "stack_primary");
+      expect(stack).toMatchObject({
+        met: true,
+        evidence: "Our stack is TypeScript, Node.js and React",
+      });
+      // The fixture says "startup" is not met, though the keyword matcher would say it is.
+      expect(evaluation?.evidence.find((e) => e.criterionId === "startup")?.met).toBe(false);
+    });
+
+    it("retries once, then falls back to the keyword matcher for that Evaluation", async () => {
+      const { evaluation, run, fake } = await runWith([
+        completion("not json"),
+        completion("still not json"),
+      ]);
+
+      expect(fake.calls).toHaveLength(2);
+      expect(run?.status).toBe("completed");
+      expect(run?.scoring).toBe("ai");
+      expect(evaluation?.scoredBy).toBe("fallback");
+      expect(evaluation?.evidence.find((e) => e.criterionId === "startup")?.met).toBe(true);
+    });
   });
 });

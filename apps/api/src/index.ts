@@ -7,7 +7,7 @@ import { BOARDS } from "./discovery/boards.js";
 import { createDiscovery } from "./discovery/discovery.js";
 import { readBoardFixture } from "./discovery/fixtures.js";
 import { greenhouseJobSource } from "./discovery/greenhouse.js";
-import { keywordMatcher } from "./evaluation/keyword-matcher.js";
+import { createScoring } from "./ai/scoring.js";
 import { recoverInterruptedRuns } from "./runs/recover-interrupted-runs.js";
 import { DEMO_UID, loadUser, seedUser } from "./user.js";
 
@@ -28,11 +28,14 @@ const discovery = createDiscovery({
   readFixture: readBoardFixture,
   mode: config.JOB_SOURCE,
 });
+// With an AI key the model judges each Posting (falling back per Posting);
+// without one the whole Run uses the keyword matcher (D24).
+const scoring = createScoring(config, fetch);
 const pipeline = buildPipeline({
   repo,
   discovery,
-  // No AI client yet (ticket 09): the whole Run uses fallback scoring (D24).
-  evaluator: keywordMatcher,
+  evaluator: scoring.evaluator,
+  scoringMode: scoring.mode,
   screening: { salaryFloorLpa: config.SALARY_FLOOR_LPA },
   clock: () => new Date(),
   delay: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
@@ -55,5 +58,6 @@ app.listen(config.PORT, () => {
     namespace: config.FIRESTORE_NAMESPACE,
     persistence: persistence.kind,
     jobSource: config.JOB_SOURCE,
+    scoring: scoring.mode,
   });
 });

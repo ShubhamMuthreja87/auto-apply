@@ -22,21 +22,20 @@ import {
   type SubscriptionErrorHandler,
 } from "@auto-apply/shared";
 import { createApp } from "./app.js";
-import type { Config } from "./config.js";
+import { loadConfig, type Config } from "./config.js";
 import { InMemoryRepo } from "./repo/in-memory-repo.js";
 import { buildPipeline } from "./pipeline/pipeline.js";
 import type { Discovery } from "./pipeline/ports.js";
 import { SEED_USER } from "./seed-user.js";
 import { keywordMatcher } from "./evaluation/keyword-matcher.js";
 
-const testConfig: Config = {
+const testConfig: Config = loadConfig({
   NODE_ENV: "test",
-  PORT: 3001,
   FIRESTORE_NAMESPACE: "test-local",
   REPO: "memory",
   CORS_ORIGIN: "http://localhost:5173",
   JOB_SOURCE: "fixtures",
-};
+});
 
 function aPosting(jobId: string): Posting {
   return {

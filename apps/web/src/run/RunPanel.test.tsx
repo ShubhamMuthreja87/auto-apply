@@ -167,6 +167,34 @@ describe("<RunPanel />", () => {
     expect(sourceCells[2]).toMatch(/fixture/i);
   });
 
+  it("says the whole Run uses fallback scoring when no AI key is configured (D24)", async () => {
+    fakeApi({ active: aRun({ scoring: "fallback" }) });
+    render(<RunPanel />);
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+
+    act(() =>
+      FakeEventSource.latest().emit("snapshot", {
+        run: aRun({ scoring: "fallback" }),
+        evaluations: [],
+      }),
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/fallback scoring/i);
+    expect(screen.getByRole("alert")).toHaveTextContent(/no ai key/i);
+  });
+
+  it("shows no fallback notice for an AI-scored Run", async () => {
+    fakeApi({ active: aRun({ scoring: "ai" }) });
+    render(<RunPanel />);
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+
+    act(() =>
+      FakeEventSource.latest().emit("snapshot", { run: aRun({ scoring: "ai" }), evaluations: [] }),
+    );
+
+    expect(screen.queryByText(/fallback scoring/i)).not.toBeInTheDocument();
+  });
+
   it("shows progress through the Run's jobs", async () => {
     fakeApi({ active: aRun() });
     render(<RunPanel />);

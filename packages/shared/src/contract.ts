@@ -379,6 +379,13 @@ export const runSchema = z.object({
   status: runStatusSchema,
   funnel: runFunnelSchema,
   reason: z.string().nullable(),
+  /**
+   * How this Run judges the AI-side criteria, fixed when it starts (D24):
+   * `ai` when an AI key is configured (a single Evaluation may still fall
+   * back, see its `scoredBy`); `fallback` when none is, so the whole Run uses
+   * the keyword matcher and the UI says so. Absent on Runs from before it.
+   */
+  scoring: z.lazy(() => scoredBySchema).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
