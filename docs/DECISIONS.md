@@ -47,3 +47,7 @@ Source of truth for WHAT the prototype does. `CLAUDE.md` summarises the technica
 - Horizontal scaling, queues, multiple pm2 instances (scale doc)
 - An evaluation harness for match quality
 - 2026-10-06 (time cut): discovery uses Greenhouse only; Lever and Ashby move to the design doc as next adapters (narrows D2).
+
+## Notes from the run (2026-10-06)
+
+- Demo submit path: the recorded APPLY NOW jobs (Cloudflare) stay `needs_you` (no resume URL in the seed; a required privacy acknowledgement that D10 never auto-answers). The fixtures-only mode (`JOB_SOURCE=fixtures`) and the E2E test therefore include one clearly labelled synthetic demo board whose form has only standard fields, so D18/D19 can be shown. It is never in the live board registry and the UI labels it "Fixture".

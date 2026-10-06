@@ -12,3 +12,6 @@
 - [x] Code refuses to start with `FIRESTORE_NAMESPACE=prod` unless `NODE_ENV=production`; env parsed once at startup, fail fast.
 - [x] The ticket-02 contract suite runs against the Firestore adapter **when credentials are present**, in a unique `test-<random>` namespace, torn down with `recursiveDelete(nsDoc())` in `afterAll`. Skipped cleanly when no credentials.
 - [x] Browsers have no access (documented in `firestore.rules`); only the Admin SDK reads/writes.
+
+## Log
+- Built in `1063701` (+ follow-up `2141819`) before this run. 2026-10-06 audit: all bullets verified; the live contract suite ran in a `test-*` namespace and tore it down.

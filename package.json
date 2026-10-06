@@ -16,6 +16,7 @@
     "lint": "eslint .",
     "test": "npm -w @auto-apply/shared run test && npm -w @auto-apply/api run test && npm -w @auto-apply/web run test",
     "verify": "npm run typecheck && npm run lint && npm run test",
+    "test:e2e": "playwright test",
     "build": "npm -w @auto-apply/shared run build && npm -w @auto-apply/api run build && npm -w @auto-apply/web run build"
   },
   "overrides": {

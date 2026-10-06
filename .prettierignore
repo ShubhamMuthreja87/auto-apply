@@ -1,0 +1,7 @@
+# Generated, vendored or recorded files prettier must not touch.
+.claude/worktrees
+dist
+node_modules
+test-results
+playwright-report
+apps/api/fixtures

@@ -29,3 +29,6 @@ Choices made:
 - `.playwright-mcp/` (browser-check screenshots) is gitignored.
 
 For ticket 13: the routes are client-side, so nginx needs `try_files $uri /index.html` so that deep links like `/applied` load on refresh.
+
+## Log
+- Built in `a9a6294` before this run. 2026-10-06 audit: all bullets verified; the placeholders it introduced were replaced by tickets 11, 12 and 17, and `PlaceholderPage.tsx` was deleted with the author's approval.

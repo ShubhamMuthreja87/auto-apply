@@ -17,15 +17,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ActiveRunExistsError,
+  UserMissingError,
   emptyFunnel,
   jobKey,
+  type CriterionEvidence,
   type Evaluation,
+  type MissingField,
   type EvaluationChange,
   type Posting,
   type Repo,
   type Run,
   type RunStatus,
   type EvaluationStatus,
+  type SimulatedSubmission,
   type UserDoc,
 } from "@auto-apply/shared";
 
@@ -91,8 +95,46 @@ function aPosting(jobId = "1"): Posting {
     location: "Remote",
     descriptionText: "Build things.",
     applyUrl: `https://boards.greenhouse.io/acme/jobs/${jobId}`,
+    remote: true,
+    source: "live",
   };
 }
+
+const evidenceItem: CriterionEvidence = {
+  criterionId: "startup",
+  label: "Startup or scale-up",
+  weight: 1,
+  judgedBy: "ai",
+  met: true,
+  evidence: "a fast-growing scale-up",
+  points: 1,
+};
+
+const missingField: MissingField = {
+  id: "question_1",
+  label: "Agreement to Arbitrate",
+  why: "Legal agreement; never auto-answered (D10)",
+};
+
+const submission: SimulatedSubmission = {
+  ats: "greenhouse",
+  endpoint: "https://boards-api.greenhouse.io/v1/boards/acme/jobs/1",
+  method: "POST",
+  sent: false,
+  formUrl: "https://job-boards.greenhouse.io/acme/jobs/1",
+  payload: { first_name: "Ada", question_7: 0, "question_8[]": [101, 102] },
+  answers: [
+    {
+      id: "question_7",
+      label: "Sponsorship?",
+      type: "select",
+      source: "settings",
+      value: [{ label: "No", value: 0 }],
+    },
+  ],
+  attempt: 1,
+  builtAt: "2026-10-06T12:00:00.000Z",
+};
 
 function anEvaluation(posting: Posting, overrides: Partial<Evaluation> = {}): Evaluation {
   const now = new Date().toISOString();
@@ -104,6 +146,10 @@ function anEvaluation(posting: Posting, overrides: Partial<Evaluation> = {}): Ev
     verdict: null,
     score: null,
     reason: null,
+    evidence: [],
+    scoredBy: null,
+    missingFields: [],
+    submission: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -161,6 +207,42 @@ export function describeRepoContract(
         await repo.seedUserIfMissing("user-1", aUser({ profile: { title: "Overwritten" } }));
         const user = await repo.getUser("user-1");
         expect(user?.profile).toEqual({ title: "Staff" });
+      });
+
+      it("replaces profile, preferences and settings of an existing user, keeping the uid", async () => {
+        await repo.seedUserIfMissing(
+          "user-1",
+          aUser({ profile: { title: "Staff", city: "Pune" }, settings: { notice: 30 } }),
+        );
+        await repo.updateUser("user-1", {
+          profile: { title: "EM" },
+          preferences: { region: "India" },
+          settings: { notice: 60 },
+        });
+        expect(await repo.getUser("user-1")).toEqual({
+          uid: "user-1",
+          profile: { title: "EM" },
+          preferences: { region: "India" },
+          settings: { notice: 60 },
+        });
+      });
+
+      it("rejects an update for a missing user and creates nothing", async () => {
+        await expect(
+          repo.updateUser("user-1", { profile: {}, preferences: {}, settings: {} }),
+        ).rejects.toBeInstanceOf(UserMissingError);
+        expect(await repo.getUser("user-1")).toBeNull();
+      });
+
+      it("keeps an edited user on a later seed (D13)", async () => {
+        await repo.seedUserIfMissing("user-1", aUser({ profile: { title: "Staff" } }));
+        await repo.updateUser("user-1", {
+          profile: { title: "EM" },
+          preferences: {},
+          settings: {},
+        });
+        await repo.seedUserIfMissing("user-1", aUser({ profile: { title: "Staff" } }));
+        expect((await repo.getUser("user-1"))?.profile).toEqual({ title: "EM" });
       });
     });
 
@@ -379,6 +461,10 @@ export function describeRepoContract(
           status: "submitted",
           verdict: "APPLY_NOW",
           score: 42,
+          evidence: [evidenceItem],
+          scoredBy: "fallback",
+          missingFields: [missingField],
+          submission,
         });
         await eventually(() => expect(changes.at(-1)?.evaluation.status).toBe("submitted"));
         // The first delivery introduces the document; every later one modifies it.
@@ -390,6 +476,10 @@ export function describeRepoContract(
         );
         expect(changes.at(-1)?.evaluation.verdict).toBe("APPLY_NOW");
         expect(changes.at(-1)?.evaluation.score).toBe(42);
+        expect(changes.at(-1)?.evaluation.evidence).toEqual([evidenceItem]);
+        expect(changes.at(-1)?.evaluation.scoredBy).toBe("fallback");
+        expect(changes.at(-1)?.evaluation.missingFields).toEqual([missingField]);
+        expect(changes.at(-1)?.evaluation.submission).toEqual(submission);
         unsub();
       });
 
@@ -445,6 +535,54 @@ export function describeRepoContract(
         await repo.patchEvaluation("run-1", jobKey(posting), { status: "evaluating" });
         await eventually(() => expect(changes.at(-1)?.evaluation.status).toBe("evaluating"));
         unsub();
+      });
+    });
+    describe("listing (Scanned jobs, ticket 12)", () => {
+      it("lists a user's runs newest first, and no other user's", async () => {
+        await repo.createRun(aRun({ status: "completed", createdAt: "2026-10-01T10:00:00.000Z" }));
+        await repo.createRun(
+          aRun({ runId: "run-2", status: "failed", createdAt: "2026-10-03T10:00:00.000Z" }),
+        );
+        await repo.createRun(aRun({ runId: "run-3", createdAt: "2026-10-02T10:00:00.000Z" }));
+        await repo.createRun(aRun({ runId: "run-9", uid: "user-2" }));
+
+        const runs = await repo.listRuns("user-1");
+
+        expect(runs.map((run) => run.runId)).toEqual(["run-2", "run-3", "run-1"]);
+        expect(await repo.listRuns("nobody")).toEqual([]);
+      });
+
+      it("lists a run's evaluations in the order they were added, with their latest state", async () => {
+        await repo.createRun(aRun());
+        await repo.createRun(aRun({ runId: "run-2", uid: "user-2" }));
+        await repo.putEvaluation(
+          "run-1",
+          anEvaluation(aPosting("1"), { createdAt: "2026-10-06T12:00:01.000Z" }),
+        );
+        await repo.putEvaluation(
+          "run-1",
+          anEvaluation(aPosting("2"), { createdAt: "2026-10-06T12:00:02.000Z" }),
+        );
+        await repo.putEvaluation("run-2", { ...anEvaluation(aPosting("9")), runId: "run-2" });
+        await repo.patchEvaluation("run-1", jobKey(aPosting("1")), {
+          status: "held",
+          verdict: "APPLY",
+          score: 6,
+          evidence: [evidenceItem],
+          scoredBy: "fallback",
+        });
+
+        const evaluations = await repo.listEvaluations("run-1");
+
+        expect(evaluations.map((e) => e.posting.jobId)).toEqual(["1", "2"]);
+        expect(evaluations[0]).toMatchObject({
+          status: "held",
+          verdict: "APPLY",
+          score: 6,
+          evidence: [evidenceItem],
+          scoredBy: "fallback",
+        });
+        expect(await repo.listEvaluations("unknown-run")).toEqual([]);
       });
     });
   });

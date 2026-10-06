@@ -7,6 +7,12 @@ import {
   MAX_IN_FLIGHT,
   MAX_AI_EVALS,
   LIMITS,
+  APPLY_MIN_FIT,
+  APPLY_NOW_MIN_FIT,
+  FIT_CAP,
+  evaluationSchema,
+  runSchema,
+  simulatedSubmissionSchema,
 } from "./index.js";
 
 describe("contract", () => {
@@ -52,5 +58,81 @@ describe("contract", () => {
     expect(() => healthResponseSchema.parse({ ...ok, repo: "postgres" })).toThrow();
     const { repo: _repo, ...withoutRepo } = ok;
     expect(() => healthResponseSchema.parse(withoutRepo)).toThrow();
+  });
+
+  it("pins the fit scale and Verdict bands from the job-search prompt (D8)", () => {
+    expect(FIT_CAP).toBe(10);
+    expect(APPLY_NOW_MIN_FIT).toBe(7);
+    expect(APPLY_MIN_FIT).toBe(5);
+  });
+
+  it("reads an Evaluation stored before scoring existed with no evidence and no scorer", () => {
+    const stored = {
+      jobKey: "greenhouse:acme:1",
+      runId: "run-1",
+      posting: {
+        ats: "greenhouse",
+        board: "acme",
+        jobId: "1",
+        title: "Engineer",
+        company: "Acme",
+        location: "Remote",
+        descriptionText: "",
+        applyUrl: "https://boards.greenhouse.io/acme/jobs/1",
+      },
+      status: "skipped",
+      verdict: null,
+      score: null,
+      reason: "seen",
+      createdAt: "t",
+      updatedAt: "t",
+    };
+    expect(evaluationSchema.parse(stored)).toMatchObject({
+      evidence: [],
+      scoredBy: null,
+      missingFields: [],
+      submission: null,
+    });
+  });
+
+  it("reads a Run with or without its scoring mode, and only ai or fallback (D24)", () => {
+    const stored = {
+      runId: "run-1",
+      uid: "u",
+      status: "completed",
+      funnel: {
+        discovered: 0,
+        evaluated: 0,
+        blocked: 0,
+        skipped: 0,
+        held: 0,
+        submitted: 0,
+        failed: 0,
+      },
+      reason: null,
+      createdAt: "t",
+      updatedAt: "t",
+    };
+    expect(runSchema.parse(stored).scoring).toBeUndefined();
+    expect(runSchema.parse({ ...stored, scoring: "fallback" }).scoring).toBe("fallback");
+    expect(() => runSchema.parse({ ...stored, scoring: "guess" })).toThrow();
+  });
+
+  it("only ever stores a submission as not sent (D18)", () => {
+    const submission = {
+      ats: "greenhouse",
+      endpoint: "https://boards-api.greenhouse.io/v1/boards/acme/jobs/1",
+      method: "POST",
+      sent: false,
+      formUrl: "https://job-boards.greenhouse.io/acme/jobs/1",
+      payload: { first_name: "Ada", question_1: 7, "question_2[]": [1, 2] },
+      answers: [
+        { id: "first_name", label: "First Name", type: "text", source: "profile", value: "Ada" },
+      ],
+      attempt: 1,
+      builtAt: "t",
+    };
+    expect(simulatedSubmissionSchema.parse(submission).payload).toEqual(submission.payload);
+    expect(() => simulatedSubmissionSchema.parse({ ...submission, sent: true })).toThrow();
   });
 });

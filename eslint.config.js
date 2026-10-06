@@ -3,7 +3,13 @@ import reactHooks from "eslint-plugin-react-hooks";
 
 export default tseslint.config(
   {
-    ignores: ["**/dist/**", "**/node_modules/**", "**/*.config.ts", "**/*.config.js"],
+    ignores: [
+      ".claude/worktrees/**",
+      "**/dist/**",
+      "**/node_modules/**",
+      "**/*.config.ts",
+      "**/*.config.js",
+    ],
   },
   ...tseslint.configs.recommended,
   {

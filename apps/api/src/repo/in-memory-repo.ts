@@ -21,6 +21,8 @@ import {
   type SubscriptionErrorHandler,
   type Unsubscribe,
   type UserDoc,
+  type UserUpdate,
+  UserMissingError,
 } from "@auto-apply/shared";
 import type { z } from "zod";
 
@@ -45,7 +47,11 @@ function clone<T>(value: T): T {
  * adapter does on read: one that breaks the contract becomes an `Error` for
  * `onError` instead of a callback, and the subscription keeps going (ADR-0003).
  */
-function validate<T>(schema: z.ZodType<T>, value: unknown, label: string): T | Error {
+function validate<T>(
+  schema: z.ZodType<T, z.ZodTypeDef, unknown>,
+  value: unknown,
+  label: string,
+): T | Error {
   const parsed = schema.safeParse(structuredClone(value));
   return parsed.success ? parsed.data : new Error(`invalid ${label}: ${parsed.error.message}`);
 }
@@ -67,6 +73,13 @@ export class InMemoryRepo implements Repo {
 
   async seedUserIfMissing(uid: string, doc: UserDoc): Promise<void> {
     if (!this.users.has(uid)) this.users.set(uid, clone(doc));
+  }
+
+  async updateUser(uid: string, update: UserUpdate): Promise<void> {
+    const user = this.users.get(uid);
+    if (!user) throw new UserMissingError(uid);
+    const { profile, preferences, settings } = clone(update);
+    this.users.set(uid, { ...user, profile, preferences, settings });
   }
 
   async createRun(run: Run): Promise<void> {
@@ -100,6 +113,13 @@ export class InMemoryRepo implements Repo {
     this.notifyRun(runId);
   }
 
+  async listRuns(uid: string): Promise<Run[]> {
+    return [...this.runs.values()]
+      .filter((run) => run.uid === uid)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map(clone);
+  }
+
   async putEvaluation(runId: string, evaluation: Evaluation): Promise<void> {
     const byKey = this.evaluations.get(runId) ?? new Map<string, Evaluation>();
     const type = byKey.has(evaluation.jobKey) ? "modified" : "added";
@@ -115,8 +135,24 @@ export class InMemoryRepo implements Repo {
     if (delta.verdict !== undefined) evaluation.verdict = delta.verdict;
     if (delta.score !== undefined) evaluation.score = delta.score;
     if (delta.reason !== undefined) evaluation.reason = delta.reason;
+    if (delta.evidence !== undefined) evaluation.evidence = clone(delta.evidence);
+    if (delta.scoredBy !== undefined) evaluation.scoredBy = delta.scoredBy;
+    if (delta.missingFields !== undefined) evaluation.missingFields = clone(delta.missingFields);
+    if (delta.submission !== undefined) evaluation.submission = clone(delta.submission);
     evaluation.updatedAt = new Date().toISOString();
     this.notifyEvaluation(runId, { type: "modified", evaluation });
+  }
+
+  async listEvaluations(runId: string): Promise<Evaluation[]> {
+    const byKey = this.evaluations.get(runId) ?? new Map<string, Evaluation>();
+    // Validated like the Firestore adapter's reads: a bad document rejects.
+    return [...byKey.values()]
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .map((evaluation) => {
+        const valid = validate(evaluationSchema, evaluation, `evaluation ${evaluation.jobKey}`);
+        if (valid instanceof Error) throw valid;
+        return valid;
+      });
   }
 
   async isSeen(jobKey: string): Promise<boolean> {

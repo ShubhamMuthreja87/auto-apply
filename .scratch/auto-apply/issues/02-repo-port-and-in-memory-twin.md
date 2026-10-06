@@ -29,3 +29,6 @@ interface Repo {
 - [x] Subscription semantics: initial callback delivered on a microtask (not synchronously); a callback fires on every matching write (local writes echo back); delta ordering preserved.
 - [x] `createRun` rejects when an active Run already exists (the future 409).
 - [x] A **shared contract suite** exercises any `Repo`: async-initial snapshot, delta ordering, funnel-count increments, seen/active-run behaviour. It runs against the in-memory implementation here and is structured so a second implementation can be dropped in (ticket 03).
+
+## Log
+- Built in `3486302` before this run. 2026-10-06 audit: all bullets verified. Later changed by ADR-0003 (`2141819`, state-based subscriptions): adapters may coalesce writes, and `watch*` gained `onError` and batch delivery; the in-memory twin still delivers one callback per write.

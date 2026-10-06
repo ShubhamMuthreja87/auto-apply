@@ -28,9 +28,13 @@ import {
   type SubscriptionErrorHandler,
   type Unsubscribe,
   type UserDoc,
+  type UserUpdate,
+  UserMissingError,
 } from "@auto-apply/shared";
 import { nsDoc } from "../firestore/firestore.js";
 
+/** gRPC status for an `update()` on a document that does not exist. */
+const NOT_FOUND = 5;
 /** gRPC status for a `create()` on a document that already exists. */
 const ALREADY_EXISTS = 6;
 
@@ -40,7 +44,7 @@ interface Snapshot {
 }
 
 /** Validates a document read against the contract (ADR-0003: never trusted). */
-function validate<T>(schema: z.ZodType<T>, snap: Snapshot): T | Error {
+function validate<T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>, snap: Snapshot): T | Error {
   const parsed = schema.safeParse(snap.data());
   return parsed.success
     ? parsed.data
@@ -48,7 +52,7 @@ function validate<T>(schema: z.ZodType<T>, snap: Snapshot): T | Error {
 }
 
 /** For direct reads: a bad document rejects the caller's promise. */
-function parse<T>(schema: z.ZodType<T>, snap: Snapshot): T {
+function parse<T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>, snap: Snapshot): T {
   const valid = validate(schema, snap);
   if (valid instanceof Error) throw valid;
   return valid;
@@ -76,6 +80,18 @@ export class FirestoreRepo implements Repo {
       await this.users().doc(uid).create(doc);
     } catch (err) {
       if (isAlreadyExists(err)) return;
+      throw err;
+    }
+  }
+
+  async updateUser(uid: string, update: UserUpdate): Promise<void> {
+    // `update()` replaces each named top-level field whole and fails on a
+    // missing document, so an edit never creates one in place of the seed.
+    const { profile, preferences, settings } = update;
+    try {
+      await this.users().doc(uid).update({ profile, preferences, settings });
+    } catch (err) {
+      if (hasGrpcCode(err, NOT_FOUND)) throw new UserMissingError(uid);
       throw err;
     }
   }
@@ -110,6 +126,14 @@ export class FirestoreRepo implements Repo {
     await this.runs().doc(runId).update(update);
   }
 
+  async listRuns(uid: string): Promise<Run[]> {
+    // Sorted in code, like `createRun`'s check: no composite index is needed.
+    const snap = await this.runsOf(uid).get();
+    return snap.docs
+      .map((doc) => parse(runSchema, doc))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
   async putEvaluation(runId: string, evaluation: Evaluation): Promise<void> {
     await this.jobs(runId).doc(evaluation.jobKey).set(evaluation);
   }
@@ -120,7 +144,16 @@ export class FirestoreRepo implements Repo {
     if (delta.verdict !== undefined) update.verdict = delta.verdict;
     if (delta.score !== undefined) update.score = delta.score;
     if (delta.reason !== undefined) update.reason = delta.reason;
+    if (delta.evidence !== undefined) update.evidence = delta.evidence;
+    if (delta.scoredBy !== undefined) update.scoredBy = delta.scoredBy;
+    if (delta.missingFields !== undefined) update.missingFields = delta.missingFields;
+    if (delta.submission !== undefined) update.submission = delta.submission;
     await this.jobs(runId).doc(jobKey).update(update);
+  }
+
+  async listEvaluations(runId: string): Promise<Evaluation[]> {
+    const snap = await this.jobs(runId).orderBy("createdAt").get();
+    return snap.docs.map((doc) => parse(evaluationSchema, doc));
   }
 
   async isSeen(jobKey: string): Promise<boolean> {
@@ -153,18 +186,15 @@ export class FirestoreRepo implements Repo {
     // Ordered by creation so the initial snapshot replays evaluations in the
     // order they were added (Firestore breaks ties by document id).
     const query = this.jobs(runId).orderBy("createdAt");
-    return query.onSnapshot(
-      (snap) => {
-        const changes: EvaluationChange[] = [];
-        for (const change of snap.docChanges()) {
-          const evaluation = validate(evaluationSchema, change.doc);
-          if (evaluation instanceof Error) onError(evaluation);
-          else changes.push({ type: change.type, evaluation });
-        }
-        cb(changes);
-      },
-      onError,
-    );
+    return query.onSnapshot((snap) => {
+      const changes: EvaluationChange[] = [];
+      for (const change of snap.docChanges()) {
+        const evaluation = validate(evaluationSchema, change.doc);
+        if (evaluation instanceof Error) onError(evaluation);
+        else changes.push({ type: change.type, evaluation });
+      }
+      cb(changes);
+    }, onError);
   }
 
   private users(): CollectionReference {
@@ -189,5 +219,9 @@ export class FirestoreRepo implements Repo {
 }
 
 function isAlreadyExists(err: unknown): boolean {
-  return typeof err === "object" && err !== null && "code" in err && err.code === ALREADY_EXISTS;
+  return hasGrpcCode(err, ALREADY_EXISTS);
+}
+
+function hasGrpcCode(err: unknown, code: number): boolean {
+  return typeof err === "object" && err !== null && "code" in err && err.code === code;
 }

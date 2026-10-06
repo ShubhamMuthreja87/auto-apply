@@ -15,7 +15,7 @@ import {
   type Evaluation,
   type Run,
 } from "@auto-apply/shared";
-import { runEventsUrl } from "../api";
+import { getSession, runEventsUrl } from "../api";
 
 export type Connection = "connecting" | "live" | "reconnecting" | "closed";
 
@@ -108,11 +108,16 @@ export function useRunStream(runId: string | null): RunStreamState {
       }
       // CLOSED means the browser gave up (e.g. the server answered non-200)
       // and will not retry: say so rather than leave a stale view looking live.
+      const closed = source.readyState === EventSource.CLOSED;
       setState((prev) =>
-        source.readyState === EventSource.CLOSED
+        closed
           ? { ...prev, connection: "closed", error: LOST_CONNECTION }
           : { ...prev, connection: "reconnecting" },
       );
+      // An EventSource never exposes the status code, so ask whether the
+      // session expired: a 401 signs the browser out and shows the login page
+      // (D26). Any other failure leaves the lost-connection message as it is.
+      if (closed) getSession().catch(() => undefined);
     });
 
     return () => source.close();

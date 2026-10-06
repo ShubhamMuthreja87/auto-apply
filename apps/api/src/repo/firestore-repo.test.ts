@@ -12,6 +12,8 @@ import { loadCredential } from "../firestore/credential.js";
 import { nsDoc, openFirestore, type FirestoreHandle } from "../firestore/firestore.js";
 import { FirestoreRepo } from "./firestore-repo.js";
 import { describeRepoContract } from "./repo-contract.js";
+import { SEED_USER } from "../seed-user.js";
+import { DEMO_UID, loadUser, seedUser } from "../user.js";
 
 const credential = loadCredential(process.env);
 const namespace = `test-${randomBytes(6).toString("hex")}`;
@@ -73,6 +75,23 @@ describe.skipIf(!credential)(`FirestoreRepo (namespace ${namespace})`, () => {
       expect((await db.doc(`${root}/seen/greenhouse:acme:1`).get()).exists).toBe(true);
       // Nothing leaks to top-level collections.
       expect((await db.doc("runs/run-1").get()).exists).toBe(false);
+
+      await db.recursiveDelete(nsDoc(db, namespace));
+    },
+  );
+
+  it(
+    "seeds a fresh namespace with the full user document and reads it back valid (D13)",
+    { timeout: 30_000 },
+    async () => {
+      const { db } = firestore();
+      const repo = new FirestoreRepo(db, namespace);
+
+      await seedUser(repo, DEMO_UID);
+      const user = await loadUser(repo, DEMO_UID);
+
+      // Nested arrays, nulls and negative weights survive the round trip.
+      expect(user).toEqual({ uid: DEMO_UID, ...SEED_USER });
 
       await db.recursiveDelete(nsDoc(db, namespace));
     },

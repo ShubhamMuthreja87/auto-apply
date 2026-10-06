@@ -31,11 +31,17 @@ function anEvaluation(jobId: string, overrides: Partial<Evaluation> = {}): Evalu
       location: "Remote",
       descriptionText: "Build things.",
       applyUrl: `https://boards.greenhouse.io/acme/jobs/${jobId}`,
+      remote: true,
+      source: "live",
     },
     status: "queued",
     verdict: null,
     score: null,
     reason: null,
+    evidence: [],
+    scoredBy: null,
+    missingFields: [],
+    submission: null,
     createdAt: "2026-10-06T12:00:00.000Z",
     updatedAt: "2026-10-06T12:00:00.000Z",
     ...overrides,
@@ -49,14 +55,16 @@ function funnel(counts: Partial<RunFunnel>): RunFunnel {
 /** A fake API: the active Run on load, and what `POST /api/runs` answers. */
 function fakeApi({
   active = null,
+  runs = active ? [active] : [],
   post = new Response(JSON.stringify({ runId: "run-1" }), { status: 202 }),
-}: { active?: Run | null; post?: Response } = {}) {
+}: { active?: Run | null; runs?: Run[]; post?: Response } = {}) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.endsWith("/api/runs/active")) {
       return new Response(JSON.stringify({ run: active }), { status: 200 });
     }
     if (url.endsWith("/api/runs") && init?.method === "POST") return post;
+    if (url.endsWith("/api/runs")) return new Response(JSON.stringify({ runs }), { status: 200 });
     return new Response("not found", { status: 404 });
   });
   vi.stubGlobal("fetch", fetchMock);
@@ -137,6 +145,60 @@ describe("<RunPanel />", () => {
     ]);
   });
 
+  it("labels jobs read from recorded fixtures instead of the live board (D3)", async () => {
+    fakeApi({ active: aRun() });
+    render(<RunPanel />);
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+
+    const withSource = (jobId: string, source: "live" | "fallback" | "fixture") => {
+      const evaluation = anEvaluation(jobId);
+      return { ...evaluation, posting: { ...evaluation.posting, source } };
+    };
+    act(() =>
+      FakeEventSource.latest().emit("snapshot", {
+        run: aRun(),
+        evaluations: [
+          withSource("1", "live"),
+          withSource("2", "fallback"),
+          withSource("3", "fixture"),
+        ],
+      }),
+    );
+
+    const sourceCells = jobRows().map((row) => within(row).getAllByRole("cell")[2]?.textContent);
+    expect(sourceCells[0]).not.toMatch(/fallback|fixture/i);
+    expect(sourceCells[1]).toMatch(/fallback/i);
+    expect(sourceCells[2]).toMatch(/fixture/i);
+  });
+
+  it("says the whole Run uses fallback scoring when no AI key is configured (D24)", async () => {
+    fakeApi({ active: aRun({ scoring: "fallback" }) });
+    render(<RunPanel />);
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+
+    act(() =>
+      FakeEventSource.latest().emit("snapshot", {
+        run: aRun({ scoring: "fallback" }),
+        evaluations: [],
+      }),
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/fallback scoring/i);
+    expect(screen.getByRole("alert")).toHaveTextContent(/no ai key/i);
+  });
+
+  it("shows no fallback notice for an AI-scored Run", async () => {
+    fakeApi({ active: aRun({ scoring: "ai" }) });
+    render(<RunPanel />);
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+
+    act(() =>
+      FakeEventSource.latest().emit("snapshot", { run: aRun({ scoring: "ai" }), evaluations: [] }),
+    );
+
+    expect(screen.queryByText(/fallback scoring/i)).not.toBeInTheDocument();
+  });
+
   it("shows progress through the Run's jobs", async () => {
     fakeApi({ active: aRun() });
     render(<RunPanel />);
@@ -169,7 +231,7 @@ describe("<RunPanel />", () => {
       expect.objectContaining({ method: "POST" }),
     );
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
-    expect(FakeEventSource.latest().url).toMatch(/\/api\/runs\/run-1\/events$/);
+    expect(FakeEventSource.latest().url).toBe("/api/runs/run-1/events");
     expect(FakeEventSource.latest().withCredentials).toBe(true);
     expect(connection()).toMatch(/^connecting/i);
   });
@@ -225,7 +287,7 @@ describe("<RunPanel />", () => {
     render(<RunPanel />);
 
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
-    expect(FakeEventSource.latest().url).toMatch(/\/api\/runs\/run-1\/events$/);
+    expect(FakeEventSource.latest().url).toBe("/api/runs/run-1/events");
     act(() =>
       FakeEventSource.latest().emit("snapshot", {
         run: aRun({ status: "evaluating", funnel: funnel({ discovered: 2, evaluated: 1 }) }),
@@ -346,6 +408,30 @@ describe("<RunPanel />", () => {
     expect(screen.getByRole("button", { name: /auto-apply/i })).toBeEnabled();
   });
 
+  it("shows the most recent Run when none is active, e.g. one a restart interrupted", async () => {
+    const interrupted = aRun({
+      runId: "run-9",
+      status: "failed",
+      reason: "interrupted",
+      funnel: funnel({ discovered: 4, blocked: 1, failed: 3 }),
+    });
+    fakeApi({ active: null, runs: [interrupted, aRun({ runId: "run-1", status: "completed" })] });
+    render(<RunPanel />);
+
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    expect(FakeEventSource.latest().url).toBe("/api/runs/run-9/events");
+    act(() => {
+      FakeEventSource.latest().emit("snapshot", { run: interrupted, evaluations: [] });
+      FakeEventSource.latest().emit("done", { runId: "run-9", status: "failed" });
+    });
+
+    expect(screen.queryByText(/no runs yet/i)).not.toBeInTheDocument();
+    expect(valueOf("Status")).toBe("Failed");
+    expect(valueOf("Discovered")).toBe("4");
+    expect(screen.getByRole("alert")).toHaveTextContent(/interrupted.*server restarted/i);
+    expect(screen.getByRole("button", { name: /auto-apply/i })).toBeEnabled();
+  });
+
   it("shows closed and an error, not endless loading, when the browser gives up on the stream", async () => {
     fakeApi({ active: aRun() });
     render(<RunPanel />);
@@ -374,14 +460,14 @@ describe("<RunPanel />", () => {
     expect(jobRows()).toHaveLength(1);
   });
 
-  it("shows an error state, not the empty state, when the active Run cannot be loaded", async () => {
+  it("shows an error state, not the empty state, when the latest Run cannot be loaded", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response("boom", { status: 500 })),
     );
     render(<RunPanel />);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/could not load the active run/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not load the latest run/i);
     expect(screen.queryByText(/no runs yet/i)).not.toBeInTheDocument();
   });
 

@@ -7,7 +7,7 @@ The ubiquitous language for the auto-apply prototype: the terms that recur acros
 ### Jobs and evaluation
 
 **Posting**:
-A single job as returned by an ATS board, normalised into our own shape (`ats`, `board`, `jobId`, `title`, `company`, `location`, `descriptionText`, `applyUrl`). The unit of discovery.
+A single job as returned by an ATS board, normalised into our own shape (`ats`, `board`, `jobId`, `title`, `company`, `location`, `descriptionText`, `applyUrl`, plus a parsed `remote` flag and its `source`: `live`, `fallback` when the board failed and its recorded fixtures stood in (D3), or `fixture` in fixtures-only mode). The unit of discovery.
 _Avoid_: listing, job (bare), opening, req
 
 **Evaluation**:

@@ -4,11 +4,18 @@
 
 **Blocked by:** 10 , 05b .
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `ApplicationSubmitter` builds the real Greenhouse payload with real field IDs, waits (injected `delay`), stores it, and **never sends it** — no POST to any employer/ATS endpoint (D18).
-- [ ] The first submit per Run fails with `failed:simulated`; Retry is the one explicit backward edge in the transition table (D19) and rebuilds/shows the payload, then succeeds (`submitted`).
-- [ ] UI labels it "Submitted (simulated)" with a banner; nothing is presented as a real application.
-- [ ] Web **Applied jobs** view lists submitted (simulated) Evaluations with a "View payload" action and a working Retry on the failed one.
-- [ ] Pipeline-seam tests assert first-fail-then-retry deterministically (fake `ApplicationSubmitter`, injected `delay` — no real sleep) and that the stored payload carries real field IDs.
+- [x] `ApplicationSubmitter` builds the real Greenhouse payload with real field IDs, waits (injected `delay`), stores it, and **never sends it** — no POST to any employer/ATS endpoint (D18).
+- [x] The first submit per Run fails with `failed:simulated`; Retry is the one explicit backward edge in the transition table (D19) and rebuilds/shows the payload, then succeeds (`submitted`).
+- [x] UI labels it "Submitted (simulated)" with a banner; nothing is presented as a real application.
+- [x] Web **Applied jobs** view lists submitted (simulated) Evaluations with a "View payload" action and a working Retry on the failed one.
+- [x] Pipeline-seam tests assert first-fail-then-retry deterministically (fake `ApplicationSubmitter`, injected `delay` — no real sleep) and that the stored payload carries real field IDs.
 Build the UI with the 05b shell, theme and StatusChip; tables use MUI Table; no ad-hoc styling.
+
+## Log
+- 2026-10-06 /run-tickets: merged branch ticket-11 (`0de14eb`, merge `7d5e358`). `ApplicationSubmitter` port + `apps/api/src/submit/simulated-submitter.ts`: builds the Greenhouse payload keyed by real field ids, waits via injected `delay`, has no `fetch` (`sent: false` always). Complete form → `evaluating → applying`; submits run in the Run's `applying` stage, one at a time in discovery order; the Run's first submit ends `failed: simulated`. Retry: `pipeline.retrySubmit` rebuilds from stored answers (attempt 2) → `submitted`; funnel failed −1 / submitted +1; backward edge `RETRY_EDGE`/`assertRetryTransition` in `transitions.ts`; in-process lock against double Retry. `POST /api/runs/:runId/jobs/:jobKey/retry` (200 / 404 / 409 `not_retryable` / 400). Web: `AppliedJobsPage.tsx` (simulated banner, table, "View payload" dialog, Retry). Demo board `demo-synthetic` ("Demo Co (synthetic)") only in fixtures mode via `boardsFor(mode)`; never in live `BOARDS` (tested); files `fixtures/greenhouse/boards/demo-synthetic.json`, `forms/demo-synthetic-9000001.json`, `README-demo-synthetic.md`. Tests added: 4 submitter, 8 pipeline-seam (incl. fixtures-mode demo run fail→retry→submitted), 6 transition, 3 HTTP retry, 2 board registry, repo round-trip, 1 contract, 7 RTL. Contract (additive): `FAILED_REASONS`, `payloadValueSchema`, `formFieldTypeSchema`, `formOptionSchema`, `submittedAnswerSchema`, `simulatedSubmissionSchema`, `evaluation.submission` (default null), `retrySubmitResponseSchema`; `EvaluationDelta.submission?` in `repo.ts`.
+- Process note: the implementer edited `contract.ts` via shell scripts, so the approval hook did not fire. Orchestrator reviewed the diff: additive only (one stale comment removed). Flagged to the author.
+- Decisions: deterministic first-fail via discovery-order submits; Retry reuses stored answers (no second AI call); retry route waits for the 1.2 s simulated send. Pending: `apps/web/src/pages/PlaceholderPage.tsx` unused (deletion needs approval); a crash during the `applying` stage leaves jobs in `applying` (interrupted recovery only fails the Run). Browser check pending.
+- 2026-10-06 follow-up (author asked): startup recovery now also fails the interrupted Run's unfinished jobs (`queued`/`evaluating`/`applying` → `failed: interrupted`, counted in `funnel.failed`); new edge `queued → failed` (recovery only); interrupted jobs are not retryable. Test added in `recover-interrupted-runs.test.ts`. `PlaceholderPage.tsx` deleted (author approved). Still open: a Retry interrupted by a restart after its Run completed stays `applying` (recovery only looks at active Runs).
+- 2026-10-06 final audit + fix pass (merged `e7aee7e` via fix-pass): fix pass: `retrySubmit` now goes through `apiFetch` (a 401 signs out); a successful Retry opens the payload dialog (D19 "Retry shows the payload"); startup recovery also fails a Retry cut off after its Run completed (last 5 Runs checked). The e2e (ticket 16) covers this ticket's browser path.

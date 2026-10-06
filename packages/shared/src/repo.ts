@@ -9,11 +9,15 @@
  * friends — live in `contract.ts` because those *do* travel to the browser.
  */
 import type {
+  CriterionEvidence,
   Evaluation,
   EvaluationStatus,
+  MissingField,
   Run,
   RunFunnel,
   RunStatus,
+  ScoredBy,
+  SimulatedSubmission,
   UserDoc,
   Verdict,
 } from "./contract.js";
@@ -31,7 +35,8 @@ export type SubscriptionErrorHandler = (error: Error) => void;
 
 /**
  * A forward-only patch to a Run. `funnelIncrements` are *added* to the current
- * counts — never an overwrite — so the Firestore adapter can map them to
+ * counts — never an overwrite; a negative one moves a count, as Retry moves a
+ * job from `failed` to `submitted` (D19) — so the Firestore adapter can map them to
  * `FieldValue.increment` (CODING_STANDARDS landmine: lost updates). `updatedAt`
  * is set by the adapter, not the caller.
  */
@@ -47,6 +52,24 @@ export interface EvaluationDelta {
   verdict?: Verdict | null;
   score?: number | null;
   reason?: string | null;
+  /** Replaces the whole evidence list; it is written once, when the Posting is scored. */
+  evidence?: CriterionEvidence[];
+  scoredBy?: ScoredBy | null;
+  /** Replaces the whole list; written when a Posting is held as `needs_you` (D11). */
+  missingFields?: MissingField[];
+  /** Replaces the stored simulated submission (D18); written on every submit attempt. */
+  submission?: SimulatedSubmission | null;
+}
+
+/** The editable parts of the user document; the uid is never rewritten. */
+export type UserUpdate = Pick<UserDoc, "profile" | "preferences" | "settings">;
+
+/** Thrown by `updateUser` when the user document does not exist. */
+export class UserMissingError extends Error {
+  constructor(readonly uid: string) {
+    super(`no user document for ${uid}`);
+    this.name = "UserMissingError";
+  }
 }
 
 /** Mirrors a Firestore collection change: how an Evaluation entered the stream. */
@@ -85,15 +108,25 @@ export interface Repo {
   getUser(uid: string): Promise<UserDoc | null>;
   /** Seeds the user on first boot (D13); a no-op if the document already exists. */
   seedUserIfMissing(uid: string, doc: UserDoc): Promise<void>;
+  /**
+   * Replaces the profile, preferences and settings of an existing user whole
+   * (ticket 17); rejects with {@link UserMissingError} and creates nothing
+   * when there is no document, so an edit can never stand in for the seed.
+   */
+  updateUser(uid: string, update: UserUpdate): Promise<void>;
 
   /** Creates a Run; rejects with {@link ActiveRunExistsError} if one is active (D17). */
   createRun(run: Run): Promise<void>;
   getRun(runId: string): Promise<Run | null>;
   getActiveRun(uid: string): Promise<Run | null>;
   patchRun(runId: string, delta: RunDelta): Promise<void>;
+  /** The user's Runs, newest first (by `createdAt`); for the Scanned jobs view. */
+  listRuns(uid: string): Promise<Run[]>;
 
   putEvaluation(runId: string, evaluation: Evaluation): Promise<void>;
   patchEvaluation(runId: string, jobKey: string, delta: EvaluationDelta): Promise<void>;
+  /** A Run's Evaluations in the order they were added (by `createdAt`); `[]` for an unknown Run. */
+  listEvaluations(runId: string): Promise<Evaluation[]>;
 
   /** Seen spans Runs so dedupe survives across them (GLOSSARY: Seen, D15). */
   isSeen(jobKey: string): Promise<boolean>;

@@ -1,0 +1,421 @@
+{
+  "jobs": [
+    {
+      "absolute_url": "https://instacart.careers/job/?gh_jid=7927378",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": false,
+          "requires_processing_consent": false,
+          "requires_retention_consent": false,
+          "retention_period": null,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "internal_job_id": 3445258,
+      "location": {
+        "name": "Canada - Remote (ON, AB, BC, or NS Only)"
+      },
+      "metadata": [
+        {
+          "id": 16452,
+          "name": "Employment Type",
+          "value": "Regular",
+          "value_type": "single_select"
+        },
+        {
+          "id": 740030,
+          "name": "Exemption Status",
+          "value": "Exempt",
+          "value_type": "single_select"
+        },
+        {
+          "id": 235666,
+          "name": "Time Type",
+          "value": "Full time",
+          "value_type": "single_select"
+        }
+      ],
+      "id": 7927378,
+      "updated_at": "2026-09-11T11:22:23-04:00",
+      "requisition_id": "R018591",
+      "title": "Engineering Manager, Catalog ",
+      "company_name": "Instacart",
+      "first_published": "2026-05-14T16:59:00-04:00",
+      "language": "en",
+      "application_deadline": null,
+      "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;&lt;strong&gt;We&#39;re transforming the grocery industry&lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;&lt;span class=&quot;im&quot;&gt;At Instacart, we invite the world to share love through food because we believe everyone should have access to the food they love and more time to enjoy it together. Where others see a simple need for grocery delivery, we see exciting complexity and endless opportunity to serve the varied needs of our community. We work to deliver an essential service that customers rely on to get their groceries and household goods, while also offering safe and flexible earnings opportunities to Instacart Personal Shoppers.&lt;/span&gt;&lt;/p&gt;\n&lt;p&gt;Instacart has become a lifeline for millions of people, and we’re building the team to help push our shopping cart forward. If you’re ready to do the best work of your life, come join our table.&lt;/p&gt;\n&lt;p&gt;&lt;strong&gt;Instacart is a Flex First team &lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;There’s no one-size fits all approach to how we do our best work. Our employees have the flexibility to choose where they do their best work—whether it’s from home, an office, or your favorite coffee shop—while staying connected and building community through regular in-person events. &lt;a href=&quot;https://www.instacart.careers/flex-first&quot; target=&quot;_blank&quot; data-saferedirecturl=&quot;https://www.google.com/url?q=https://instacart.careers/remote/&amp;amp;source=gmail&amp;amp;ust=1651869232122000&amp;amp;usg=AOvVaw37OlxP8hAKN7nq4YwHQH7e&quot;&gt;Learn more about our flexible approach to where we work.&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;&lt;strong&gt;Overview&lt;/strong&gt;&lt;/h2&gt;\n&lt;p&gt;Instacart is the North American leader in online grocery, and we’re building the operating system for the grocery industry so people can access the food they love and more time to enjoy it together.&lt;/p&gt;\n&lt;p&gt;We’re looking for an Engineering Manager to lead our Catalog Enrichment team. This team builds the AI-native platform and pipelines that create, enrich, and maintain product attributes across a catalog of tens of millions of products&amp;nbsp; from more than 100,000 retailer locations. Catalog data is the foundation of our marketplace: when attributes are complete and accurate, search returns the right results, recommendations feel personal, and advertisers can target with confidence.&lt;/p&gt;\n&lt;p&gt;In this role, you’ll lead a team of engineers building systems that blend large language models, classical inference, workflow orchestration, and human review into configurable pipelines that non-engineers can run. You’ll also own the ML-facing interfaces to catalog data, including policies that govern how attributes are sourced, shared, and licensed across downstream models and customer surfaces. You will partner closely with ML, product, operations, search, ads, and retailer teams to drive measurable impact across Instacart’s ecosystem.&amp;nbsp;&lt;/p&gt;\n&lt;h2&gt;&lt;strong&gt;About the Job&lt;/strong&gt;&lt;/h2&gt;\n&lt;p&gt;This is a fast-paced, highly cross-functional environment. You’ll thrive if you enjoy building platforms at scale, turning ambiguity into clarity, and mentoring engineers while rolling up your sleeves on hard technical problems.&lt;/p&gt;\n&lt;ul&gt;\n&lt;li&gt;Lead, mentor, and grow a team of engineers who build the platform, pipelines, and interfaces that power catalog enrichment and ML access to catalog data.&lt;/li&gt;\n&lt;li&gt;Define and execute the technical roadmap, balancing new platform investments with reliability, observability, and developer experience for a growing user base.&lt;/li&gt;\n&lt;li&gt;Build and operate an AI-native enrichment platform that blends LLMs, classical ML, rules, workflow orchestration, and human review into pipelines non-engineers can configure and run.&lt;/li&gt;\n&lt;li&gt;Drive the evolution toward autonomous pipeline construction, where users express goals in plain language and the system assembles, evaluates, and optimizes workflows.&lt;/li&gt;\n&lt;li&gt;Own the ML-facing catalog data layer, including canonical product metadata and the policy controls that separate internal model inputs from customer-facing use cases.&lt;/li&gt;\n&lt;li&gt;Partner with ML, search, ads, commerce, and retailer teams to streamline data flows end to end and remove integration friction.&lt;/li&gt;\n&lt;li&gt;Advocate for clear, human-readable controls for source prioritization, rights management, licensing, and compliance to ensure auditable governance.&lt;/li&gt;\n&lt;li&gt;Boost developer and operator productivity via AI-assisted integration testing, investigation tooling, and on-call automation; set and meet SLAs on core attributes and model usage.&lt;/li&gt;\n&lt;li&gt;Contribute hands-on to architecture discussions, design reviews, and code reviews, especially in new or exploratory areas.&lt;/li&gt;\n&lt;/ul&gt;\n&lt;h2&gt;&lt;strong&gt;About You&lt;/strong&gt;&lt;/h2&gt;\n&lt;h3&gt;Minimum Qualifications&lt;/h3&gt;\n&lt;ul&gt;\n&lt;li&gt;7+ years of software engineering experience, including 2+ years managing engineers as a people leader.&lt;/li&gt;\n&lt;li&gt;Experience leading teams that build and operate production data or ML platforms, including both batch and streaming components.&lt;/li&gt;\n&lt;li&gt;Strong foundation in distributed systems, data pipelines, and workflow orchestration, with demonstrated build/buy/partner decision-making.&lt;/li&gt;\n&lt;li&gt;Ownership of data quality, coverage, or compliance commitments, with examples of frameworks and processes used to meet them.&lt;/li&gt;\n&lt;li&gt;Excellent written and verbal communication skills, including the ability to translate complex technical work for diverse audiences.&lt;/li&gt;\n&lt;/ul&gt;\n&lt;h3&gt;Preferred Qualifications&lt;/h3&gt;\n&lt;ul&gt;\n&lt;li&gt;Experience with catalog, commerce, or product data platforms operating at large scale.&lt;/li&gt;\n&lt;li&gt;Hands-on experience with workflow orchestration systems (e.g., Temporal, Airflow, Flink) and running them in production.&lt;/li&gt;\n&lt;li&gt;Experience shipping applied AI/ML features in production and understanding trade-offs across LLMs, classical ML, deterministic rules, and human review.&lt;/li&gt;\n&lt;li&gt;Proven success partnering across ML, product, and operations to deliver outcomes that require alignment and shared goals.&lt;/li&gt;\n&lt;li&gt;Familiarity with data governance, rights management, and licensing controls in multi-stakeholder environments.&lt;/li&gt;\n&lt;li&gt;Experience building pipeline builders, low-code/no-code tooling, or internal platforms used by non-engineers.&lt;/li&gt;\n&lt;li&gt;Background in developer productivity tooling, including AI-assisted testing and investigation workflows.&lt;/li&gt;\n&lt;li&gt;Success operating in fast-growing environments where both the platform and team are evolving.&lt;/li&gt;\n&lt;/ul&gt;\n&lt;p&gt;#LI-Remote&lt;/p&gt;&lt;div class=&quot;content-pay-transparency&quot;&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;description&quot;&gt;&lt;p&gt;Instacart provides highly market-competitive compensation and benefits in each location where our employees work. This role is remote and the base pay range for a successful candidate is dependent on their permanent work location. Please review our Flex First remote work policy &lt;a href=&quot;https://instacart.careers/flex-first/&quot;&gt;here&lt;/a&gt;. Currently, we are only hiring in the following provinces: Ontario, Alberta, British Columbia, and Nova Scotia.&lt;/p&gt;\n&lt;p&gt;Offers may vary based on many factors, such as candidate experience and skills required for the role. Additionally, this role is eligible for a new hire equity grant as well as annual refresh grants. Please read more about our benefits offerings &lt;a href=&quot;https://instacart.careers/taste-of-instacart/&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;\n&lt;p&gt;For Canadian based candidates, the base pay ranges for a successful candidate are listed below.&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;title&quot;&gt;CAN&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$196,000&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$207,000 CAD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;",
+      "departments": [
+        {
+          "id": 51084,
+          "name": "Leadership (Engineering)",
+          "child_ids": [],
+          "parent_id": 4132
+        }
+      ],
+      "offices": [
+        {
+          "id": 88202,
+          "name": "Remote - Canada",
+          "location": null,
+          "child_ids": [],
+          "parent_id": 88198
+        }
+      ],
+      "ai_disclaimer": "<p>Instacart (Maplebear Inc. d/b/a Instacart) uses Greenhouse's Real Talent technology as part of our hiring process. Select \"Learn more\" for information on how these tools work, what data is involved, and your rights.&nbsp;</p>",
+      "include_ai_disclaimer": false,
+      "ai_opt_out_request_url": "http://app.greenhouse.io/ai_opt_out_request/job_post/7927378/ai_opt_out"
+    },
+    {
+      "absolute_url": "https://instacart.careers/job/?gh_jid=7960988",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": false,
+          "requires_processing_consent": false,
+          "requires_retention_consent": false,
+          "retention_period": null,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "internal_job_id": 3456543,
+      "location": {
+        "name": "Canada - Remote (ON, AB, BC, or NS Only)"
+      },
+      "metadata": [
+        {
+          "id": 16452,
+          "name": "Employment Type",
+          "value": "Regular",
+          "value_type": "single_select"
+        },
+        {
+          "id": 740030,
+          "name": "Exemption Status",
+          "value": "Exempt",
+          "value_type": "single_select"
+        },
+        {
+          "id": 235666,
+          "name": "Time Type",
+          "value": "Full time",
+          "value_type": "single_select"
+        }
+      ],
+      "id": 7960988,
+      "updated_at": "2026-08-24T13:15:00-04:00",
+      "requisition_id": "R018601",
+      "title": "Engineering Manager, Service Platform",
+      "company_name": "Instacart",
+      "first_published": "2026-05-27T13:27:59-04:00",
+      "language": "en",
+      "application_deadline": null,
+      "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;&lt;strong&gt;We&#39;re transforming the grocery industry&lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;&lt;span class=&quot;im&quot;&gt;At Instacart, we invite the world to share love through food because we believe everyone should have access to the food they love and more time to enjoy it together. Where others see a simple need for grocery delivery, we see exciting complexity and endless opportunity to serve the varied needs of our community. We work to deliver an essential service that customers rely on to get their groceries and household goods, while also offering safe and flexible earnings opportunities to Instacart Personal Shoppers.&lt;/span&gt;&lt;/p&gt;\n&lt;p&gt;Instacart has become a lifeline for millions of people, and we’re building the team to help push our shopping cart forward. If you’re ready to do the best work of your life, come join our table.&lt;/p&gt;\n&lt;p&gt;&lt;strong&gt;Instacart is a Flex First team &lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;There’s no one-size fits all approach to how we do our best work. Our employees have the flexibility to choose where they do their best work—whether it’s from home, an office, or your favorite coffee shop—while staying connected and building community through regular in-person events. &lt;a href=&quot;https://www.instacart.careers/flex-first&quot; target=&quot;_blank&quot; data-saferedirecturl=&quot;https://www.google.com/url?q=https://instacart.careers/remote/&amp;amp;source=gmail&amp;amp;ust=1651869232122000&amp;amp;usg=AOvVaw37OlxP8hAKN7nq4YwHQH7e&quot;&gt;Learn more about our flexible approach to where we work.&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;&lt;strong&gt;Overview&lt;/strong&gt;&lt;/h2&gt;\n&lt;p&gt;As the Engineering Manager for the Service Platform team, you will lead the group responsible for Instacart’s core deployment and release engineering systems, including our canary infrastructure and end‑to‑end deployment tooling. This platform is foundational to the reliability of every service at Instacart, and your work will directly shape how developers safely, confidently, and efficiently ship code. You will partner closely with product, infrastructure, and service teams to define and evolve a platform that enables fast iteration without compromising reliability.&amp;nbsp;&lt;/p&gt;\n&lt;p&gt;We are looking for a product-focused engineering manager with a strong interest in developer experience and internal tools, who can guide the team in building intuitive, scalable, and highly resilient systems. You will set the vision, drive execution, and ensure that Instacart engineers have world‑class tools to deploy, validate, and monitor their services.&lt;/p&gt;\n&lt;p&gt;At Instacart, the Service Platform team is a critical enabler for every engineering organization across the company. From owning our deployment pipeline and canary systems to defining the tooling that powers safe, reliable service delivery, our team ensures that developers can ship with confidence. We take pride in deep ownership, a strong product mindset, and a highly collaborative culture. You will work closely with experienced engineers and leaders across Instacart to drive key reliability and platform initiatives end to end. Our work directly shapes the stability, velocity, and success of Instacart’s overall platform.&lt;/p&gt;\n&lt;h2&gt;&lt;strong&gt;About the Job&amp;nbsp;&lt;/strong&gt;&lt;/h2&gt;\n&lt;ul&gt;\n&lt;li&gt;Product focused leader who is able to adapt to critically fast paced environment&lt;/li&gt;\n&lt;li&gt;Ability to lead both product and critical reliability systems like Temporal/Canary/Deployments&lt;/li&gt;\n&lt;li&gt;Ability to articulate and convey priorities and balance constant needs around the organization&lt;/li&gt;\n&lt;li&gt;Ability to manage cross-cutting stakeholder relationships, prioritizing customer needs first&lt;/li&gt;\n&lt;li&gt;Eager to navigate ambiguous, hairy, and technical problem spaces and fully understand our deployment infra end to end&lt;/li&gt;\n&lt;li&gt;Leader by example, and strong incident triaging mindset&lt;/li&gt;\n&lt;li&gt;Eager to jump into domains, languages, and problem areas that might be new and unfamiliar&lt;/li&gt;\n&lt;/ul&gt;\n&lt;p&gt;&amp;nbsp;&lt;/p&gt;\n&lt;h2&gt;&lt;strong&gt;About You&lt;/strong&gt;&lt;/h2&gt;\n&lt;p&gt;&lt;strong&gt;&lt;em&gt;Minimum Qualifications&lt;/em&gt;&lt;/strong&gt;&lt;/p&gt;\n&lt;ul&gt;\n&lt;li&gt;Bachelor’s degree in Computer Science, a related field, or equivalent practical experience&lt;/li&gt;\n&lt;li&gt;2+ years of experience of leading and managing people with an emphasis on getting deep into details on designing, analyzing, and troubleshooting large-scale distributed systems.&lt;/li&gt;\n&lt;li&gt;7+ years of experience with software development in one or more programming languages&lt;/li&gt;\n&lt;li&gt;Proven track record of launching and shipping high-impact products; bonus points for internal, developer facing products.&lt;/li&gt;\n&lt;li&gt;Strong proficiency in maintaining high standards for production services&lt;/li&gt;\n&lt;/ul&gt;\n&lt;p&gt;&lt;strong&gt;&lt;em&gt;Preferred Qualifications&lt;/em&gt;&lt;/strong&gt;&lt;/p&gt;\n&lt;ul&gt;\n&lt;li&gt;Strong communication skills and ability to contextualize problems across various audiences&lt;/li&gt;\n&lt;li&gt;Skilled at navigating ambiguity and involving the right stakeholders to address issues efficiently&lt;/li&gt;\n&lt;li&gt;Experience building and shipping products to users&amp;nbsp;&lt;/li&gt;\n&lt;li&gt;Expertise&amp;nbsp; building platforms and high scale infrastructure&lt;/li&gt;\n&lt;li&gt;Visionary thinker capable of generating transformative ideas&lt;/li&gt;\n&lt;/ul&gt;\n&lt;p class=&quot;p1&quot;&gt;#LI-Remote&lt;/p&gt;&lt;div class=&quot;content-pay-transparency&quot;&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;description&quot;&gt;&lt;p&gt;Instacart provides highly market-competitive compensation and benefits in each location where our employees work. This role is remote and the base pay range for a successful candidate is dependent on their permanent work location. Please review our Flex First remote work policy &lt;a href=&quot;https://instacart.careers/flex-first/&quot;&gt;here&lt;/a&gt;. Currently, we are only hiring in the following provinces: Ontario, Alberta, British Columbia, and Nova Scotia.&lt;/p&gt;\n&lt;p&gt;Offers may vary based on many factors, such as candidate experience and skills required for the role. Additionally, this role is eligible for a new hire equity grant as well as annual refresh grants. Please read more about our benefits offerings &lt;a href=&quot;https://instacart.careers/taste-of-instacart/&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;\n&lt;p&gt;For Canadian based candidates, the base pay ranges for a successful candidate are listed below.&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;title&quot;&gt;CAN&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$196,000&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$207,000 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;",
+      "departments": [
+        {
+          "id": 51084,
+          "name": "Leadership (Engineering)",
+          "child_ids": [],
+          "parent_id": 4132
+        }
+      ],
+      "offices": [
+        {
+          "id": 59835,
+          "name": "Remote - United States",
+          "location": null,
+          "child_ids": [],
+          "parent_id": 88197
+        }
+      ],
+      "ai_disclaimer": "<p>Instacart (Maplebear Inc. d/b/a Instacart) uses Greenhouse's Real Talent technology as part of our hiring process. Select \"Learn more\" for information on how these tools work, what data is involved, and your rights.&nbsp;</p>",
+      "include_ai_disclaimer": false,
+      "ai_opt_out_request_url": "http://app.greenhouse.io/ai_opt_out_request/job_post/7960988/ai_opt_out"
+    },
+    {
+      "absolute_url": "https://instacart.careers/job/?gh_jid=7960958",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": false,
+          "requires_processing_consent": false,
+          "requires_retention_consent": false,
+          "retention_period": null,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "education": "education_optional",
+      "internal_job_id": 3456543,
+      "location": {
+        "name": "United States - Remote"
+      },
+      "metadata": [
+        {
+          "id": 16452,
+          "name": "Employment Type",
+          "value": "Regular",
+          "value_type": "single_select"
+        },
+        {
+          "id": 740030,
+          "name": "Exemption Status",
+          "value": "Exempt",
+          "value_type": "single_select"
+        },
+        {
+          "id": 235666,
+          "name": "Time Type",
+          "value": "Full time",
+          "value_type": "single_select"
+        }
+      ],
+      "id": 7960958,
+      "updated_at": "2026-08-24T13:15:00-04:00",
+      "requisition_id": "R018601",
+      "title": "Engineering Manager, Service Platform",
+      "company_name": "Instacart",
+      "first_published": "2026-05-27T13:27:57-04:00",
+      "language": "en",
+      "application_deadline": null,
+      "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;&lt;strong&gt;We&#39;re transforming the grocery industry&lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;&lt;span class=&quot;im&quot;&gt;At Instacart, we invite the world to share love through food because we believe everyone should have access to the food they love and more time to enjoy it together. Where others see a simple need for grocery delivery, we see exciting complexity and endless opportunity to serve the varied needs of our community. We work to deliver an essential service that customers rely on to get their groceries and household goods, while also offering safe and flexible earnings opportunities to Instacart Personal Shoppers.&lt;/span&gt;&lt;/p&gt;\n&lt;p&gt;Instacart has become a lifeline for millions of people, and we’re building the team to help push our shopping cart forward. If you’re ready to do the best work of your life, come join our table.&lt;/p&gt;\n&lt;p&gt;&lt;strong&gt;Instacart is a Flex First team &lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;There’s no one-size fits all approach to how we do our best work. Our employees have the flexibility to choose where they do their best work—whether it’s from home, an office, or your favorite coffee shop—while staying connected and building community through regular in-person events. &lt;a href=&quot;https://www.instacart.careers/flex-first&quot; target=&quot;_blank&quot; data-saferedirecturl=&quot;https://www.google.com/url?q=https://instacart.careers/remote/&amp;amp;source=gmail&amp;amp;ust=1651869232122000&amp;amp;usg=AOvVaw37OlxP8hAKN7nq4YwHQH7e&quot;&gt;Learn more about our flexible approach to where we work.&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;&lt;strong&gt;Overview&lt;/strong&gt;&lt;/h2&gt;\n&lt;p&gt;As the Engineering Manager for the Service Platform team, you will lead the group responsible for Instacart’s core deployment and release engineering systems, including our canary infrastructure and end‑to‑end deployment tooling. This platform is foundational to the reliability of every service at Instacart, and your work will directly shape how developers safely, confidently, and efficiently ship code. You will partner closely with product, infrastructure, and service teams to define and evolve a platform that enables fast iteration without compromising reliability.&amp;nbsp;&lt;/p&gt;\n&lt;p&gt;We are looking for a product-focused engineering manager with a strong interest in developer experience and internal tools, who can guide the team in building intuitive, scalable, and highly resilient systems. You will set the vision, drive execution, and ensure that Instacart engineers have world‑class tools to deploy, validate, and monitor their services.&lt;/p&gt;\n&lt;p&gt;At Instacart, the Service Platform team is a critical enabler for every engineering organization across the company. From owning our deployment pipeline and canary systems to defining the tooling that powers safe, reliable service delivery, our team ensures that developers can ship with confidence. We take pride in deep ownership, a strong product mindset, and a highly collaborative culture. You will work closely with experienced engineers and leaders across Instacart to drive key reliability and platform initiatives end to end. Our work directly shapes the stability, velocity, and success of Instacart’s overall platform.&lt;/p&gt;\n&lt;h2&gt;&lt;strong&gt;About the Job&amp;nbsp;&lt;/strong&gt;&lt;/h2&gt;\n&lt;ul&gt;\n&lt;li&gt;Product focused leader who is able to adapt to critically fast paced environment&lt;/li&gt;\n&lt;li&gt;Ability to lead both product and critical reliability systems like Temporal/Canary/Deployments&lt;/li&gt;\n&lt;li&gt;Ability to articulate and convey priorities and balance constant needs around the organization&lt;/li&gt;\n&lt;li&gt;Ability to manage cross-cutting stakeholder relationships, prioritizing customer needs first&lt;/li&gt;\n&lt;li&gt;Eager to navigate ambiguous, hairy, and technical problem spaces and fully understand our deployment infra end to end&lt;/li&gt;\n&lt;li&gt;Leader by example, and strong incident triaging mindset&lt;/li&gt;\n&lt;li&gt;Eager to jump into domains, languages, and problem areas that might be new and unfamiliar&lt;/li&gt;\n&lt;/ul&gt;\n&lt;h2&gt;&lt;strong&gt;About You&lt;/strong&gt;&lt;/h2&gt;\n&lt;p&gt;&lt;strong&gt;&lt;em&gt;Minimum Qualifications&lt;/em&gt;&lt;/strong&gt;&lt;/p&gt;\n&lt;ul&gt;\n&lt;li&gt;Bachelor’s degree in Computer Science, a related field, or equivalent practical experience&lt;/li&gt;\n&lt;li&gt;2+ years of experience of leading and managing people with an emphasis on getting deep into details on designing, analyzing, and troubleshooting large-scale distributed systems.&lt;/li&gt;\n&lt;li&gt;7+ years of experience with software development in one or more programming languages&lt;/li&gt;\n&lt;li&gt;Proven track record of launching and shipping high-impact products; bonus points for internal, developer facing products.&lt;/li&gt;\n&lt;li&gt;Strong proficiency in maintaining high standards for production services&lt;/li&gt;\n&lt;/ul&gt;\n&lt;p&gt;&lt;strong&gt;&lt;em&gt;Preferred Qualifications&lt;/em&gt;&lt;/strong&gt;&lt;/p&gt;\n&lt;ul&gt;\n&lt;li&gt;Strong communication skills and ability to contextualize problems across various audiences&lt;/li&gt;\n&lt;li&gt;Skilled at navigating ambiguity and involving the right stakeholders to address issues efficiently&lt;/li&gt;\n&lt;li&gt;Experience building and shipping products to users&amp;nbsp;&lt;/li&gt;\n&lt;li&gt;Expertise&amp;nbsp; building platforms and high scale infrastructure&lt;/li&gt;\n&lt;li&gt;Visionary thinker capable of generating transformative ideas&lt;/li&gt;\n&lt;/ul&gt;\n&lt;p class=&quot;p1&quot;&gt;#LI-Remote&lt;/p&gt;&lt;div class=&quot;content-pay-transparency&quot;&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;description&quot;&gt;&lt;p&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;Instacart provides highly market-competitive compensation and benefits in each location where our employees work. This role is remote and the base pay range for a successful candidate is dependent on their permanent work location. Please review our Flex First remote work policy &lt;/span&gt;&lt;a href=&quot;https://instacart.careers/flex-first/&quot; target=&quot;_blank&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;\n&lt;p&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;Offers may vary based on many factors, such as candidate experience and skills required for the role. &lt;/span&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;Additionally, this role is eligible for a new hire equity grant as well as annual refresh grants. Please rea&lt;/span&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;d more about our benefits offerings &lt;/span&gt;&lt;a href=&quot;https://instacart.careers/taste-of-instacart/&quot; target=&quot;_blank&quot;&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;here&lt;/span&gt;&lt;/a&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;. &lt;br&gt;&lt;br&gt;&lt;/span&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;For US based candidates, the base pay ranges for a successful candidate are listed below.&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;title&quot;&gt;CA, NY, CT, NJ&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$230,000&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$242,500 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;title&quot;&gt;WA&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$220,000&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$232,000 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;title&quot;&gt;OR, DE, ME, MA, MD, NH, RI, VT, DC, PA, VA, CO, TX, IL, HI&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$211,000&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$222,500 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;title&quot;&gt;All other states&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$192,000&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$202,500 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;",
+      "departments": [
+        {
+          "id": 51084,
+          "name": "Leadership (Engineering)",
+          "child_ids": [],
+          "parent_id": 4132
+        }
+      ],
+      "offices": [
+        {
+          "id": 59835,
+          "name": "Remote - United States",
+          "location": null,
+          "child_ids": [],
+          "parent_id": 88197
+        }
+      ],
+      "ai_disclaimer": "<p>Instacart (Maplebear Inc. d/b/a Instacart) uses Greenhouse's Real Talent technology as part of our hiring process. Select \"Learn more\" for information on how these tools work, what data is involved, and your rights.&nbsp;</p>",
+      "include_ai_disclaimer": false,
+      "ai_opt_out_request_url": "http://app.greenhouse.io/ai_opt_out_request/job_post/7960958/ai_opt_out"
+    },
+    {
+      "absolute_url": "https://instacart.careers/job/?gh_jid=8246076",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": false,
+          "requires_processing_consent": false,
+          "requires_retention_consent": false,
+          "retention_period": null,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "education": "education_optional",
+      "internal_job_id": 3567813,
+      "location": {
+        "name": "Canada - Remote (ON, AB, BC, or NS Only)"
+      },
+      "metadata": [
+        {
+          "id": 16452,
+          "name": "Employment Type",
+          "value": "Regular",
+          "value_type": "single_select"
+        },
+        {
+          "id": 740030,
+          "name": "Exemption Status",
+          "value": "Exempt",
+          "value_type": "single_select"
+        },
+        {
+          "id": 235666,
+          "name": "Time Type",
+          "value": "Full time",
+          "value_type": "single_select"
+        }
+      ],
+      "id": 8246076,
+      "updated_at": "2026-10-01T11:40:06-04:00",
+      "requisition_id": "PR00100",
+      "title": "Engineering Manager, Site Reliability",
+      "company_name": "Instacart",
+      "first_published": "2026-10-01T11:40:06-04:00",
+      "language": "en",
+      "application_deadline": null,
+      "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;&lt;strong&gt;We&#39;re transforming the grocery industry&lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;&lt;span class=&quot;im&quot;&gt;At Instacart, we invite the world to share love through food because we believe everyone should have access to the food they love and more time to enjoy it together. Where others see a simple need for grocery delivery, we see exciting complexity and endless opportunity to serve the varied needs of our community. We work to deliver an essential service that customers rely on to get their groceries and household goods, while also offering safe and flexible earnings opportunities to Instacart Personal Shoppers.&lt;/span&gt;&lt;/p&gt;\n&lt;p&gt;Instacart has become a lifeline for millions of people, and we’re building the team to help push our shopping cart forward. If you’re ready to do the best work of your life, come join our table.&lt;/p&gt;\n&lt;p&gt;&lt;strong&gt;Instacart is a Flex First team &lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;There’s no one-size fits all approach to how we do our best work. Our employees have the flexibility to choose where they do their best work—whether it’s from home, an office, or your favorite coffee shop—while staying connected and building community through regular in-person events. &lt;a href=&quot;https://www.instacart.careers/flex-first&quot; target=&quot;_blank&quot; data-saferedirecturl=&quot;https://www.google.com/url?q=https://instacart.careers/remote/&amp;amp;source=gmail&amp;amp;ust=1651869232122000&amp;amp;usg=AOvVaw37OlxP8hAKN7nq4YwHQH7e&quot;&gt;Learn more about our flexible approach to where we work.&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;&lt;strong&gt;Overview&lt;/strong&gt;&lt;/h2&gt;\n&lt;p&gt;Instacart is transforming the grocery industry by building technology that connects customers, shoppers, retailers, and brands through a reliable, convenient online marketplace. The Site Reliability Engineering team helps ensure that this experience remains resilient, scalable, and dependable as Instacart grows.&lt;/p&gt;\n&lt;p&gt;We are seeking an Engineering Manager to lead a team of Site Reliability Engineers responsible for the systems, tools, and practices that support the reliability of Instacart’s technology platform. In this role, you will manage and develop a team of engineers while partnering closely with engineering teams across the company to improve availability, scalability, performance, observability, and operational excellence.&lt;/p&gt;\n&lt;p&gt;This is an opportunity to shape the future of reliability at significant scale. You will help establish sound engineering practices, guide complex technical initiatives, and create an environment where teams can build and operate dependable systems. The role is well suited for a collaborative, hands-on people leader who is energized by complex problems, thrives in a fast-changing environment, and is motivated by helping others do their best work.&lt;/p&gt;\n&lt;h2&gt;&lt;strong&gt;About the Job&lt;/strong&gt;&lt;/h2&gt;\n&lt;ul&gt;\n&lt;li&gt;Lead, mentor, and develop a team of Site Reliability Engineers, establishing clear goals, providing actionable feedback, and supporting career growth and professional development.&lt;/li&gt;\n&lt;li&gt;Set the team’s technical direction and priorities for improving the reliability, scalability, availability, performance, and operational readiness of Instacart’s systems.&lt;/li&gt;\n&lt;li&gt;Partner with engineering, product, security, infrastructure, and other cross-functional teams to define reliability standards, influence system design, and deliver initiatives that improve the customer and developer experience.&lt;/li&gt;\n&lt;li&gt;Drive incident management and operational excellence, including incident response, post-incident learning, service-level objectives, capacity planning, observability, and continuous risk reduction.&lt;/li&gt;\n&lt;li&gt;Promote automation and self-service tooling that reduce operational toil, improve deployment confidence, and enable engineering teams to own and operate their services effectively.&lt;/li&gt;\n&lt;li&gt;Balance near-term operational needs with long-term investments, making thoughtful tradeoffs in a high-growth environment where priorities and requirements can change quickly.&lt;/li&gt;\n&lt;li&gt;Communicate clearly with technical and non-technical stakeholders, bringing transparency to reliability risks, project status, tradeoffs, and decisions.&lt;/li&gt;\n&lt;/ul&gt;\n&lt;p&gt;This role requires comfort with ambiguity and a willingness to engage directly with challenging operational and organizational problems. You will be expected to make decisions with incomplete information, respond calmly during incidents, and help teams learn from failure without assigning blame. Success will require both strong people leadership and enough technical depth to ask the right questions, evaluate tradeoffs, and guide effective solutions.&lt;/p&gt;\n&lt;h2&gt;&lt;strong&gt;About You&lt;/strong&gt;&lt;/h2&gt;\n&lt;h3&gt;Minimum Qualifications&lt;/h3&gt;\n&lt;ul&gt;\n&lt;li&gt;Bachelor’s degree in Computer Science, Engineering, or a related technical field, or equivalent practical experience.&lt;/li&gt;\n&lt;li&gt;Seven or more years of experience in software engineering, infrastructure engineering, Site Reliability Engineering, or a related field.&lt;/li&gt;\n&lt;li&gt;Two or more years of experience managing, mentoring, or leading engineering teams.&lt;/li&gt;\n&lt;li&gt;Professional experience with cloud infrastructure, distributed systems, networking, containers, orchestration platforms, or related production technologies.&lt;/li&gt;\n&lt;li&gt;Experience leading or participating in production incident response, post-incident reviews, reliability improvement initiatives, and operational readiness practices.&lt;/li&gt;\n&lt;li&gt;Experience communicating technical risks, priorities, and tradeoffs to engineering leaders and cross-functional stakeholders.&lt;/li&gt;\n&lt;/ul&gt;\n&lt;h3&gt;Preferred Qualifications&lt;/h3&gt;\n&lt;ul&gt;\n&lt;li&gt;Experience leading Site Reliability Engineering, platform engineering, infrastructure engineering, or developer productivity teams.&lt;/li&gt;\n&lt;li&gt;Experience operating highly available services at significant scale and improving service-level objectives, observability, capacity, or disaster recovery capabilities.&lt;/li&gt;\n&lt;li&gt;Experience with infrastructure as code, continuous delivery, monitoring, logging, tracing, and automated remediation.&lt;/li&gt;\n&lt;li&gt;Experience building or evolving reliability programs across multiple engineering teams, including shared standards, operational reviews, and service ownership practices.&lt;/li&gt;\n&lt;li&gt;Demonstrated ability to create alignment across teams, navigate ambiguity, and turn complex technical challenges into clear, achievable plans.&lt;/li&gt;\n&lt;li&gt;A leadership approach grounded in empathy, transparency, direct communication, collaboration, and a commitment to inclusive team development.&lt;/li&gt;\n&lt;/ul&gt;\n&lt;p&gt;Instacart is a remote-first organization with team members working across the United States and Canada. This role is especially well suited to candidates based on the West Coast, while applicants in other eligible locations may also be considered.&lt;/p&gt;\n&lt;p&gt;#LI-Remote&lt;/p&gt;\n&lt;p&gt;&lt;br&gt;&lt;br&gt;&lt;/p&gt;&lt;div class=&quot;content-pay-transparency&quot;&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;description&quot;&gt;&lt;p&gt;Instacart provides highly market-competitive compensation and benefits in each location where our employees work. This role is remote and the base pay range for a successful candidate is dependent on their permanent work location. Please review our Flex First remote work policy &lt;a href=&quot;https://instacart.careers/flex-first/&quot;&gt;here&lt;/a&gt;. Currently, we are only hiring in the following provinces: Ontario, Alberta, British Columbia, and Nova Scotia.&lt;/p&gt;\n&lt;p&gt;Offers may vary based on many factors, such as candidate experience and skills required for the role. Additionally, this role is eligible for a new hire equity grant as well as annual refresh grants. Please read more about our benefits offerings &lt;a href=&quot;https://instacart.careers/taste-of-instacart/&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;\n&lt;p&gt;For Canadian based candidates, the base pay ranges for a successful candidate are listed below.&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;title&quot;&gt;CAN&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$183,000&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$193,000 CAD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;",
+      "departments": [
+        {
+          "id": 51084,
+          "name": "Leadership (Engineering)",
+          "child_ids": [],
+          "parent_id": 4132
+        }
+      ],
+      "offices": [
+        {
+          "id": 88202,
+          "name": "Remote - Canada",
+          "location": null,
+          "child_ids": [],
+          "parent_id": 88198
+        },
+        {
+          "id": 59835,
+          "name": "Remote - United States",
+          "location": null,
+          "child_ids": [],
+          "parent_id": 88197
+        }
+      ],
+      "ai_disclaimer": "<p>Instacart (Maplebear Inc. d/b/a Instacart) uses Greenhouse's Real Talent technology as part of our hiring process. Select \"Learn more\" for information on how these tools work, what data is involved, and your rights.&nbsp;</p>",
+      "include_ai_disclaimer": false,
+      "ai_opt_out_request_url": "http://app.greenhouse.io/ai_opt_out_request/job_post/8246076/ai_opt_out"
+    },
+    {
+      "absolute_url": "https://instacart.careers/job/?gh_jid=8246075",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": false,
+          "requires_processing_consent": false,
+          "requires_retention_consent": false,
+          "retention_period": null,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "education": "education_optional",
+      "internal_job_id": 3567813,
+      "location": {
+        "name": "United States - Remote"
+      },
+      "metadata": [
+        {
+          "id": 16452,
+          "name": "Employment Type",
+          "value": "Regular",
+          "value_type": "single_select"
+        },
+        {
+          "id": 740030,
+          "name": "Exemption Status",
+          "value": "Exempt",
+          "value_type": "single_select"
+        },
+        {
+          "id": 235666,
+          "name": "Time Type",
+          "value": "Full time",
+          "value_type": "single_select"
+        }
+      ],
+      "id": 8246075,
+      "updated_at": "2026-10-01T11:40:04-04:00",
+      "requisition_id": "PR00100",
+      "title": "Engineering Manager, Site Reliability",
+      "company_name": "Instacart",
+      "first_published": "2026-10-01T11:40:04-04:00",
+      "language": "en",
+      "application_deadline": null,
+      "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;&lt;strong&gt;We&#39;re transforming the grocery industry&lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;&lt;span class=&quot;im&quot;&gt;At Instacart, we invite the world to share love through food because we believe everyone should have access to the food they love and more time to enjoy it together. Where others see a simple need for grocery delivery, we see exciting complexity and endless opportunity to serve the varied needs of our community. We work to deliver an essential service that customers rely on to get their groceries and household goods, while also offering safe and flexible earnings opportunities to Instacart Personal Shoppers.&lt;/span&gt;&lt;/p&gt;\n&lt;p&gt;Instacart has become a lifeline for millions of people, and we’re building the team to help push our shopping cart forward. If you’re ready to do the best work of your life, come join our table.&lt;/p&gt;\n&lt;p&gt;&lt;strong&gt;Instacart is a Flex First team &lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;There’s no one-size fits all approach to how we do our best work. Our employees have the flexibility to choose where they do their best work—whether it’s from home, an office, or your favorite coffee shop—while staying connected and building community through regular in-person events. &lt;a href=&quot;https://www.instacart.careers/flex-first&quot; target=&quot;_blank&quot; data-saferedirecturl=&quot;https://www.google.com/url?q=https://instacart.careers/remote/&amp;amp;source=gmail&amp;amp;ust=1651869232122000&amp;amp;usg=AOvVaw37OlxP8hAKN7nq4YwHQH7e&quot;&gt;Learn more about our flexible approach to where we work.&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;&lt;strong&gt;Overview&lt;/strong&gt;&lt;/h2&gt;\n&lt;p&gt;Instacart is transforming the grocery industry by building technology that connects customers, shoppers, retailers, and brands through a reliable, convenient online marketplace. The Site Reliability Engineering team helps ensure that this experience remains resilient, scalable, and dependable as Instacart grows.&lt;/p&gt;\n&lt;p&gt;We are seeking an Engineering Manager to lead a team of Site Reliability Engineers responsible for the systems, tools, and practices that support the reliability of Instacart’s technology platform. In this role, you will manage and develop a team of engineers while partnering closely with engineering teams across the company to improve availability, scalability, performance, observability, and operational excellence.&lt;/p&gt;\n&lt;p&gt;This is an opportunity to shape the future of reliability at significant scale. You will help establish sound engineering practices, guide complex technical initiatives, and create an environment where teams can build and operate dependable systems. The role is well suited for a collaborative, hands-on people leader who is energized by complex problems, thrives in a fast-changing environment, and is motivated by helping others do their best work.&lt;/p&gt;\n&lt;h2&gt;&lt;strong&gt;About the Job&lt;/strong&gt;&lt;/h2&gt;\n&lt;ul&gt;\n&lt;li&gt;Lead, mentor, and develop a team of Site Reliability Engineers, establishing clear goals, providing actionable feedback, and supporting career growth and professional development.&lt;/li&gt;\n&lt;li&gt;Set the team’s technical direction and priorities for improving the reliability, scalability, availability, performance, and operational readiness of Instacart’s systems.&lt;/li&gt;\n&lt;li&gt;Partner with engineering, product, security, infrastructure, and other cross-functional teams to define reliability standards, influence system design, and deliver initiatives that improve the customer and developer experience.&lt;/li&gt;\n&lt;li&gt;Drive incident management and operational excellence, including incident response, post-incident learning, service-level objectives, capacity planning, observability, and continuous risk reduction.&lt;/li&gt;\n&lt;li&gt;Promote automation and self-service tooling that reduce operational toil, improve deployment confidence, and enable engineering teams to own and operate their services effectively.&lt;/li&gt;\n&lt;li&gt;Balance near-term operational needs with long-term investments, making thoughtful tradeoffs in a high-growth environment where priorities and requirements can change quickly.&lt;/li&gt;\n&lt;li&gt;Communicate clearly with technical and non-technical stakeholders, bringing transparency to reliability risks, project status, tradeoffs, and decisions.&lt;/li&gt;\n&lt;/ul&gt;\n&lt;p&gt;This role requires comfort with ambiguity and a willingness to engage directly with challenging operational and organizational problems. You will be expected to make decisions with incomplete information, respond calmly during incidents, and help teams learn from failure without assigning blame. Success will require both strong people leadership and enough technical depth to ask the right questions, evaluate tradeoffs, and guide effective solutions.&lt;/p&gt;\n&lt;h2&gt;&lt;strong&gt;About You&lt;/strong&gt;&lt;/h2&gt;\n&lt;h3&gt;Minimum Qualifications&lt;/h3&gt;\n&lt;ul&gt;\n&lt;li&gt;Bachelor’s degree in Computer Science, Engineering, or a related technical field, or equivalent practical experience.&lt;/li&gt;\n&lt;li&gt;Seven or more years of experience in software engineering, infrastructure engineering, Site Reliability Engineering, or a related field.&lt;/li&gt;\n&lt;li&gt;Two or more years of experience managing, mentoring, or leading engineering teams.&lt;/li&gt;\n&lt;li&gt;Professional experience with cloud infrastructure, distributed systems, networking, containers, orchestration platforms, or related production technologies.&lt;/li&gt;\n&lt;li&gt;Experience leading or participating in production incident response, post-incident reviews, reliability improvement initiatives, and operational readiness practices.&lt;/li&gt;\n&lt;li&gt;Experience communicating technical risks, priorities, and tradeoffs to engineering leaders and cross-functional stakeholders.&lt;/li&gt;\n&lt;/ul&gt;\n&lt;h3&gt;Preferred Qualifications&lt;/h3&gt;\n&lt;ul&gt;\n&lt;li&gt;Experience leading Site Reliability Engineering, platform engineering, infrastructure engineering, or developer productivity teams.&lt;/li&gt;\n&lt;li&gt;Experience operating highly available services at significant scale and improving service-level objectives, observability, capacity, or disaster recovery capabilities.&lt;/li&gt;\n&lt;li&gt;Experience with infrastructure as code, continuous delivery, monitoring, logging, tracing, and automated remediation.&lt;/li&gt;\n&lt;li&gt;Experience building or evolving reliability programs across multiple engineering teams, including shared standards, operational reviews, and service ownership practices.&lt;/li&gt;\n&lt;li&gt;Demonstrated ability to create alignment across teams, navigate ambiguity, and turn complex technical challenges into clear, achievable plans.&lt;/li&gt;\n&lt;li&gt;A leadership approach grounded in empathy, transparency, direct communication, collaboration, and a commitment to inclusive team development.&lt;/li&gt;\n&lt;/ul&gt;\n&lt;p&gt;Instacart is a remote-first organization with team members working across the United States and Canada. This role is especially well suited to candidates based on the West Coast, while applicants in other eligible locations may also be considered.&lt;/p&gt;\n&lt;p&gt;#LI-Remote&lt;br&gt;&lt;br&gt;&lt;/p&gt;&lt;div class=&quot;content-pay-transparency&quot;&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;description&quot;&gt;&lt;p&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;Instacart provides highly market-competitive compensation and benefits in each location where our employees work. This role is remote and the base pay range for a successful candidate is dependent on their permanent work location. Please review our Flex First remote work policy &lt;/span&gt;&lt;a href=&quot;https://instacart.careers/flex-first/&quot; target=&quot;_blank&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;\n&lt;p&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;Offers may vary based on many factors, such as candidate experience and skills required for the role. &lt;/span&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;Additionally, this role is eligible for a new hire equity grant as well as annual refresh grants. Please rea&lt;/span&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;d more about our benefits offerings &lt;/span&gt;&lt;a href=&quot;https://instacart.careers/taste-of-instacart/&quot; target=&quot;_blank&quot;&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;here&lt;/span&gt;&lt;/a&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;. &lt;br&gt;&lt;br&gt;&lt;/span&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;For US based candidates, the base pay ranges for a successful candidate are listed below.&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;title&quot;&gt;CA, NY, CT, NJ&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$214,000&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$226,000 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;title&quot;&gt;WA&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$205,000&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$216,500 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;title&quot;&gt;OR, DE, ME, MA, MD, NH, RI, VT, DC, PA, VA, CO, TX, IL, HI&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$196,000&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$207,000 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;title&quot;&gt;All other states&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$178,000&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$188,000 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;",
+      "departments": [
+        {
+          "id": 51084,
+          "name": "Leadership (Engineering)",
+          "child_ids": [],
+          "parent_id": 4132
+        }
+      ],
+      "offices": [
+        {
+          "id": 88202,
+          "name": "Remote - Canada",
+          "location": null,
+          "child_ids": [],
+          "parent_id": 88198
+        },
+        {
+          "id": 59835,
+          "name": "Remote - United States",
+          "location": null,
+          "child_ids": [],
+          "parent_id": 88197
+        }
+      ],
+      "ai_disclaimer": "<p>Instacart (Maplebear Inc. d/b/a Instacart) uses Greenhouse's Real Talent technology as part of our hiring process. Select \"Learn more\" for information on how these tools work, what data is involved, and your rights.&nbsp;</p>",
+      "include_ai_disclaimer": false,
+      "ai_opt_out_request_url": "http://app.greenhouse.io/ai_opt_out_request/job_post/8246075/ai_opt_out"
+    },
+    {
+      "absolute_url": "https://instacart.careers/job/?gh_jid=8084349",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": false,
+          "requires_processing_consent": false,
+          "requires_retention_consent": false,
+          "retention_period": null,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "education": "education_optional",
+      "internal_job_id": 3502498,
+      "location": {
+        "name": "United States - Remote"
+      },
+      "metadata": [
+        {
+          "id": 16452,
+          "name": "Employment Type",
+          "value": "Regular",
+          "value_type": "single_select"
+        },
+        {
+          "id": 740030,
+          "name": "Exemption Status",
+          "value": "Exempt",
+          "value_type": "single_select"
+        },
+        {
+          "id": 235666,
+          "name": "Time Type",
+          "value": "Full time",
+          "value_type": "single_select"
+        }
+      ],
+      "id": 8084349,
+      "updated_at": "2026-09-24T15:39:46-04:00",
+      "requisition_id": "PR00050",
+      "title": "Senior Engineering Manager, Core Picking",
+      "company_name": "Instacart",
+      "first_published": "2026-07-27T15:46:41-04:00",
+      "language": "en",
+      "application_deadline": null,
+      "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;&lt;strong&gt;We&#39;re transforming the grocery industry&lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;&lt;span class=&quot;im&quot;&gt;At Instacart, we invite the world to share love through food because we believe everyone should have access to the food they love and more time to enjoy it together. Where others see a simple need for grocery delivery, we see exciting complexity and endless opportunity to serve the varied needs of our community. We work to deliver an essential service that customers rely on to get their groceries and household goods, while also offering safe and flexible earnings opportunities to Instacart Personal Shoppers.&lt;/span&gt;&lt;/p&gt;\n&lt;p&gt;Instacart has become a lifeline for millions of people, and we’re building the team to help push our shopping cart forward. If you’re ready to do the best work of your life, come join our table.&lt;/p&gt;\n&lt;p&gt;&lt;strong&gt;Instacart is a Flex First team &lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;There’s no one-size fits all approach to how we do our best work. Our employees have the flexibility to choose where they do their best work—whether it’s from home, an office, or your favorite coffee shop—while staying connected and building community through regular in-person events. &lt;a href=&quot;https://www.instacart.careers/flex-first&quot; target=&quot;_blank&quot; data-saferedirecturl=&quot;https://www.google.com/url?q=https://instacart.careers/remote/&amp;amp;source=gmail&amp;amp;ust=1651869232122000&amp;amp;usg=AOvVaw37OlxP8hAKN7nq4YwHQH7e&quot;&gt;Learn more about our flexible approach to where we work.&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;&lt;strong&gt;Overview&lt;/strong&gt;&lt;/h2&gt;\n&lt;p&gt;The Fulfillment Services team at Instacart is at the heart of building the picking technology platform that powers the fulfillment needs of the world&#39;s largest retailers and millions of customers. Our work directly shapes how shoppers experience their day-to-day work and how customers receive the quality orders they expect — and we&#39;re just getting started.&lt;/p&gt;\n&lt;p&gt;We are looking for a Senior Engineering Manager to lead the Core Picking engineering team. As a Senior Engineering Manager for the Core Picking team at Instacart, you will lead the engineering team responsible for our core shopper picking experiences, supporting our mission to build the picking technology platform required to meet the fulfillment needs of the world&#39;s largest retailers and millions of customers. You will provide leadership in driving the stability, scalability, and extensibility of engineering systems that advance the shopper app’s picking experience. You will interface with engineering and product leaders across the company, as well as retailer leadership, to collaborate on facilitating new and innovative grocery picking solutions. As the leader of this team, you will develop Instacart&#39;s picking technology and provide shoppers with tools to work more efficiently in delivering quality orders for our customers.&lt;/p&gt;\n&lt;p&gt;This is a high-impact leadership role where you will own the technical direction for a team of 10+ engineers, set the bar for enterprise-grade engineering quality, and help shape the future of how the world&#39;s largest retailers fulfill grocery orders. If you thrive in a fast-moving environment where the problems are complex, the stakes are high, and the opportunity to make a real difference is enormous, this role is for you.&lt;/p&gt;\n&lt;p&gt;&amp;nbsp;&lt;/p&gt;\n&lt;h2&gt;&lt;strong&gt;About the Job&lt;/strong&gt;&lt;/h2&gt;\n&lt;ul&gt;\n&lt;li&gt;Define, communicate, and drive the technical vision and strategy for the team that supports the product strategy and key bets for the company, including new technical investments.&lt;/li&gt;\n&lt;li&gt;Drive high-quality execution of key business outcomes of the team by overseeing the roadmap and enabling technical and product decisions.&lt;/li&gt;\n&lt;li&gt;Create best practices for production services, ensuring an exemplary enterprise-grade experience for retailers.&lt;/li&gt;\n&lt;li&gt;Lead, coach, and develop a team of 10+ engineers building the best in-class picking experience for retailers and shoppers.&amp;nbsp;&lt;/li&gt;\n&lt;li&gt;Lead the recruitment and hiring processes to build a high-performing team.&lt;/li&gt;\n&lt;/ul&gt;\n&lt;p&gt;&amp;nbsp;&lt;/p&gt;\n&lt;h2&gt;&lt;strong&gt;About You&lt;/strong&gt;&lt;/h2&gt;\n&lt;h3&gt;Minimum Qualifications&lt;/h3&gt;\n&lt;ul&gt;\n&lt;li&gt;Proven track record as a hands-on technical leader, preferably at a Staff+ level in a similar industry.&lt;/li&gt;\n&lt;li&gt;10+ years of professional software engineering experience, including 4+ years managing engineers, with a track record leading teams of 15+ and delivering complex consumer or enterprise facing products.&lt;/li&gt;\n&lt;li&gt;Ability to craft and execute strategic engineering roadmaps that align with business objectives.&lt;/li&gt;\n&lt;li&gt;Highly structured and proactive communication capabilities.&lt;/li&gt;\n&lt;li&gt;Experience in staffing, mentoring, and leading engineering teams to success.&lt;/li&gt;\n&lt;li&gt;Effective cross-functional leadership. Experience working with product managers, EM peers, and senior ICs.&lt;/li&gt;\n&lt;/ul&gt;\n&lt;h3&gt;Preferred Qualifications&lt;/h3&gt;\n&lt;ul&gt;\n&lt;li&gt;Experience leading multiple teams or managing managers, including scaling a team from early stages to 10+ engineers.&lt;/li&gt;\n&lt;li&gt;Prior experience in managing engineering teams that oversee mission critical business systems.&lt;/li&gt;\n&lt;li&gt;Experience building enterprise-grade software systems.&lt;/li&gt;\n&lt;li&gt;Technical depth with Ruby on Rails, Go, Swift and/or Kotlin&lt;/li&gt;\n&lt;/ul&gt;\n&lt;p&gt;&amp;nbsp;&lt;/p&gt;\n&lt;p&gt;#LI-Remote&lt;/p&gt;&lt;div class=&quot;content-pay-transparency&quot;&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;description&quot;&gt;&lt;p&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;Instacart provides highly market-competitive compensation and benefits in each location where our employees work. This role is remote and the base pay range for a successful candidate is dependent on their permanent work location. Please review our Flex First remote work policy &lt;/span&gt;&lt;a href=&quot;https://instacart.careers/flex-first/&quot; target=&quot;_blank&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;\n&lt;p&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;Offers may vary based on many factors, such as candidate experience and skills required for the role. &lt;/span&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;Additionally, this role is eligible for a new hire equity grant as well as annual refresh grants. Please rea&lt;/span&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;d more about our benefits offerings &lt;/span&gt;&lt;a href=&quot;https://instacart.careers/taste-of-instacart/&quot; target=&quot;_blank&quot;&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;here&lt;/span&gt;&lt;/a&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;. &lt;br&gt;&lt;br&gt;&lt;/span&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;For US based candidates, the base pay ranges for a successful candidate are listed below.&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;title&quot;&gt;CA, NY, CT, NJ&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$265,000&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$279,500 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;title&quot;&gt;WA&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$254,000&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$268,000 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;title&quot;&gt;OR, DE, ME, MA, MD, NH, RI, VT, DC, PA, VA, CO, TX, IL, HI&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$243,000&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$256,500 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;title&quot;&gt;All other states&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$221,000&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$233,000 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;",
+      "departments": [
+        {
+          "id": 51084,
+          "name": "Leadership (Engineering)",
+          "child_ids": [],
+          "parent_id": 4132
+        }
+      ],
+      "offices": [
+        {
+          "id": 59835,
+          "name": "Remote - United States",
+          "location": null,
+          "child_ids": [],
+          "parent_id": 88197
+        }
+      ],
+      "ai_disclaimer": "<p>Instacart (Maplebear Inc. d/b/a Instacart) uses Greenhouse's Real Talent technology as part of our hiring process. Select \"Learn more\" for information on how these tools work, what data is involved, and your rights.&nbsp;</p>",
+      "include_ai_disclaimer": false,
+      "ai_opt_out_request_url": "http://app.greenhouse.io/ai_opt_out_request/job_post/8084349/ai_opt_out"
+    }
+  ],
+  "meta": {
+    "total": 122
+  }
+}
