@@ -20,11 +20,3 @@ export const aiEnvSchema = z.object({
   AI_API_KEY: optionalSecret,
   AI_TIMEOUT_MS: z.coerce.number().int().positive().default(20_000),
 });
-
-export const AI_ENV_KEYS = [
-  "AI_PROVIDER",
-  "AI_BASE_URL",
-  "AI_MODEL",
-  "AI_API_KEY",
-  "AI_TIMEOUT_MS",
-] as const;

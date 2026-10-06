@@ -104,6 +104,19 @@ describe("login gate", () => {
     });
   });
 
+  it("calls the API only at same-origin /api paths, never an absolute URL", async () => {
+    const fetchMock = fakeApi({ signedIn: false, password: "correct" });
+    renderAt("/");
+
+    await signIn("correct");
+    expect(await screen.findByRole("button", { name: /auto-apply/i })).toBeInTheDocument();
+
+    // An absolute http:// API URL is blocked as mixed content on the https site.
+    const urls = fetchMock.mock.calls.map(([input]) => String(input));
+    expect(urls).toContain("/api/login");
+    expect(urls.filter((url) => !url.startsWith("/api/"))).toEqual([]);
+  });
+
   it("says so on a wrong password and stays on the login page", async () => {
     fakeApi({ signedIn: false, password: "correct" });
     renderAt("/");

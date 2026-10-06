@@ -229,7 +229,7 @@ describe("<RunPanel />", () => {
       expect.objectContaining({ method: "POST" }),
     );
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
-    expect(FakeEventSource.latest().url).toMatch(/\/api\/runs\/run-1\/events$/);
+    expect(FakeEventSource.latest().url).toBe("/api/runs/run-1/events");
     expect(FakeEventSource.latest().withCredentials).toBe(true);
     expect(connection()).toMatch(/^connecting/i);
   });
@@ -285,7 +285,7 @@ describe("<RunPanel />", () => {
     render(<RunPanel />);
 
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
-    expect(FakeEventSource.latest().url).toMatch(/\/api\/runs\/run-1\/events$/);
+    expect(FakeEventSource.latest().url).toBe("/api/runs/run-1/events");
     act(() =>
       FakeEventSource.latest().emit("snapshot", {
         run: aRun({ status: "evaluating", funnel: funnel({ discovered: 2, evaluated: 1 }) }),

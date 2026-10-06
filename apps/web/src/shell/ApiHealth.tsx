@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import Typography from "@mui/material/Typography";
 import { healthResponseSchema, type HealthResponse } from "@auto-apply/shared";
-import { API_URL, messageOf } from "../api";
+import { messageOf } from "../api";
 
 type State =
   | { kind: "loading" }
@@ -18,7 +18,7 @@ export function ApiHealth() {
   useEffect(() => {
     let cancelled = false;
 
-    fetch(`${API_URL}/api/health`)
+    fetch(`/api/health`)
       .then(async (res) => {
         if (!res.ok) {
           throw new Error(`API responded ${res.status}`);

@@ -111,7 +111,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 function fakeMe(response: () => Response) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL) =>
-    new URL(String(input)).pathname === "/api/me"
+    new URL(String(input), location.origin).pathname === "/api/me"
       ? response()
       : json({ error: { code: "not_found", message: "Not found" } }, 404),
   );
