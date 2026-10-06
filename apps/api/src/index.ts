@@ -7,6 +7,8 @@ import { BOARDS } from "./discovery/boards.js";
 import { createDiscovery } from "./discovery/discovery.js";
 import { readBoardFixture } from "./discovery/fixtures.js";
 import { greenhouseJobSource } from "./discovery/greenhouse.js";
+import { recoverInterruptedRuns } from "./runs/recover-interrupted-runs.js";
+import { DEMO_UID } from "./user.js";
 
 // Env and the Firestore credential are both validated here, once; anything
 // invalid stops the boot.
@@ -31,6 +33,10 @@ const app = createApp(config, persistence, pipeline);
 if (persistence.kind === "memory") {
   logger.warn("persistence_in_memory", { reason: "REPO=memory; data is lost on restart" });
 }
+
+// Before listening, so no Run of this boot exists yet: whatever is still
+// active was killed by the restart and is failed as interrupted.
+await recoverInterruptedRuns(persistence.repo, [DEMO_UID]);
 
 app.listen(config.PORT, () => {
   logger.info("api_listening", {

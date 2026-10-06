@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { emptyFunnel, type Evaluation, type Run, type RunFunnel } from "@auto-apply/shared";
 import { FakeEventSource } from "../test/fake-event-source";
@@ -348,5 +348,93 @@ describe("<RunPanel />", () => {
     );
 
     expect(screen.getByRole("alert")).toHaveTextContent(/listener failed/);
+  });
+
+  it("explains a Run that a server restart interrupted, and lets the user start again", async () => {
+    fakeApi({ active: aRun({ status: "evaluating" }) });
+    render(<RunPanel />);
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const stream = FakeEventSource.latest();
+    act(() => stream.emit("snapshot", { run: aRun({ status: "evaluating" }), evaluations: [] }));
+
+    // The server restarts: the browser reconnects and re-snapshots the failed Run.
+    act(() => stream.drop());
+    expect(connection()).toMatch(/reconnecting/i);
+    act(() => {
+      stream.emit("snapshot", {
+        run: aRun({ status: "failed", reason: "interrupted" }),
+        evaluations: [],
+      });
+      stream.emit("done", { runId: "run-1", status: "failed" });
+    });
+
+    expect(valueOf("Status")).toBe("Failed");
+    expect(screen.getByRole("alert")).toHaveTextContent(/interrupted.*server restarted/i);
+    expect(connection()).toMatch(/closed/i);
+    expect(screen.getByRole("button", { name: /auto-apply/i })).toBeEnabled();
+  });
+
+  it("shows closed and an error, not endless loading, when the browser gives up on the stream", async () => {
+    fakeApi({ active: aRun() });
+    render(<RunPanel />);
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    expect(screen.getByText(/loading run/i)).toBeInTheDocument();
+
+    act(() => FakeEventSource.latest().fail());
+
+    expect(connection()).toMatch(/closed/i);
+    expect(screen.getByRole("alert")).toHaveTextContent(/lost the live connection/i);
+    expect(screen.queryByText(/loading run/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /auto-apply/i })).toBeEnabled();
+  });
+
+  it("keeps the last state and says so when the stream is lost mid-Run", async () => {
+    fakeApi({ active: aRun() });
+    render(<RunPanel />);
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const stream = FakeEventSource.latest();
+    act(() => stream.emit("snapshot", { run: aRun(), evaluations: [anEvaluation("1")] }));
+
+    act(() => stream.fail());
+
+    expect(connection()).toMatch(/closed/i);
+    expect(screen.getByRole("alert")).toHaveTextContent(/lost the live connection/i);
+    expect(jobRows()).toHaveLength(1);
+  });
+
+  it("shows an error state, not the empty state, when the active Run cannot be loaded", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("boom", { status: 500 })),
+    );
+    render(<RunPanel />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not load the active run/i);
+    expect(screen.queryByText(/no runs yet/i)).not.toBeInTheDocument();
+  });
+
+  it("disables the button between the click and the server's answer", async () => {
+    let answer: (res: Response) => void = () => {};
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/api/runs/active")) {
+        return new Response(JSON.stringify({ run: null }), { status: 200 });
+      }
+      if (init?.method === "POST") return new Promise<Response>((resolve) => (answer = resolve));
+      return new Response("not found", { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<RunPanel />);
+    const button = await screen.findByRole("button", { name: /auto-apply/i });
+
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(button).toBeDisabled();
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
+    await act(async () =>
+      answer(new Response(JSON.stringify({ runId: "run-1" }), { status: 202 })),
+    );
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    expect(button).toBeDisabled();
   });
 });

@@ -183,6 +183,13 @@ export const runSchema = z.object({
 export type Run = z.infer<typeof runSchema>;
 
 /**
+ * The `reason` of a Run that a server restart killed mid-flight: on startup
+ * the API fails every Run still active from before boot with it, and the UI
+ * explains it instead of showing a Run stuck forever (spec, Persistence).
+ */
+export const RUN_INTERRUPTED_REASON = "interrupted";
+
+/**
  * A Run is active until it reaches a terminal status. This drives the
  * one-active-run-per-user rule (D17) that `createRun` enforces as a future 409.
  */
