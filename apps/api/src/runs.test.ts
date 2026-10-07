@@ -20,6 +20,7 @@ import {
   runEventSchema,
   runsListResponseSchema,
   snapshotEventSchema,
+  submitAnswersResponseSchema,
   type Evaluation,
   type EvaluationChange,
   type Posting,
@@ -447,6 +448,7 @@ describe("POST /api/runs/:runId/jobs/:jobKey/retry (D19)", () => {
       evidence: [],
       scoredBy: "fallback",
       missingFields: [],
+      draft: null,
       submission: {
         ats: "greenhouse",
         endpoint: "https://boards-api.greenhouse.io/v1/boards/acme/jobs/1",
@@ -514,5 +516,184 @@ describe("POST /api/runs/:runId/jobs/:jobKey/retry (D19)", () => {
 
     expect([noRun.status, noJob.status, malformed.status]).toEqual([404, 404, 400]);
     expect(errorResponseSchema.parse(noJob.body).error.code).toBe("job_not_found");
+  });
+});
+
+describe("POST /api/runs/:runId/jobs/:jobKey/answers (Answer & submit)", () => {
+  const key = "greenhouse:acme:1";
+  const answersUrl = (runId: string, jobKey: string) =>
+    `/api/runs/${runId}/jobs/${encodeURIComponent(jobKey)}/answers`;
+
+  /** A finished Run whose one job is held for the user: a select, an essay and a resume. */
+  async function withNeedsYou(overrides: Partial<Evaluation> = {}) {
+    const h = harness();
+    h.openGate();
+    const now = "2026-10-06T12:00:00.000Z";
+    await h.repo.createRun({
+      runId: "run-x",
+      uid: DEMO_UID,
+      status: "completed",
+      funnel: { ...emptyFunnel(), discovered: 1, evaluated: 1, held: 1 },
+      reason: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await h.repo.putEvaluation("run-x", {
+      jobKey: key,
+      runId: "run-x",
+      posting: aPosting("1"),
+      status: "held",
+      verdict: "APPLY_NOW",
+      score: 8,
+      reason: "needs_you",
+      evidence: [],
+      scoredBy: "fallback",
+      missingFields: [
+        {
+          id: "question_5",
+          label: "Have you ever been employed by Acme?",
+          why: "Only you can answer this",
+          type: "select",
+          options: [
+            { label: "Yes", value: 1 },
+            { label: "No", value: 0 },
+          ],
+        },
+        {
+          id: "question_6",
+          label: "Why Acme?",
+          why: "Free text; no AI is configured, so only you can answer (D24)",
+          type: "textarea",
+          options: [],
+        },
+        {
+          id: "resume",
+          label: "Resume/CV",
+          why: "Not answered by your settings (resume)",
+          type: "file",
+          options: [],
+        },
+      ],
+      submission: null,
+      draft: {
+        formUrl: "https://job-boards.greenhouse.io/acme/jobs/1",
+        answers: [
+          {
+            id: "first_name",
+            label: "First Name",
+            type: "text",
+            source: "profile",
+            value: "Shubham",
+          },
+        ],
+      },
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+    });
+    return h;
+  }
+
+  const goodAnswers = {
+    question_5: 0,
+    question_6: "Real-time systems at scale.",
+    resume: "https://example.com/files/cv.pdf",
+  };
+
+  it("submits (simulated) with the user's answers under their real field ids, source user", async () => {
+    const { app, repo } = await withNeedsYou();
+
+    const res = await request(app)
+      .post(answersUrl("run-x", key))
+      .set("Cookie", authCookie())
+      .send({ answers: goodAnswers });
+
+    expect(res.status).toBe(200);
+    const { evaluation } = submitAnswersResponseSchema.parse(res.body);
+    expect(evaluation).toMatchObject({ status: "submitted", reason: null, missingFields: [] });
+    expect(evaluation.submission).toMatchObject({
+      sent: false,
+      attempt: 1,
+      formUrl: "https://job-boards.greenhouse.io/acme/jobs/1",
+      payload: {
+        first_name: "Shubham",
+        question_5: 0,
+        question_6: "Real-time systems at scale.",
+        resume_url: "https://example.com/files/cv.pdf",
+        resume_url_filename: "cv.pdf",
+      },
+    });
+    const sources = Object.fromEntries(
+      (evaluation.submission?.answers ?? []).map((a) => [a.id, a.source]),
+    );
+    expect(sources).toEqual({
+      first_name: "profile",
+      question_5: "user",
+      question_6: "user",
+      resume: "user",
+    });
+    expect((await repo.getRun("run-x"))?.funnel).toMatchObject({ held: 0, submitted: 1 });
+  });
+
+  it("returns 409 not_answerable for a job that is not held as needs_you", async () => {
+    const { app } = await withNeedsYou({ reason: "below_auto_threshold" });
+
+    const res = await request(app)
+      .post(answersUrl("run-x", key))
+      .set("Cookie", authCookie())
+      .send({ answers: goodAnswers });
+
+    expect(res.status).toBe(409);
+    expect(errorResponseSchema.parse(res.body).error.code).toBe("not_answerable");
+  });
+
+  it("returns 400 naming the missing or invalid fields, never echoing a value", async () => {
+    const { app, repo } = await withNeedsYou();
+
+    const res = await request(app)
+      .post(answersUrl("run-x", key))
+      .set("Cookie", authCookie())
+      .send({ answers: { question_5: "secret-choice-42", resume: "not-a-url-secret" } });
+
+    expect(res.status).toBe(400);
+    const { error } = errorResponseSchema.parse(res.body);
+    expect(error.code).toBe("invalid_answers");
+    for (const id of ["question_5", "question_6", "resume"]) expect(error.message).toContain(id);
+    expect(JSON.stringify(res.body)).not.toMatch(/secret/);
+    const [still] = await repo.listEvaluations("run-x");
+    expect(still).toMatchObject({ status: "held", reason: "needs_you" });
+
+    const malformed = await request(app)
+      .post(answersUrl("run-x", key))
+      .set("Cookie", authCookie())
+      .send({ answers: "secret-yes" });
+    expect(malformed.status).toBe(400);
+    expect(JSON.stringify(malformed.body)).not.toMatch(/secret/);
+  });
+
+  it("returns 404 for an unknown Run or job", async () => {
+    const { app } = await withNeedsYou();
+
+    const noRun = await request(app)
+      .post(answersUrl("run-nope", key))
+      .set("Cookie", authCookie())
+      .send({ answers: goodAnswers });
+    const noJob = await request(app)
+      .post(answersUrl("run-x", "greenhouse:acme:2"))
+      .set("Cookie", authCookie())
+      .send({ answers: goodAnswers });
+
+    expect([noRun.status, noJob.status]).toEqual([404, 404]);
+    expect(errorResponseSchema.parse(noRun.body).error.code).toBe("run_not_found");
+    expect(errorResponseSchema.parse(noJob.body).error.code).toBe("job_not_found");
+  });
+
+  it("returns 401 without the session cookie", async () => {
+    const { app } = await withNeedsYou();
+
+    const res = await request(app).post(answersUrl("run-x", key)).send({ answers: goodAnswers });
+
+    expect(res.status).toBe(401);
+    expect(errorResponseSchema.parse(res.body).error.code).toBe("unauthenticated");
   });
 });

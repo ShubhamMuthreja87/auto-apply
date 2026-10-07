@@ -29,6 +29,7 @@ const testConfig: Config = loadConfig({
 const startsRuns: Pipeline = {
   startRun: async () => ({ runId: crypto.randomUUID(), finished: Promise.resolve() }),
   retrySubmit: () => Promise.reject(new Error("not used by these tests")),
+  submitAnswers: () => Promise.reject(new Error("not used by these tests")),
 };
 
 async function appWith(options: AppOptions = {}) {
@@ -118,6 +119,7 @@ describe("requireAuth", () => {
     ["POST", "/api/runs"],
     ["GET", "/api/evaluations"],
     ["GET", "/api/runs/some-run/events"],
+    ["POST", "/api/runs/some-run/jobs/greenhouse:acme:1/answers"],
     // Guarded at the router level, so routes added later are covered too.
     ["GET", "/api/not-built-yet"],
     ["PUT", "/api/me"],

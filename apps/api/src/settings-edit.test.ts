@@ -31,6 +31,7 @@ import { DEMO_UID, loadUser, seedUser } from "./user.js";
 const noPipeline: Pipeline = {
   startRun: () => Promise.reject(new Error("not used by this test")),
   retrySubmit: () => Promise.reject(new Error("not used by this test")),
+  submitAnswers: () => Promise.reject(new Error("not used by this test")),
 };
 
 const testConfig: Config = loadConfig({

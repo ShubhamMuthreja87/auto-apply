@@ -10,9 +10,15 @@ import {
   activeRunResponseSchema,
   createRunResponseSchema,
   retrySubmitResponseSchema,
+  submitAnswersRequestSchema,
+  submitAnswersResponseSchema,
   type Repo,
 } from "@auto-apply/shared";
-import { EvaluationNotFoundError, type Pipeline } from "../pipeline/pipeline.js";
+import {
+  EvaluationNotFoundError,
+  InvalidAnswersError,
+  type Pipeline,
+} from "../pipeline/pipeline.js";
 import { IllegalTransitionError } from "../pipeline/transitions.js";
 import { DEMO_UID } from "../user.js";
 import { streamRun } from "./run-stream.js";
@@ -70,6 +76,51 @@ export function runsRouter(repo: Repo, pipeline: Pipeline, heartbeatMs: number):
       }
       if (err instanceof IllegalTransitionError) {
         sendError(res, 409, "not_retryable", "Only a simulated failure can be retried");
+        return;
+      }
+      next(err);
+    }
+  });
+
+  // Answer & submit: the user answers a needs_you job's missing fields, and
+  // it is submitted (simulated), answered when the short simulated send ends.
+  router.post("/api/runs/:runId/jobs/:jobKey/answers", async (req, res, next) => {
+    const params = retryParamsSchema.safeParse(req.params);
+    if (!params.success) {
+      sendError(res, 400, "invalid_request", "Malformed run id or job key");
+      return;
+    }
+    const body = submitAnswersRequestSchema.safeParse(req.body);
+    if (!body.success) {
+      // Never echo the body: the answers can be personal.
+      sendError(res, 400, "invalid_request", "Expected { answers: { [fieldId]: value } }");
+      return;
+    }
+    try {
+      const run = await ownRunOr404(repo, res, params.data.runId);
+      if (!run) return;
+      const evaluation = await pipeline.submitAnswers(
+        run.runId,
+        params.data.jobKey,
+        body.data.answers,
+      );
+      res.json(submitAnswersResponseSchema.parse({ evaluation }));
+    } catch (err) {
+      if (err instanceof EvaluationNotFoundError) {
+        sendError(res, 404, "job_not_found", "No such job in this run");
+        return;
+      }
+      if (err instanceof InvalidAnswersError) {
+        sendError(
+          res,
+          400,
+          "invalid_answers",
+          `Missing or invalid answers for: ${err.fieldIds.join(", ")}`,
+        );
+        return;
+      }
+      if (err instanceof IllegalTransitionError) {
+        sendError(res, 409, "not_answerable", "Only a job that needs your answers can be answered");
         return;
       }
       next(err);

@@ -37,8 +37,12 @@
  *      (`failed: simulated`); {@link Pipeline.retrySubmit} is the Retry that
  *      then succeeds (`submitted`).
  *
+ * A `held: needs_you` Posting keeps its answered fields as a draft;
+ * {@link Pipeline.submitAnswers} (Answer & submit) merges the user's answers
+ * into it and submits it (simulated).
+ *
  * Every status change goes through the transition table (`transitions.ts`);
- * Retry is its one explicit backward edge.
+ * Retry and Answer & submit are its two explicit, named edges.
  */
 import {
   FAILED_REASONS,
@@ -59,7 +63,9 @@ import {
   type ScoredBy,
   type SubmittedAnswer,
   type User,
+  type UserAnswerValue,
 } from "@auto-apply/shared";
+import { checkUserAnswers } from "../forms/user-answers.js";
 import { aiCriteria, buildRubric, judgeInCode } from "../evaluation/rubric.js";
 import { applyLanguageGate, languageGateQuestions } from "../evaluation/language-gate.js";
 import { scoreJudgements } from "../evaluation/score.js";
@@ -77,6 +83,7 @@ import type {
   JobEvaluator,
 } from "./ports.js";
 import {
+  assertAnswerTransition,
   assertEvaluationTransition,
   assertRetryTransition,
   assertRunTransition,
@@ -155,6 +162,27 @@ export interface Pipeline {
    * including a second Retry already under way.
    */
   retrySubmit(runId: string, jobKey: string): Promise<Evaluation>;
+  /**
+   * Answer & submit: merges the user's answers to a `held: needs_you` job's
+   * missing fields into its stored draft and submits it (simulated), resolving
+   * with it `submitted`. Rejects with {@link EvaluationNotFoundError} for an
+   * unknown Run or job, `IllegalTransitionError` for any other job (or one
+   * already being submitted), and {@link InvalidAnswersError} when a missing
+   * field is unanswered or answered with something it cannot take.
+   */
+  submitAnswers(
+    runId: string,
+    jobKey: string,
+    answers: Readonly<Record<string, UserAnswerValue>>,
+  ): Promise<Evaluation>;
+}
+
+/** Names the fields whose answers were missing or invalid; never their values (PII). */
+export class InvalidAnswersError extends Error {
+  constructor(readonly fieldIds: readonly string[]) {
+    super(`missing or invalid answers: ${fieldIds.join(", ")}`);
+    this.name = "InvalidAnswersError";
+  }
 }
 
 export class EvaluationNotFoundError extends Error {
@@ -377,6 +405,58 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
     return after;
   }
 
+  /** Answer & submits in progress, so a double click cannot submit twice. */
+  const answering = new Set<string>();
+
+  async function submitAnswers(
+    runId: string,
+    key: string,
+    given: Readonly<Record<string, UserAnswerValue>>,
+  ): Promise<Evaluation> {
+    const lock = `${runId}/${key}`;
+    const evaluation = (await repo.listEvaluations(runId)).find((e) => e.jobKey === key);
+    if (!evaluation) throw new EvaluationNotFoundError(runId, key);
+    if (answering.has(lock)) {
+      throw new IllegalTransitionError("evaluation", "applying (answer under way)", "applying");
+    }
+    assertAnswerTransition(evaluation);
+    // A job held before drafts were kept cannot be finished without reading
+    // its form again, so it is not answerable.
+    const draft = evaluation.draft;
+    if (!draft) {
+      throw new IllegalTransitionError("evaluation", "held (needs_you, no draft)", "applying");
+    }
+    const checked = checkUserAnswers(evaluation.missingFields, given);
+    if (!checked.ok) throw new InvalidAnswersError(checked.invalid);
+    answering.add(lock);
+    try {
+      await repo.patchEvaluation(runId, key, {
+        status: "applying",
+        reason: null,
+        missingFields: [],
+      });
+      await repo.patchRun(runId, { funnelIncrements: { held: -1 } });
+      // No deliberate failure here: D19's "first submit fails" belongs to the
+      // Run's applying stage only, and the user's own submit is not a Run's.
+      await submitOne(
+        runId,
+        key,
+        {
+          posting: evaluation.posting,
+          formUrl: draft.formUrl,
+          answers: [...draft.answers, ...checked.answers],
+          attempt: 1,
+        },
+        { simulateFailure: false },
+      );
+    } finally {
+      answering.delete(lock);
+    }
+    const after = (await repo.listEvaluations(runId)).find((e) => e.jobKey === key);
+    if (!after) throw new EvaluationNotFoundError(runId, key);
+    return after;
+  }
+
   /**
    * The pool: `LIMITS.maxInFlight` workers pull Postings in discovery order until
    * none are left or every AI-evaluation slot is taken. Slots are counted
@@ -524,8 +604,11 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
           missing: fill.missing.length,
         });
         if (fill.missing.length > 0) {
+          // The answered fields stay as a draft, so Answer & submit can finish
+          // the job without reading the form or calling the AI again.
           return await finish("held", HELD_REASONS.needsYou, "held", scoredOptions, {
             missingFields: fill.missing,
+            draft: { formUrl: fill.formUrl, answers: answersOf(fill.resolutions) },
           });
         }
         // Complete: it waits as `applying` for the Run's submit stage, which
@@ -570,6 +653,7 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
       scoredBy: null,
       missingFields: [],
       submission: null,
+      draft: null,
       createdAt: now,
       updatedAt: now,
     });
@@ -614,5 +698,6 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
       return { runId: created.runId, finished };
     },
     retrySubmit,
+    submitAnswers,
   };
 }

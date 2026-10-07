@@ -56,6 +56,7 @@ function anEvaluation(
     scoredBy: null,
     missingFields: [],
     submission: null,
+    draft: null,
     createdAt: "2026-10-06T12:00:00.000Z",
     updatedAt: "2026-10-06T12:00:00.000Z",
   };

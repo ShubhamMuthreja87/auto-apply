@@ -10,6 +10,7 @@ import type { Pipeline } from "./pipeline/pipeline.js";
 const noPipeline: Pipeline = {
   startRun: () => Promise.reject(new Error("not used by these tests")),
   retrySubmit: () => Promise.reject(new Error("not used by these tests")),
+  submitAnswers: () => Promise.reject(new Error("not used by these tests")),
 };
 
 const testConfig: Config = loadConfig({
