@@ -1,0 +1,942 @@
+diff --git a/.gitignore b/.gitignore
+index a584d8a..2174190 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -10,3 +10,6 @@ test-results/
+ .secrets/
+ *-firebase-adminsdk-*.json
+ *service-account*.json
++
++# Playwright MCP screenshots and snapshots
++.playwright-mcp/
+diff --git a/apps/web/package.json b/apps/web/package.json
+index bf7058f..b0de684 100644
+--- a/apps/web/package.json
++++ b/apps/web/package.json
+@@ -12,7 +12,13 @@
+   },
+   "dependencies": {
+     "@auto-apply/shared": "*",
++    "@emotion/react": "^11.14.0",
++    "@emotion/styled": "^11.14.1",
++    "@fontsource/inter": "^5.3.0",
++    "@mui/icons-material": "^9.4.0",
++    "@mui/material": "^9.4.0",
+     "react": "^18.3.1",
+-    "react-dom": "^18.3.1"
++    "react-dom": "^18.3.1",
++    "react-router-dom": "^7.18.4"
+   }
+ }
+diff --git a/apps/web/src/App.tsx b/apps/web/src/App.tsx
+index 90a324e..477b1dd 100644
+--- a/apps/web/src/App.tsx
++++ b/apps/web/src/App.tsx
+@@ -1,65 +1,52 @@
+-import { useEffect, useState } from "react";
+-import { healthResponseSchema, type HealthResponse } from "@auto-apply/shared";
+-import { API_URL } from "./api";
++/**
++ * The themed shell and the routed views (D20). The router itself is provided
++ * by the caller (`BrowserRouter` in `main.tsx`, `MemoryRouter` in tests).
++ */
++import { Navigate, Route, Routes } from "react-router-dom";
++import CssBaseline from "@mui/material/CssBaseline";
++import { ThemeProvider } from "@mui/material/styles";
++import { theme } from "./theme";
++import { AppShell } from "./shell/AppShell";
+ import { RunPanel } from "./run/RunPanel";
+-
+-type State =
+-  | { kind: "loading" }
+-  | { kind: "error"; message: string }
+-  | { kind: "ready"; health: HealthResponse };
++import { PlaceholderPage } from "./pages/PlaceholderPage";
+ 
+ export function App() {
+-  const [state, setState] = useState<State>({ kind: "loading" });
+-
+-  useEffect(() => {
+-    let cancelled = false;
+-
+-    fetch(`${API_URL}/api/health`)
+-      .then(async (res) => {
+-        if (!res.ok) {
+-          throw new Error(`API responded ${res.status}`);
+-        }
+-        return healthResponseSchema.parse(await res.json());
+-      })
+-      .then((health) => {
+-        if (!cancelled) {
+-          setState({ kind: "ready", health });
+-        }
+-      })
+-      .catch((err: unknown) => {
+-        if (!cancelled) {
+-          setState({
+-            kind: "error",
+-            message: err instanceof Error ? err.message : "Unknown error",
+-          });
+-        }
+-      });
+-
+-    return () => {
+-      cancelled = true;
+-    };
+-  }, []);
+-
+   return (
+-    <main>
+-      <h1>AI Auto-Apply</h1>
+-      <RunPanel />
+-      {state.kind === "loading" && <p role="status">Checking API…</p>}
+-      {state.kind === "error" && <p role="alert">Could not reach the API: {state.message}</p>}
+-      {state.kind === "ready" && (
+-        <dl>
+-          <dt>API status</dt>
+-          <dd>{state.health.status}</dd>
+-          <dt>Service</dt>
+-          <dd>{state.health.service}</dd>
+-          <dt>Namespace</dt>
+-          <dd>{state.health.namespace}</dd>
+-          <dt>Storage</dt>
+-          <dd>
+-            {state.health.repo === "memory" ? "In-memory (not persisted)" : "Firestore"}
+-          </dd>
+-        </dl>
+-      )}
+-    </main>
++    <ThemeProvider theme={theme}>
++      <CssBaseline />
++      <AppShell>
++        <Routes>
++          <Route path="/" element={<RunPanel />} />
++          <Route
++            path="/applied"
++            element={
++              <PlaceholderPage
++                title="Applied jobs"
++                description="Each simulated submission and the payload built for it will be listed here."
++              />
++            }
++          />
++          <Route
++            path="/scanned"
++            element={
++              <PlaceholderPage
++                title="Scanned jobs"
++                description="Every job evaluated across runs, with its verdict and reason, will be listed here."
++              />
++            }
++          />
++          <Route
++            path="/settings"
++            element={
++              <PlaceholderPage
++                title="Settings"
++                description="The profile, preferences and settings that drive matching will be shown here."
++              />
++            }
++          />
++          <Route path="*" element={<Navigate to="/" replace />} />
++        </Routes>
++      </AppShell>
++    </ThemeProvider>
+   );
+ }
+diff --git a/apps/web/src/main.tsx b/apps/web/src/main.tsx
+index 62b768d..80368bd 100644
+--- a/apps/web/src/main.tsx
++++ b/apps/web/src/main.tsx
+@@ -1,5 +1,11 @@
+ import { StrictMode } from "react";
+ import { createRoot } from "react-dom/client";
++import { BrowserRouter } from "react-router-dom";
++// Inter is bundled by Vite: no request to a font CDN.
++import "@fontsource/inter/400.css";
++import "@fontsource/inter/500.css";
++import "@fontsource/inter/600.css";
++import "@fontsource/inter/700.css";
+ import { App } from "./App";
+ 
+ const rootElement = document.getElementById("root");
+@@ -9,6 +15,8 @@ if (!rootElement) {
+ 
+ createRoot(rootElement).render(
+   <StrictMode>
+-    <App />
++    <BrowserRouter>
++      <App />
++    </BrowserRouter>
+   </StrictMode>,
+ );
+diff --git a/apps/web/src/run/RunPanel.tsx b/apps/web/src/run/RunPanel.tsx
+index 44b49a2..a70aae3 100644
+--- a/apps/web/src/run/RunPanel.tsx
++++ b/apps/web/src/run/RunPanel.tsx
+@@ -4,24 +4,23 @@
+  * a new Run and stays disabled while one is active (the API's 409 backs it up).
+  */
+ import { useEffect, useState } from "react";
+-import { isRunActive, type RunFunnel, type RunStatus } from "@auto-apply/shared";
++import Alert from "@mui/material/Alert";
++import Box from "@mui/material/Box";
++import Button from "@mui/material/Button";
++import Card from "@mui/material/Card";
++import CardContent from "@mui/material/CardContent";
++import CircularProgress from "@mui/material/CircularProgress";
++import LinearProgress from "@mui/material/LinearProgress";
++import Stack from "@mui/material/Stack";
++import Typography from "@mui/material/Typography";
++import BoltIcon from "@mui/icons-material/Bolt";
++import TravelExploreIcon from "@mui/icons-material/TravelExplore";
++import { isRunActive, type Run, type RunFunnel } from "@auto-apply/shared";
+ import { ApiError, getActiveRun, startRun } from "../api";
+-import { useRunStream, type Connection } from "./useRunStream";
+-
+-const statusLabels: Record<RunStatus, string> = {
+-  discovering: "Discovering",
+-  evaluating: "Evaluating",
+-  applying: "Applying",
+-  completed: "Completed",
+-  failed: "Failed",
+-};
+-
+-const connectionLabels: Record<Connection, string> = {
+-  connecting: "Connecting…",
+-  live: "Live",
+-  reconnecting: "Reconnecting…",
+-  closed: "Closed",
+-};
++import { ConnectionIndicator } from "../ui/ConnectionIndicator";
++import { StatusChip } from "../ui/StatusChip";
++import { JobsTable } from "./JobsTable";
++import { useRunStream } from "./useRunStream";
+ 
+ const funnelLabels: [keyof RunFunnel, string][] = [
+   ["discovered", "Discovered"],
+@@ -33,6 +32,21 @@ const funnelLabels: [keyof RunFunnel, string][] = [
+   ["failed", "Failed"],
+ ];
+ 
++/**
++ * How far through its discovered jobs the Run is, as a percentage; `null`
++ * while discovering, when the total is not known yet.
++ */
++function progressOf(run: Run): number | null {
++  if (!isRunActive(run.status)) return 100;
++  if (run.status === "discovering") return null;
++  const { discovered, blocked, skipped, held, submitted, failed } = run.funnel;
++  if (discovered === 0) return 0;
++  return Math.min(
++    100,
++    Math.round(((blocked + skipped + held + submitted + failed) / discovered) * 100),
++  );
++}
++
+ function messageOf(err: unknown): string {
+   return err instanceof Error ? err.message : "Unknown error";
+ }
+@@ -88,57 +102,183 @@ export function RunPanel() {
+   // Waiting for the first snapshot counts as active, so a double click cannot
+   // slip in between POST and stream.
+   const runActive = run ? isRunActive(run.status) : runId !== null;
++  const progress = run ? progressOf(run) : null;
+ 
+   return (
+-    <section aria-label="Auto-apply">
+-      <button type="button" onClick={onAutoApply} disabled={checking || starting || runActive}>
+-        {starting ? "Starting…" : "Auto-apply"}
+-      </button>
+-      <p>Submissions are simulated: payloads are built and stored, never sent.</p>
++    <Stack component="section" aria-label="Auto-apply" spacing={3}>
++      <Card>
++        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
++          <Stack
++            direction={{ xs: "column", sm: "row" }}
++            spacing={2}
++            sx={{ justifyContent: "space-between", alignItems: { sm: "center" } }}
++          >
++            <Box>
++              <Typography variant="h1" gutterBottom>
++                Auto-apply
++              </Typography>
++              <Typography color="text.secondary">
++                Find matching jobs, score them against your profile and prepare applications.
++              </Typography>
++            </Box>
++            <Button
++              variant="contained"
++              size="large"
++              onClick={onAutoApply}
++              disabled={checking || starting || runActive}
++              startIcon={
++                starting ? (
++                  <CircularProgress size={16} color="inherit" aria-hidden="true" />
++                ) : (
++                  <BoltIcon />
++                )
++              }
++              sx={{ flexShrink: 0, px: 3 }}
++            >
++              {starting ? "Starting…" : "Auto-apply"}
++            </Button>
++          </Stack>
+ 
+-      {startError && <p role="alert">{startError}</p>}
+-      {stream.error && <p role="alert">Stream error: {stream.error}</p>}
+-
+-      {runId && (
+-        <div>
+-          <p>Connection: {connectionLabels[stream.connection]}</p>
+-          {!run ? (
+-            <p role="status">Loading run…</p>
+-          ) : (
+-            <>
+-              <dl>
+-                <dt>Status</dt>
+-                <dd>{statusLabels[run.status]}</dd>
+-                {run.reason && (
+-                  <>
+-                    <dt>Reason</dt>
+-                    <dd>{run.reason}</dd>
+-                  </>
+-                )}
+-                {funnelLabels.map(([key, label]) => (
+-                  <div key={key}>
+-                    <dt>{label}</dt>
+-                    <dd>{run.funnel[key]}</dd>
+-                  </div>
+-                ))}
+-              </dl>
+-              {stream.evaluations.length === 0 ? (
+-                <p>No jobs yet.</p>
+-              ) : (
+-                <ul>
+-                  {stream.evaluations.map((evaluation) => (
+-                    <li key={evaluation.jobKey}>
+-                      <strong>{evaluation.posting.title}</strong> at {evaluation.posting.company}:{" "}
+-                      <span>{evaluation.status}</span>
+-                      {evaluation.reason && <span> ({evaluation.reason})</span>}
+-                    </li>
+-                  ))}
+-                </ul>
+-              )}
+-            </>
++          {runId && (
++            <Box sx={{ mt: 3 }}>
++              <Stack
++                direction="row"
++                spacing={2}
++                sx={{ justifyContent: "space-between", alignItems: "center", mb: 1.5 }}
++              >
++                <Box component="dl" sx={{ display: "flex", alignItems: "center", gap: 1, m: 0 }}>
++                  <Typography component="dt" variant="body2" color="text.secondary">
++                    Status
++                  </Typography>
++                  <Box component="dd" sx={{ m: 0 }}>
++                    {run ? <StatusChip status={run.status} /> : "—"}
++                  </Box>
++                </Box>
++                <ConnectionIndicator connection={stream.connection} />
++              </Stack>
++              <LinearProgress
++                aria-label="Run progress"
++                variant={progress === null ? "indeterminate" : "determinate"}
++                value={progress ?? undefined}
++                color={
++                  run?.status === "failed"
++                    ? "error"
++                    : run?.status === "completed"
++                      ? "success"
++                      : "primary"
++                }
++                sx={{ height: 6, borderRadius: 3 }}
++              />
++            </Box>
+           )}
+-        </div>
++        </CardContent>
++      </Card>
++
++      {startError && (
++        <Alert severity="error" role="alert">
++          {startError}
++        </Alert>
++      )}
++      {stream.error && (
++        <Alert severity="error" role="alert">
++          Stream error: {stream.error}
++        </Alert>
++      )}
++      {run?.reason && (
++        <Alert severity={run.status === "failed" ? "error" : "info"}>{run.reason}</Alert>
++      )}
++
++      {!runId ? (
++        checking ? (
++          <Stack
++            direction="row"
++            spacing={1.5}
++            sx={{ alignItems: "center", color: "text.secondary" }}
++          >
++            <CircularProgress size={16} color="inherit" aria-hidden="true" />
++            <Typography variant="body2">Checking for an active run…</Typography>
++          </Stack>
++        ) : (
++          <Card>
++            <CardContent sx={{ py: 7, textAlign: "center" }}>
++              <TravelExploreIcon
++                sx={{ fontSize: 40, color: "text.disabled", mb: 1 }}
++                aria-hidden="true"
++              />
++              <Typography variant="h3" gutterBottom>
++                No runs yet
++              </Typography>
++              <Typography color="text.secondary" sx={{ maxWidth: 460, mx: "auto" }}>
++                Press Auto-apply to discover jobs, score each one against your profile and build the
++                applications. Nothing is ever sent to an employer.
++              </Typography>
++            </CardContent>
++          </Card>
++        )
++      ) : !run ? (
++        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", color: "text.secondary" }}>
++          <CircularProgress size={16} color="inherit" aria-hidden="true" />
++          <Typography variant="body2">Loading run…</Typography>
++        </Stack>
++      ) : (
++        <>
++          <Box
++            component="dl"
++            aria-label="Funnel"
++            sx={{
++              m: 0,
++              display: "grid",
++              gap: 1.5,
++              gridTemplateColumns: {
++                xs: "repeat(2, 1fr)",
++                sm: "repeat(4, 1fr)",
++                md: "repeat(7, 1fr)",
++              },
++            }}
++          >
++            {funnelLabels.map(([key, label]) => (
++              <Card
++                key={key}
++                sx={{
++                  px: 2,
++                  py: 1.5,
++                  display: "flex",
++                  flexDirection: "column",
++                  justifyContent: "space-between",
++                }}
++              >
++                <Typography component="dt" variant="caption" color="text.secondary">
++                  {label}
++                </Typography>
++                <Typography
++                  component="dd"
++                  sx={{
++                    m: 0,
++                    fontSize: "1.5rem",
++                    fontWeight: 600,
++                    fontVariantNumeric: "tabular-nums",
++                  }}
++                >
++                  {run.funnel[key]}
++                </Typography>
++              </Card>
++            ))}
++          </Box>
++
++          <Card>
++            <Box sx={{ px: { xs: 2, sm: 3 }, pt: 2, pb: 1 }}>
++              <Typography variant="h2">Jobs</Typography>
++            </Box>
++            {stream.evaluations.length === 0 ? (
++              <Typography color="text.secondary" sx={{ px: { xs: 2, sm: 3 }, pb: 3 }}>
++                No jobs yet.
++              </Typography>
++            ) : (
++              <JobsTable evaluations={stream.evaluations} />
++            )}
++          </Card>
++        </>
+       )}
+-    </section>
++    </Stack>
+   );
+ }
+diff --git a/docs/adr/0002-allowed-dependencies.md b/docs/adr/0002-allowed-dependencies.md
+index c9138f3..18a4427 100644
+--- a/docs/adr/0002-allowed-dependencies.md
++++ b/docs/adr/0002-allowed-dependencies.md
+@@ -5,9 +5,11 @@ This is the up-front allow-list the grilling produced. Anything on it may be ins
+ ## Runtime
+ 
+ ### `packages/shared`
++
+ - **zod** — the contract: API payloads, SSE event payloads, Firestore document shapes, the status+reason unions, rubric constants.
+ 
+ ### `apps/api`
++
+ - **express** — HTTP server.
+ - **firebase-admin** — Firestore access (Admin SDK only; browsers never touch Firebase).
+ - **zod** — boundary validation (shared).
+@@ -18,10 +20,15 @@ This is the up-front allow-list the grilling produced. Anything on it may be ins
+ - **express-rate-limit** — rate-limit `POST /api/login` and `POST /api/runs` (D26, D28).
+ 
+ ### `apps/web`
++
+ - **react**, **react-dom** — UI.
+ - **react-router-dom** — the routed pages: login, live run, Applied jobs, Scanned jobs, Settings (D20, D26).
++- **@mui/material**, **@emotion/react**, **@emotion/styled** — the UI kit and its styling engine (ticket 05b, human-approved): one theme, plus accessible Table, Chip, Card and progress components, so a minimal UI looks designed without hand-rolled CSS.
++- **@mui/icons-material** — the handful of icons in the shell and status chips.
++- **@fontsource/inter** — Inter, self-hosted and bundled by Vite, so the page makes no requests to a font CDN.
+ 
+ ## Dev / build / test
++
+ - **typescript** — strict everywhere; also the api/shared production build (`tsc`).
+ - **vite**, **@vitejs/plugin-react** — web dev server and production build.
+ - **vitest** — unit/integration tests across all workspaces.
+@@ -37,6 +44,7 @@ This is the up-front allow-list the grilling produced. Anything on it may be ins
+ - **Types**: `@types/node`, `@types/express`, `@types/cors`, `@types/cookie-parser`, `@types/jsonwebtoken`, `@types/supertest`, `@types/react`, `@types/react-dom`. (`bcryptjs` and `express-rate-limit` ship their own types.)
+ 
+ ## Deliberately excluded (would need an ADR to add)
++
+ - **No AI SDK and no agent/RAG framework** — the AI is two schema-bound `fetch` calls to an OpenAI-compatible endpoint from `apps/api/src/ai/` (D22, D25); LangChain/LlamaIndex/vector stores are hook-blocked.
+ - **No state-machine library** (xstate) — the run/job machines are a centralised transition table of pure functions (D16).
+ - **No concurrency library** (p-limit) — the 3-in-flight pool is a tiny inline semaphore (D17).
+/**
+ * The one MUI theme (ticket 05b): Inter, a neutral light background, one
+ * primary colour, 8px spacing, rounded outlined cards and restrained shadows.
+ */
+import { createTheme } from "@mui/material/styles";
+
+export const theme = createTheme({
+  palette: {
+    mode: "light",
+    primary: { main: "#4f46e5" },
+    background: { default: "#f6f7f9", paper: "#ffffff" },
+    divider: "#e4e7ec",
+    text: { primary: "#101828", secondary: "#475467" },
+  },
+  spacing: 8,
+  shape: { borderRadius: 10 },
+  typography: {
+    fontFamily: '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+    h1: { fontSize: "1.75rem", fontWeight: 600 },
+    h2: { fontSize: "1.25rem", fontWeight: 600 },
+    h3: { fontSize: "1rem", fontWeight: 600 },
+    button: { textTransform: "none", fontWeight: 600 },
+    overline: { fontWeight: 600, letterSpacing: "0.06em" },
+  },
+  components: {
+    MuiCard: {
+      defaultProps: { variant: "outlined" },
+      styleOverrides: {
+        root: { boxShadow: "0 1px 2px rgba(16, 24, 40, 0.04)" },
+      },
+    },
+    MuiAppBar: {
+      defaultProps: { elevation: 0, color: "inherit" },
+      styleOverrides: {
+        root: { borderBottom: "1px solid #e4e7ec" },
+      },
+    },
+    MuiButton: {
+      defaultProps: { disableElevation: true },
+    },
+    MuiChip: {
+      styleOverrides: {
+        root: { fontWeight: 500 },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        head: { fontWeight: 600, color: "#475467", whiteSpace: "nowrap" },
+      },
+    },
+  },
+});
+/**
+ * The one way a Run or Evaluation status, or a Verdict, is shown anywhere in
+ * the UI (ticket 05b). Always colour plus text, never colour alone; statuses
+ * still in progress carry a spinner and `aria-busy`.
+ */
+import Chip, { type ChipProps } from "@mui/material/Chip";
+import CircularProgress from "@mui/material/CircularProgress";
+import Box from "@mui/material/Box";
+import type { EvaluationStatus, RunStatus, Verdict } from "@auto-apply/shared";
+
+export type Status = RunStatus | EvaluationStatus;
+
+interface Look {
+  label: string;
+  color: ChipProps["color"];
+  variant: ChipProps["variant"];
+  busy?: boolean;
+}
+
+const looks: Record<Status, Look> = {
+  discovering: { label: "Discovering", color: "info", variant: "outlined", busy: true },
+  evaluating: { label: "Evaluating", color: "info", variant: "outlined", busy: true },
+  applying: { label: "Applying", color: "info", variant: "outlined", busy: true },
+  completed: { label: "Completed", color: "success", variant: "filled" },
+  queued: { label: "Queued", color: "default", variant: "filled" },
+  held: { label: "Needs you", color: "warning", variant: "filled" },
+  skipped: { label: "Skipped", color: "default", variant: "outlined" },
+  blocked: { label: "Blocked", color: "error", variant: "outlined" },
+  submitted: { label: "Submitted", color: "success", variant: "filled" },
+  failed: { label: "Failed", color: "error", variant: "filled" },
+};
+
+export function StatusChip({ status }: { status: Status }) {
+  const look = looks[status];
+  return (
+    <Chip
+      data-testid="status-chip"
+      data-status={status}
+      aria-busy={look.busy ? true : undefined}
+      size="small"
+      color={look.color}
+      variant={look.variant}
+      icon={
+        look.busy ? <CircularProgress size={12} color="inherit" aria-hidden="true" /> : undefined
+      }
+      label={
+        status === "submitted" ? (
+          <>
+            {look.label}{" "}
+            <Box
+              component="span"
+              sx={{
+                ml: 0.5,
+                px: 0.75,
+                py: 0.125,
+                borderRadius: 1,
+                fontSize: "0.6875rem",
+                bgcolor: "rgba(255, 255, 255, 0.25)",
+              }}
+            >
+              simulated
+            </Box>
+          </>
+        ) : (
+          look.label
+        )
+      }
+    />
+  );
+}
+
+const verdictLooks: Record<
+  Verdict,
+  { label: string; color: ChipProps["color"]; variant: ChipProps["variant"] }
+> = {
+  APPLY_NOW: { label: "APPLY NOW", color: "primary", variant: "filled" },
+  APPLY: { label: "APPLY", color: "primary", variant: "outlined" },
+  STRETCH: { label: "STRETCH", color: "default", variant: "outlined" },
+  BLOCKED: { label: "BLOCKED", color: "error", variant: "outlined" },
+};
+
+export function VerdictChip({ verdict }: { verdict: Verdict | null }) {
+  if (!verdict) {
+    return (
+      <Box component="span" sx={{ color: "text.secondary" }}>
+        —
+      </Box>
+    );
+  }
+  const look = verdictLooks[verdict];
+  return <Chip size="small" label={look.label} color={look.color} variant={look.variant} />;
+}
+/**
+ * The live stream's connection state (CODING_STANDARDS, Web): a coloured dot
+ * plus a word, never the dot alone.
+ */
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import type { Connection } from "../run/useRunStream";
+
+const looks: Record<Connection, { label: string; color: string; pulse: boolean }> = {
+  connecting: { label: "Connecting…", color: "info.main", pulse: true },
+  live: { label: "Live", color: "success.main", pulse: true },
+  reconnecting: { label: "Reconnecting…", color: "warning.main", pulse: true },
+  closed: { label: "Closed", color: "text.disabled", pulse: false },
+};
+
+export function ConnectionIndicator({ connection }: { connection: Connection }) {
+  const look = looks[connection];
+  return (
+    <Stack
+      direction="row"
+      spacing={0.75}
+      sx={{ alignItems: "center" }}
+      data-testid="connection"
+      title="Live updates from the server"
+    >
+      <Box
+        aria-hidden="true"
+        sx={{
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          bgcolor: look.color,
+          ...(look.pulse && {
+            "@keyframes pulse": { "50%": { opacity: 0.35 } },
+            animation: "pulse 1.6s ease-in-out infinite",
+            "@media (prefers-reduced-motion: reduce)": { animation: "none" },
+          }),
+        }}
+      />
+      <Typography variant="body2" color="text.secondary">
+        {look.label}
+      </Typography>
+    </Stack>
+  );
+}
+/**
+ * The frame around every view (ticket 05b): an app bar with the product name,
+ * a Prototype badge and the nav tabs; a max-width content container; and a
+ * quiet footer that says submissions are simulated (D18).
+ */
+import type { ReactNode } from "react";
+import { Link, useLocation } from "react-router-dom";
+import AppBar from "@mui/material/AppBar";
+import Box from "@mui/material/Box";
+import Chip from "@mui/material/Chip";
+import Container from "@mui/material/Container";
+import Stack from "@mui/material/Stack";
+import Tab from "@mui/material/Tab";
+import Tabs from "@mui/material/Tabs";
+import Toolbar from "@mui/material/Toolbar";
+import Typography from "@mui/material/Typography";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import { ApiHealth } from "./ApiHealth";
+
+export const navItems = [
+  { path: "/", label: "Run" },
+  { path: "/applied", label: "Applied jobs" },
+  { path: "/scanned", label: "Scanned jobs" },
+  { path: "/settings", label: "Settings" },
+] as const;
+
+export function AppShell({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  const current = navItems.find((item) => item.path === pathname)?.path ?? false;
+
+  return (
+    <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <AppBar position="sticky">
+        <Container maxWidth="lg">
+          <Toolbar disableGutters sx={{ gap: 2, minHeight: { xs: 56 } }}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexShrink: 0 }}>
+              <AutoAwesomeIcon color="primary" fontSize="small" aria-hidden="true" />
+              <Typography component="span" sx={{ fontWeight: 700 }}>
+                AI Auto-apply
+              </Typography>
+              <Chip label="Prototype" size="small" variant="outlined" />
+            </Stack>
+          </Toolbar>
+          <Tabs
+            value={current}
+            aria-label="Views"
+            variant="scrollable"
+            scrollButtons={false}
+            sx={{ minHeight: 40, mt: -1 }}
+          >
+            {navItems.map((item) => (
+              <Tab
+                key={item.path}
+                label={item.label}
+                value={item.path}
+                component={Link}
+                to={item.path}
+                sx={{ minHeight: 40, px: 1.5 }}
+              />
+            ))}
+          </Tabs>
+        </Container>
+      </AppBar>
+
+      <Container component="main" maxWidth="lg" sx={{ flex: 1, py: 4 }}>
+        {children}
+      </Container>
+
+      <Box component="footer" sx={{ borderTop: 1, borderColor: "divider", py: 2 }}>
+        <Container maxWidth="lg">
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1}
+            sx={{ justifyContent: "space-between" }}
+          >
+            <Typography variant="caption" color="text.secondary">
+              Submissions are simulated · payloads are built and stored, never sent
+            </Typography>
+            <ApiHealth />
+          </Stack>
+        </Container>
+      </Box>
+    </Box>
+  );
+}
+/**
+ * A quiet line in the footer saying which API, namespace and store the page is
+ * talking to, so an in-memory store is never mistaken for persistence (ADR-0004).
+ */
+import { useEffect, useState } from "react";
+import Typography from "@mui/material/Typography";
+import { healthResponseSchema, type HealthResponse } from "@auto-apply/shared";
+import { API_URL } from "../api";
+
+type State =
+  | { kind: "loading" }
+  | { kind: "error"; message: string }
+  | { kind: "ready"; health: HealthResponse };
+
+export function ApiHealth() {
+  const [state, setState] = useState<State>({ kind: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch(`${API_URL}/api/health`)
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error(`API responded ${res.status}`);
+        }
+        return healthResponseSchema.parse(await res.json());
+      })
+      .then((health) => {
+        if (!cancelled) {
+          setState({ kind: "ready", health });
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setState({
+            kind: "error",
+            message: err instanceof Error ? err.message : "Unknown error",
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (state.kind === "loading") {
+    return (
+      <Typography variant="caption" color="text.secondary">
+        Checking API…
+      </Typography>
+    );
+  }
+  if (state.kind === "error") {
+    return (
+      <Typography variant="caption" color="error" role="alert">
+        Could not reach the API: {state.message}
+      </Typography>
+    );
+  }
+  const { health } = state;
+  return (
+    <Typography variant="caption" color="text.secondary">
+      API {health.status} · namespace {health.namespace} ·{" "}
+      {health.repo === "memory" ? "In-memory (not persisted)" : "Firestore"}
+    </Typography>
+  );
+}
+/**
+ * A view whose ticket has not landed yet (Applied jobs: 11, Scanned jobs and
+ * Settings: 12). It says so plainly instead of showing an empty list that looks
+ * like real data.
+ */
+import Card from "@mui/material/Card";
+import CardContent from "@mui/material/CardContent";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+
+export function PlaceholderPage({ title, description }: { title: string; description: string }) {
+  return (
+    <Stack spacing={3}>
+      <Typography variant="h1">{title}</Typography>
+      <Card>
+        <CardContent sx={{ py: 6, textAlign: "center" }}>
+          <Typography variant="h3" gutterBottom>
+            Not built yet
+          </Typography>
+          <Typography color="text.secondary">{description}</Typography>
+        </CardContent>
+      </Card>
+    </Stack>
+  );
+}
+/**
+ * The Evaluations of a Run as a table, one row per Job Key, updated in place
+ * as `eval` events arrive.
+ */
+import Table from "@mui/material/Table";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableContainer from "@mui/material/TableContainer";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
+import Typography from "@mui/material/Typography";
+import type { Ats, Evaluation } from "@auto-apply/shared";
+import { StatusChip, VerdictChip } from "../ui/StatusChip";
+
+const atsLabels: Record<Ats, string> = {
+  greenhouse: "Greenhouse",
+  lever: "Lever",
+  ashby: "Ashby",
+};
+
+export function JobsTable({ evaluations }: { evaluations: Evaluation[] }) {
+  return (
+    <TableContainer>
+      <Table size="small" aria-label="Jobs in this run">
+        <TableHead>
+          <TableRow>
+            <TableCell>Company</TableCell>
+            <TableCell>Role</TableCell>
+            <TableCell>Source</TableCell>
+            <TableCell>Verdict</TableCell>
+            <TableCell align="right">Score</TableCell>
+            <TableCell>Status</TableCell>
+            <TableCell>Reason</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {evaluations.map(({ jobKey, posting, verdict, score, status, reason }) => (
+            <TableRow key={jobKey} hover>
+              <TableCell sx={{ whiteSpace: "nowrap" }}>{posting.company}</TableCell>
+              <TableCell sx={{ fontWeight: 500 }}>{posting.title}</TableCell>
+              <TableCell sx={{ whiteSpace: "nowrap" }}>
+                {atsLabels[posting.ats]}
+                <Typography component="span" variant="body2" color="text.secondary">
+                  {" "}
+                  · {posting.board}
+                </Typography>
+              </TableCell>
+              <TableCell>
+                <VerdictChip verdict={verdict} />
+              </TableCell>
+              <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                {score === null ? "—" : Math.round(score)}
+              </TableCell>
+              <TableCell>
+                <StatusChip status={status} />
+              </TableCell>
+              <TableCell sx={{ color: "text.secondary", minWidth: 200 }}>{reason ?? "—"}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+}
