@@ -24,7 +24,8 @@
  *      Verdict, then the language gate caps the Verdict of IC titles
  *      (`language-gate.ts`), stored with every criterion's evidence. The Verdict drives
  *      the outcome: APPLY → `held: below_auto_threshold`; STRETCH →
- *      `skipped: stretch`; APPLY NOW → fill the form.
+ *      `skipped: stretch`; APPLY NOW → fill the form. Under the demo preset
+ *      APPLY and STRETCH are filled too (`appliesTo`), keeping their Verdict.
  *   4. Form fill (D5, D9–D12, `forms/fill-form.ts`): the Greenhouse form is
  *      read and merged and every field resolved. A required field left
  *      unanswered → `held: needs_you` with the fields listed (D11). A
@@ -63,7 +64,7 @@ import { aiCriteria, buildRubric, judgeInCode } from "../evaluation/rubric.js";
 import { applyLanguageGate, languageGateQuestions } from "../evaluation/language-gate.js";
 import { scoreJudgements } from "../evaluation/score.js";
 import { screenPosting, type ScreeningOptions } from "../evaluation/screen.js";
-import { withPreferencesPreset } from "../evaluation/preferences-preset.js";
+import { appliesTo, withPreferencesPreset } from "../evaluation/preferences-preset.js";
 import { fillForm } from "../forms/fill-form.js";
 import type { FieldResolution } from "../forms/resolve.js";
 import { logger } from "../logger.js";
@@ -505,7 +506,7 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
         scoredBy,
       };
       const scoredOptions = { markSeen: true, evaluated: true };
-      if (scored.verdict === "APPLY_NOW") {
+      if (appliesTo(user, scored.verdict)) {
         // The Verdict streams while the form is read; a form that cannot be
         // read fails the Posting below, keeping its Verdict.
         await repo.patchEvaluation(runId, key, outcome);

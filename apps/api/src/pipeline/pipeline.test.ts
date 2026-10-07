@@ -549,7 +549,8 @@ describe("preferences preset", () => {
 
     expect(real.byJob.get("abroad")?.status).toBe("blocked");
     expect(real.byJob.get("abroad")?.reason).toMatch(/^Mandatory onsite .*San Francisco, CA/);
-    expect(demo.byJob.get("abroad")).toMatchObject({ verdict: "STRETCH", status: "skipped" });
+    expect(demo.byJob.get("abroad")?.verdict).toBe("STRETCH");
+    expect(demo.byJob.get("abroad")?.status).not.toBe("blocked");
   });
 
   it("still applies every other hard block under demo", async () => {
@@ -570,15 +571,55 @@ describe("preferences preset", () => {
     const real = await runAs(theUser, postingsFor(), met);
     const demo = await runAs(demoUser, postingsFor(), met);
 
+    // Same judgement under both presets; only the action differs (below).
     const pick = (e: Evaluation | undefined) => ({
       verdict: e?.verdict,
       score: e?.score,
-      status: e?.status,
-      reason: e?.reason,
       evidence: e?.evidence,
     });
     expect(pick(demo.byJob.get("fit"))).toEqual(pick(real.byJob.get("fit")));
     expect(real.byJob.get("fit")?.verdict).toBe("APPLY");
+  });
+
+  it("applies to APPLY and STRETCH jobs under demo, keeping their Verdict; the default preset holds and skips them (D8)", async () => {
+    const postingsFor = () => [
+      {
+        ...aPosting("apply"),
+        location: "Bengaluru, India",
+        remote: false,
+        title: "Engineering Manager",
+      },
+      {
+        ...aPosting("stretch"),
+        location: "Bengaluru, India",
+        remote: false,
+        title: "Engineering Manager",
+      },
+    ];
+    // Manager title (+3) + primary stack (+3) = 6: APPLY. Manager title alone = 3: STRETCH.
+    const met = { apply: ["stack_primary"] };
+
+    const real = await runAs(theUser, postingsFor(), met);
+    const demo = await runAs(demoUser, postingsFor(), met);
+
+    expect(real.byJob.get("apply")).toMatchObject({
+      verdict: "APPLY",
+      status: "held",
+      reason: "below_auto_threshold",
+    });
+    expect(real.byJob.get("stretch")).toMatchObject({
+      verdict: "STRETCH",
+      status: "skipped",
+      reason: "stretch",
+    });
+    // Under demo both are filled and submitted (simulated): the Run's first
+    // submit fails on purpose (D19), the second is submitted.
+    expect(demo.byJob.get("apply")?.verdict).toBe("APPLY");
+    expect(demo.byJob.get("stretch")?.verdict).toBe("STRETCH");
+    const outcomesUnderDemo = [demo.byJob.get("apply"), demo.byJob.get("stretch")]
+      .map((e) => `${e?.status}${e?.reason ? `: ${e.reason}` : ""}`)
+      .sort();
+    expect(outcomesUnderDemo).toEqual(["failed: simulated", "submitted"]);
   });
 
   it("records the preset on the Run, so a demo Run stays labelled", async () => {

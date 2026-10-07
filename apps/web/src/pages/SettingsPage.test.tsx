@@ -274,7 +274,9 @@ describe("<SettingsPage />", { timeout: 20_000 }, () => {
     expect(within(preset).getByRole("option", { name: "Demo (broadened)" })).toBeVisible();
     expect(screen.getByText("Active: My preferences (default)")).toBeInTheDocument();
     expect(
-      screen.getByText(/Demo turns the location hard block off; everything else is identical/),
+      screen.getByText(
+        /Demo turns the location hard block off and also applies to APPLY and STRETCH jobs; scoring is identical/,
+      ),
     ).toBeInTheDocument();
 
     await ui.selectOptions(preset, "demo");
