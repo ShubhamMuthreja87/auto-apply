@@ -518,6 +518,78 @@ describe("screening before evaluation (D7)", () => {
   });
 });
 
+describe("preferences preset", () => {
+  const demoUser: User = {
+    ...theUser,
+    settings: { ...theUser.settings, preferencesPreset: "demo" },
+  };
+
+  /** One Run over the Postings as `user`, with every AI-side criterion in `met` met. */
+  async function runAs(user: User, discovered: Posting[], met: Record<string, string[]> = {}) {
+    const repo = new InMemoryRepo();
+    const pipeline = buildPipeline(
+      deps({
+        repo,
+        discovery: { discover: async () => discovered },
+        evaluator: cannedEvaluator(met),
+        loadUser: async () => user,
+      }),
+    );
+    const { runId, finished } = await pipeline.startRun("user-1");
+    await finished;
+    const byJob = new Map((await evaluationsOf(repo, runId)).map((e) => [e.posting.jobId, e]));
+    return { run: await repo.getRun(runId), byJob };
+  }
+
+  it("lets a Posting blocked on location under the default preset through screening under demo", async () => {
+    const abroad = { ...aPosting("abroad"), ...onsiteAbroad, title: "Engineering Manager" };
+
+    const real = await runAs(theUser, [abroad]);
+    const demo = await runAs(demoUser, [abroad]);
+
+    expect(real.byJob.get("abroad")?.status).toBe("blocked");
+    expect(real.byJob.get("abroad")?.reason).toMatch(/^Mandatory onsite .*San Francisco, CA/);
+    expect(demo.byJob.get("abroad")).toMatchObject({ verdict: "STRETCH", status: "skipped" });
+  });
+
+  it("still applies every other hard block under demo", async () => {
+    const bank = { ...aPosting("bank"), ...onsiteAbroad, company: "Barclays" };
+
+    const demo = await runAs(demoUser, [bank]);
+
+    expect(demo.byJob.get("bank")).toMatchObject({ verdict: "BLOCKED", status: "blocked" });
+    expect(demo.byJob.get("bank")?.reason).toMatch(/Barclays/);
+  });
+
+  it("gives a Posting no location rule touches the same Verdict and score under both presets", async () => {
+    const fit = { ...aPosting("fit"), location: "Bengaluru, India", remote: false };
+    const postingsFor = () => [{ ...fit, title: "Engineering Manager" }];
+    // Manager title (+3, code) + primary stack = 6: APPLY.
+    const met = { fit: ["stack_primary"] };
+
+    const real = await runAs(theUser, postingsFor(), met);
+    const demo = await runAs(demoUser, postingsFor(), met);
+
+    const pick = (e: Evaluation | undefined) => ({
+      verdict: e?.verdict,
+      score: e?.score,
+      status: e?.status,
+      reason: e?.reason,
+      evidence: e?.evidence,
+    });
+    expect(pick(demo.byJob.get("fit"))).toEqual(pick(real.byJob.get("fit")));
+    expect(real.byJob.get("fit")?.verdict).toBe("APPLY");
+  });
+
+  it("records the preset on the Run, so a demo Run stays labelled", async () => {
+    const real = await runAs(theUser, [aPosting("1")]);
+    const demo = await runAs(demoUser, [aPosting("1")]);
+
+    expect(real.run?.preferencesPreset).toBe("default");
+    expect(demo.run?.preferencesPreset).toBe("demo");
+  });
+});
+
 describe("limits (D17)", () => {
   it(`keeps at most ${MAX_IN_FLIGHT} Postings in flight and persists only what it has pulled`, async () => {
     const gated = gatedDelay();

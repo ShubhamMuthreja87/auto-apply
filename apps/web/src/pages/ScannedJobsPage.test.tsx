@@ -204,6 +204,24 @@ describe("<ScannedJobsPage />", () => {
     expect(screen.queryByText(/seen in an earlier run/i)).not.toBeInTheDocument();
   });
 
+  it("labels a Run that used the demo preferences preset in the Run picker", async () => {
+    fakeApi({
+      runs: [
+        { ...aRun("run-new", "2026-10-06T09:00:00.000Z"), preferencesPreset: "demo" },
+        aRun("run-old", "2026-10-05T09:00:00.000Z"),
+      ],
+    });
+    render(<ScannedJobsPage />);
+    await jobRows();
+
+    await userEvent.click(screen.getByRole("combobox", { name: "Run" }));
+
+    expect(
+      await screen.findByRole("option", { name: /6 Oct 2026.*Demo preferences/ }),
+    ).toBeVisible();
+    expect(screen.getByRole("option", { name: /5 Oct 2026/ })).not.toHaveTextContent(/demo/i);
+  });
+
   it("shows an empty state before anything was scanned", async () => {
     fakeApi({ runs: [], evaluations: {} });
     render(<ScannedJobsPage />);

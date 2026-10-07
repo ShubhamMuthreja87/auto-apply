@@ -4,7 +4,8 @@
  * source, and news-up nothing itself (spec, Pipeline). Tests drive it with
  * fakes and an instant `delay`; production passes real timers.
  *
- * A Run: load the user → discover Postings → per board, walk them newest
+ * A Run: load the user, with the preferences of its active preset
+ * (`evaluation/preferences-preset.ts`) → discover Postings → per board, walk them newest
  * first and take up to `MAX_POSTINGS_PER_BOARD` not yet Seen (D15), so each
  * Run moves on to the next unseen Postings. Seen ones passed over get no
  * Evaluation; they are only counted, in `funnel.alreadySeen` → pull the
@@ -62,6 +63,7 @@ import { aiCriteria, buildRubric, judgeInCode } from "../evaluation/rubric.js";
 import { applyLanguageGate, languageGateQuestions } from "../evaluation/language-gate.js";
 import { scoreJudgements } from "../evaluation/score.js";
 import { screenPosting, type ScreeningOptions } from "../evaluation/screen.js";
+import { withPreferencesPreset } from "../evaluation/preferences-preset.js";
 import { fillForm } from "../forms/fill-form.js";
 import type { FieldResolution } from "../forms/resolve.js";
 import { logger } from "../logger.js";
@@ -229,11 +231,16 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
     };
   }
 
-  async function runStages(runId: string, uid: string, run: ReturnType<typeof runMachine>) {
+  async function runStages(
+    runId: string,
+    loadingUser: Promise<User>,
+    run: ReturnType<typeof runMachine>,
+  ) {
     // A missing or invalid user document fails the Run before any discovery.
-    const user = await loadUser(uid);
+    const user = await loadingUser;
     logger.info("run_user_loaded", {
       runId,
+      preferencesPreset: user.settings.preferencesPreset,
       fitCriteria: user.preferences.fitCriteria.length,
       hardBlocks: user.preferences.hardBlocks.length,
     });
@@ -580,6 +587,12 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
 
   return {
     async startRun(uid) {
+      // Loaded before the Run exists, so the Run records its preferences
+      // preset from the start; a load failure still creates the Run, which
+      // then fails with the reason. The preset decides the preferences the
+      // Run screens and scores with.
+      const loadingUser = loadUser(uid).then(withPreferencesPreset);
+      const loaded = await loadingUser.catch(() => null);
       const now = clock().toISOString();
       const created: Run = {
         runId: newRunId(),
@@ -588,12 +601,13 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
         funnel: emptyFunnel(),
         reason: null,
         ...(scoringMode ? { scoring: scoringMode } : {}),
+        ...(loaded ? { preferencesPreset: loaded.settings.preferencesPreset } : {}),
         createdAt: now,
         updatedAt: now,
       };
       await repo.createRun(created);
       const run = runMachine(created.runId);
-      const finished = runStages(created.runId, uid, run).catch((err: unknown) =>
+      const finished = runStages(created.runId, loadingUser, run).catch((err: unknown) =>
         fail(created.runId, run, err),
       );
       return { runId: created.runId, finished };

@@ -112,6 +112,7 @@ function RunSelect({
         {runs.map((run) => (
           <MenuItem key={run.runId} value={run.runId}>
             {formatDate(run.createdAt)} · {run.status}
+            {run.preferencesPreset === "demo" && " · Demo preferences"}
           </MenuItem>
         ))}
       </Select>

@@ -307,10 +307,24 @@ export const userPreferencesSchema = z.object({
 export type UserPreferences = z.infer<typeof userPreferencesSchema>;
 
 /**
+ * Which preferences a Run screens and scores with: `default` is the stored
+ * preferences as they are; `demo` ("Demo (broadened)") is the same stored
+ * preferences with the `location` hard block left out, so live postings from
+ * any location reach scoring. Every other hard block, the language gate and
+ * the fit scoring are identical. The API derives the demo preferences when a
+ * Run loads the user; nothing else is stored for it.
+ */
+export const PREFERENCES_PRESETS = ["default", "demo"] as const;
+export const preferencesPresetSchema = z.enum(PREFERENCES_PRESETS);
+export type PreferencesPreset = z.infer<typeof preferencesPresetSchema>;
+
+/**
  * The author's answers to common application-form questions (D9). `null`
  * means the sources do not say, so the field resolves to user-only.
  */
 export const applicationSettingsSchema = z.object({
+  /** The active preferences preset; `default` for documents stored before it. */
+  preferencesPreset: preferencesPresetSchema.default("default"),
   location: z.object({
     current: z.string().nullable(),
     postalAddress: z.string().nullable(),
@@ -474,6 +488,12 @@ export const runSchema = z.object({
    * the keyword matcher and the UI says so. Absent on Runs from before it.
    */
   scoring: z.lazy(() => scoredBySchema).optional(),
+  /**
+   * The preferences preset this Run screens and scores with, recorded when it
+   * starts, so a demo Run stays labelled. Absent on Runs from before it, and
+   * on a Run whose user document could not be loaded.
+   */
+  preferencesPreset: preferencesPresetSchema.optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

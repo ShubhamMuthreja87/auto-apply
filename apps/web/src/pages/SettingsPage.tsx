@@ -29,6 +29,7 @@ import { useLoad, type LoadState } from "../useLoad";
 import {
   buildForm,
   initialValues,
+  PRESET_LABELS,
   readForm,
   type Field,
   type RuleRow,
@@ -214,7 +215,7 @@ const FieldInput = memo(function FieldInput({
   inTable: boolean;
   onChange: (key: string, value: string) => void;
 }) {
-  const select = field.input === "yesNo" || field.input === "cap";
+  const select = field.input === "yesNo" || field.input === "cap" || field.input === "preset";
   return (
     <TextField
       size="small"
@@ -246,6 +247,12 @@ const FieldInput = memo(function FieldInput({
           No
         </option>,
       ]}
+      {field.input === "preset" &&
+        Object.entries(PRESET_LABELS).map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
       {field.input === "cap" && [
         <option key="APPLY" value="APPLY">
           APPLY
@@ -450,6 +457,15 @@ function PreferencesSection({ form, saved, input }: SectionProps) {
   const framing = saved.preferences.tierFraming;
   return (
     <Section title="Preferences">
+      <SubSection
+        title="Preferences preset"
+        note="Demo turns the location hard block off; everything else is identical (other hard blocks, language gate, fit scoring)."
+      >
+        <Typography variant="body2" sx={{ mb: 1.5 }}>
+          {`Active: ${PRESET_LABELS[saved.settings.preferencesPreset]}`}
+        </Typography>
+        <FieldGrid>{input(form.preset)}</FieldGrid>
+      </SubSection>
       <FieldGrid>{form.preferences.map((f) => input(f))}</FieldGrid>
       <Typography variant="body2" color="text.secondary">
         Answer framing: {framing.manager} for manager titles, {framing.ic} for IC titles.

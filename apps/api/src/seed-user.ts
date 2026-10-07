@@ -493,6 +493,8 @@ const preferences: User["preferences"] = {
 };
 
 const settings: User["settings"] = {
+  // The author's real preferences; "demo" is only ever chosen in Settings.
+  preferencesPreset: "default",
   location: {
     current: "Gurugram, India",
     postalAddress: null,

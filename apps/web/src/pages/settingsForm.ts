@@ -9,11 +9,19 @@
 import {
   SALARY_FLOOR_RULE_ID,
   updateMeRequestSchema,
+  type PreferencesPreset,
   type UpdateMeRequest,
   type User,
 } from "@auto-apply/shared";
 
-export type InputKind = "text" | "multiline" | "list" | "number" | "date" | "yesNo" | "cap";
+export type InputKind =
+  "text" | "multiline" | "list" | "number" | "date" | "yesNo" | "cap" | "preset";
+
+/** The preferences presets as the Settings page names them. */
+export const PRESET_LABELS: Record<PreferencesPreset, string> = {
+  default: "My preferences (default)",
+  demo: "Demo (broadened)",
+};
 
 export interface Field {
   /** The value's path in the request body, e.g. `preferences.fitCriteria.0.weight`. */
@@ -36,6 +44,8 @@ export interface RuleRow {
 }
 
 export interface SettingsForm {
+  /** Which preferences a Run uses: the stored ones, or Demo (broadened). */
+  preset: Field;
   profile: Field[];
   preferences: Field[];
   fitCriteria: RuleRow[];
@@ -122,6 +132,11 @@ const yesNo: Codec<boolean | null> = {
   input: "yesNo",
   show: (v) => (v === null ? "" : v ? "yes" : "no"),
   read: (raw) => ok(raw === "" ? null : raw === "yes"),
+};
+const preset: Codec<PreferencesPreset> = {
+  input: "preset",
+  show: (v) => v,
+  read: (raw) => (raw === "default" || raw === "demo" ? ok(raw) : fail("Choose a preset")),
 };
 const cap: Codec<"APPLY" | "STRETCH"> = {
   input: "cap",
@@ -599,7 +614,24 @@ export function buildForm(user: User): SettingsForm {
     ),
   ];
 
-  return { profile, preferences, fitCriteria, hardBlocks, companyBlocks, languageGate, settings };
+  const presetField = f(
+    "settings.preferencesPreset",
+    "Preferences preset",
+    preset,
+    (x) => x.settings.preferencesPreset,
+    (x, v) => (x.settings.preferencesPreset = v),
+  );
+
+  return {
+    preset: presetField,
+    profile,
+    preferences,
+    fitCriteria,
+    hardBlocks,
+    companyBlocks,
+    languageGate,
+    settings,
+  };
 }
 
 export function allFields(form: SettingsForm): Field[] {
@@ -610,6 +642,7 @@ export function allFields(form: SettingsForm): Field[] {
     ...form.languageGate,
   ];
   return [
+    form.preset,
     ...form.profile,
     ...form.preferences,
     ...rows.flatMap((row) => row.fields),
