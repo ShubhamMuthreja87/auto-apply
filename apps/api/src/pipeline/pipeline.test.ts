@@ -20,7 +20,12 @@ import { createChatClient } from "../ai/chat-client.js";
 import { cannedEvaluation, completion, scriptedFetch } from "../ai/scripted-fetch.js";
 import { InMemoryRepo } from "../repo/in-memory-repo.js";
 import { greenhouseForms } from "../forms/greenhouse-forms.js";
-import { EvaluationNotFoundError, buildPipeline, type PipelineDeps } from "./pipeline.js";
+import {
+  EvaluationNotFoundError,
+  MAX_POSTINGS_PER_BOARD,
+  buildPipeline,
+  type PipelineDeps,
+} from "./pipeline.js";
 import { IllegalTransitionError } from "./transitions.js";
 import { simulatedSubmitter } from "../submit/simulated-submitter.js";
 import { boardsFor } from "../discovery/boards.js";
@@ -399,6 +404,28 @@ describe("seen-skip (D15)", () => {
     });
   });
 
+  it(`takes the newest ${MAX_POSTINGS_PER_BOARD} unseen Postings per board, so each Run moves on to the next ones`, async () => {
+    const repo = new InMemoryRepo();
+    const { evaluator, judged } = recordingEvaluator();
+    // One board listing 25 Postings, newest first.
+    const discovery: Discovery = { discover: async () => postings(25) };
+    const pipeline = buildPipeline(deps({ repo, evaluator, discovery }));
+    const ids = (from: number, to: number) =>
+      Array.from({ length: to - from + 1 }, (_, i) => String(from + i)).sort();
+
+    await (
+      await pipeline.startRun("user-1")
+    ).finished;
+    const firstRun = [...judged].sort();
+    await (
+      await pipeline.startRun("user-1")
+    ).finished;
+    const secondRun = judged.slice(firstRun.length).sort();
+
+    expect(firstRun).toEqual(ids(1, 10));
+    expect(secondRun).toEqual(ids(11, 20));
+  });
+
   it("does not mark a Posting seen when it failed, so a later Run tries again", async () => {
     const repo = new InMemoryRepo();
     let calls = 0;
@@ -539,7 +566,10 @@ describe("limits (D17)", () => {
       ...postings(25, {}, "fit-"),
     ];
     const discovery: Discovery = { discover: async () => discovered };
-    const pipeline = buildPipeline(deps({ repo, evaluator, discovery }));
+    // One board here, so lift the per-board cap to reach the AI cap.
+    const pipeline = buildPipeline(
+      deps({ repo, evaluator, discovery, maxPostingsPerBoard: Infinity }),
+    );
 
     const { runId, finished } = await pipeline.startRun("user-1");
     await finished;
@@ -572,7 +602,10 @@ describe("limits (D17)", () => {
     const { evaluator, judged } = recordingEvaluator();
     const discovered = postings(MAX_AI_EVALS + 5);
     const discovery: Discovery = { discover: async () => discovered };
-    const pipeline = buildPipeline(deps({ repo, evaluator, discovery }));
+    // One board here, so lift the per-board cap to reach the AI cap.
+    const pipeline = buildPipeline(
+      deps({ repo, evaluator, discovery, maxPostingsPerBoard: Infinity }),
+    );
 
     await (
       await pipeline.startRun("user-1")

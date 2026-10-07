@@ -4,7 +4,9 @@
  * source, and news-up nothing itself (spec, Pipeline). Tests drive it with
  * fakes and an instant `delay`; production passes real timers.
  *
- * A Run: load the user → discover Postings → pull them through a pool of
+ * A Run: load the user → discover Postings → per board, walk them newest
+ * first and keep up to `MAX_POSTINGS_PER_BOARD` not yet Seen (D15), so each
+ * Run moves on to the next unseen Postings → pull them through a pool of
  * `LIMITS.maxInFlight` workers (D17). Each pulled Posting is persisted as `queued`,
  * moves to `evaluating`, and then, cheapest first:
  *   1. Seen in an earlier Run → `skipped: seen` (D15), before any spend.
@@ -110,7 +112,20 @@ export interface PipelineDeps {
    * apply to the next Run.
    */
   loadUser: (uid: string) => Promise<User>;
+  /** Unseen Postings taken per board per Run; {@link MAX_POSTINGS_PER_BOARD} unless a test widens it. */
+  maxPostingsPerBoard?: number;
 }
+
+/**
+ * Unseen Postings taken per board per Run, newest-updated first. A big board
+ * lists hundreds of jobs. The Run's AI-evaluation cap (D17) stops pulling once
+ * its slots are taken, but Seen and hard-blocked Postings take no slot, and
+ * for this user most Postings are blocked by location; without this bound a
+ * Run over 15 boards could write thousands of blocked Evaluations. Seen
+ * Postings are passed over before the cap applies, so the next Run takes the
+ * next unseen ones instead of the same newest few.
+ */
+export const MAX_POSTINGS_PER_BOARD = 10;
 
 export interface StartedRun {
   runId: string;
@@ -195,6 +210,7 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
     delay,
     newRunId,
     loadUser,
+    maxPostingsPerBoard = MAX_POSTINGS_PER_BOARD,
   } = deps;
 
   /** The Run's current status, kept beside the store so every move is checked. */
@@ -221,16 +237,51 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
       hardBlocks: user.preferences.hardBlocks.length,
     });
     await delay(STEP_MS);
-    const postings = await discovery.discover();
+    const { postings, seen } = await selectPostings(await discovery.discover());
     await repo.patchRun(runId, { funnelIncrements: { discovered: postings.length } });
 
     await run.move("evaluating");
-    const ready = await evaluateAll(runId, user, postings);
+    const ready = await evaluateAll(runId, user, postings, seen);
 
     await run.move("applying");
     await delay(STEP_MS);
     await submitAll(runId, ready);
     await run.move("completed");
+  }
+
+  /**
+   * Per board (discovery lists each board's Postings together, newest first):
+   * walks its Postings, checking Seen only as it goes, until it has
+   * `maxPostingsPerBoard` unseen ones or the board runs out. Returns every
+   * Posting walked, board by board, and which of them were Seen.
+   */
+  async function selectPostings(
+    discovered: readonly Posting[],
+  ): Promise<{ postings: Posting[]; seen: Set<string> }> {
+    const boards = new Map<string, Posting[]>();
+    for (const posting of discovered) {
+      const board = `${posting.ats}:${posting.board}`;
+      boards.set(board, [...(boards.get(board) ?? []), posting]);
+    }
+    const seen = new Set<string>();
+    const walkedPerBoard = await Promise.all(
+      [...boards.values()].map(async (board) => {
+        const walked: Posting[] = [];
+        let unseen = 0;
+        while (unseen < maxPostingsPerBoard && walked.length < board.length) {
+          // Read only as many Seen keys as could still fill the cap.
+          const chunk = board.slice(walked.length, walked.length + maxPostingsPerBoard - unseen);
+          const flags = await Promise.all(chunk.map((p) => repo.isSeen(jobKey(p))));
+          chunk.forEach((posting, i) => {
+            walked.push(posting);
+            if (flags[i]) seen.add(jobKey(posting));
+            else unseen++;
+          });
+        }
+        return walked;
+      }),
+    );
+    return { postings: walkedPerBoard.flat(), seen };
   }
 
   /**
@@ -326,6 +377,7 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
     runId: string,
     user: User,
     postings: readonly Posting[],
+    seen: ReadonlySet<string>,
   ): Promise<ReadyApplication[]> {
     const ready: ReadyApplication[] = [];
     let next = 0;
@@ -347,7 +399,7 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
     async function worker(): Promise<void> {
       for (let item = pull(); item; item = pull()) {
         const { posting, order } = item;
-        const application = await evaluateOne(runId, user, posting, slots);
+        const application = await evaluateOne(runId, user, posting, slots, seen);
         if (application) ready.push({ key: jobKey(posting), order, application });
       }
     }
@@ -371,6 +423,7 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
     user: User,
     posting: Posting,
     slots: { take(): boolean },
+    seen: ReadonlySet<string>,
   ): Promise<Application | null> {
     const key = jobKey(posting);
     const current: { status: EvaluationStatus } = { status: "queued" };
@@ -399,7 +452,7 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
       await move("evaluating");
       await delay(STEP_MS);
 
-      if (await repo.isSeen(key)) {
+      if (seen.has(key)) {
         return await finish("skipped", SKIP_REASONS.seen, "skipped", { markSeen: false });
       }
 
