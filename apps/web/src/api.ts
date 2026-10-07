@@ -18,6 +18,8 @@ import {
   retrySubmitResponseSchema,
   runsListResponseSchema,
   sessionResponseSchema,
+  submitAnswersRequestSchema,
+  submitAnswersResponseSchema,
   updateMeResponseSchema,
   type Evaluation,
   type LoginRequest,
@@ -25,6 +27,7 @@ import {
   type Run,
   type UpdateMeRequest,
   type UpdateMeResponse,
+  type UserAnswerValue,
 } from "@auto-apply/shared";
 
 /** A non-2xx answer, carrying the contract's error code when there is one. */
@@ -107,6 +110,28 @@ export async function retrySubmit(runId: string, jobKey: string): Promise<Evalua
     { method: "POST" },
   );
   return retrySubmitResponseSchema.parse(await readJson(res)).evaluation;
+}
+
+/**
+ * `POST /api/runs/:runId/jobs/:jobKey/answers` (Answer & submit): the user's
+ * answers to a `needs_you` job's missing fields; resolves with the Evaluation,
+ * now submitted (simulated). An `ApiError` with code `invalid_answers` (400)
+ * or `not_answerable` (409) otherwise.
+ */
+export async function submitAnswers(
+  runId: string,
+  jobKey: string,
+  answers: Record<string, UserAnswerValue>,
+): Promise<Evaluation> {
+  const res = await apiFetch(
+    `/api/runs/${encodeURIComponent(runId)}/jobs/${encodeURIComponent(jobKey)}/answers`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(submitAnswersRequestSchema.parse({ answers })),
+    },
+  );
+  return submitAnswersResponseSchema.parse(await readJson(res)).evaluation;
 }
 
 /** `GET /api/me`: the user document (profile, preferences, settings). */

@@ -9,6 +9,7 @@
  * friends — live in `contract.ts` because those *do* travel to the browser.
  */
 import type {
+  ApplicationDraft,
   CriterionEvidence,
   Evaluation,
   EvaluationStatus,
@@ -59,6 +60,8 @@ export interface EvaluationDelta {
   missingFields?: MissingField[];
   /** Replaces the stored simulated submission (D18); written on every submit attempt. */
   submission?: SimulatedSubmission | null;
+  /** Replaces the stored draft; written when a Posting is held as `needs_you` (Answer & submit). */
+  draft?: ApplicationDraft | null;
 }
 
 /** The editable parts of the user document; the uid is never rewritten. */

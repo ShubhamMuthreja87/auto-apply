@@ -1150,6 +1150,84 @@ describe("form fill for APPLY NOW (D5, D9–D11)", () => {
     expect(fake.calls.every((c) => c.method === "GET")).toBe(true);
   });
 
+  it("keeps a needs_you job's missing-field types and options and its answered draft, to finish later", async () => {
+    const employed: FormField = {
+      ...textField("question_5", "Have you ever been employed by Acme or an Acme affiliate?"),
+      type: "select",
+      options: [
+        { label: "Yes", value: 1 },
+        { label: "No", value: 0 },
+      ],
+    };
+    const forms = formOf([textField("first_name", "First Name"), employed]);
+
+    const { evaluation } = await runOne(applyNow("acme", "1"), { forms });
+
+    expect(evaluation).toMatchObject({ status: "held", reason: "needs_you", submission: null });
+    expect(evaluation?.missingFields).toEqual([
+      {
+        id: "question_5",
+        label: "Have you ever been employed by Acme or an Acme affiliate?",
+        why: expect.any(String),
+        type: "select",
+        options: [
+          { label: "Yes", value: 1 },
+          { label: "No", value: 0 },
+        ],
+      },
+    ]);
+    expect(evaluation?.draft).toEqual({
+      formUrl: "https://job-boards.greenhouse.io/acme/jobs/1",
+      answers: [
+        {
+          id: "first_name",
+          label: "First Name",
+          type: "text",
+          source: "profile",
+          value: theUser.profile.firstName,
+        },
+      ],
+    });
+  });
+
+  it("Answer & submit: submits once when clicked twice, with no deliberate failure", async () => {
+    const employed: FormField = {
+      ...textField("question_5", "Have you ever been employed by Acme?"),
+      type: "select",
+      options: [
+        { label: "Yes", value: 1 },
+        { label: "No", value: 0 },
+      ],
+    };
+    const repo = new InMemoryRepo();
+    const fake = recordingSubmitter();
+    const pipeline = buildPipeline(
+      deps({
+        repo,
+        discovery: { discover: async () => [applyNow("acme", "1")] },
+        evaluator: evaluatorFor("1"),
+        forms: formOf([textField("first_name", "First Name"), employed]),
+        submitter: fake.submitter,
+      }),
+    );
+    const { runId, finished } = await pipeline.startRun("user-1");
+    await finished;
+
+    const results = await Promise.allSettled([
+      pipeline.submitAnswers(runId, "greenhouse:acme:1", { question_5: 0 }),
+      pipeline.submitAnswers(runId, "greenhouse:acme:1", { question_5: 0 }),
+    ]);
+
+    expect(results.map((r) => r.status).sort()).toEqual(["fulfilled", "rejected"]);
+    expect(fake.calls).toHaveLength(1);
+    expect(fake.calls[0]?.simulateFailure).toBe(false);
+    expect(fake.calls[0]?.application.answers.map((a) => [a.id, a.source])).toEqual([
+      ["first_name", "profile"],
+      ["question_5", "user"],
+    ]);
+    expect((await repo.getRun(runId))?.funnel).toMatchObject({ held: 0, submitted: 1 });
+  });
+
   it("lists Stripe's form fields the settings do not answer, but fills School and Degree", async () => {
     const forms = greenhouseForms({ fetch: recordedFetch().fetch, timeoutMs: 1_000, mode: "live" });
 
@@ -1209,7 +1287,13 @@ describe("form fill for APPLY NOW (D5, D9–D11)", () => {
 
     expect(evaluation).toMatchObject({ status: "held", reason: "needs_you" });
     expect(evaluation?.missingFields).toEqual([
-      { id: "essay", label: "Why us?", why: expect.stringMatching(/could not ground/) },
+      {
+        id: "essay",
+        label: "Why us?",
+        why: expect.stringMatching(/could not ground/),
+        type: "textarea",
+        options: [],
+      },
     ]);
   });
 

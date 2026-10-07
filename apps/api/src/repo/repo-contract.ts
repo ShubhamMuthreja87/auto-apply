@@ -114,6 +114,11 @@ const missingField: MissingField = {
   id: "question_1",
   label: "Agreement to Arbitrate",
   why: "Legal agreement; never auto-answered (D10)",
+  type: "select",
+  options: [
+    { label: "Yes", value: 1 },
+    { label: "No", value: 0 },
+  ],
 };
 
 const submission: SimulatedSubmission = {
@@ -150,6 +155,7 @@ function anEvaluation(posting: Posting, overrides: Partial<Evaluation> = {}): Ev
     scoredBy: null,
     missingFields: [],
     submission: null,
+    draft: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -465,6 +471,7 @@ export function describeRepoContract(
           scoredBy: "fallback",
           missingFields: [missingField],
           submission,
+          draft: { formUrl: submission.formUrl, answers: submission.answers },
         });
         await eventually(() => expect(changes.at(-1)?.evaluation.status).toBe("submitted"));
         // The first delivery introduces the document; every later one modifies it.
@@ -480,6 +487,10 @@ export function describeRepoContract(
         expect(changes.at(-1)?.evaluation.scoredBy).toBe("fallback");
         expect(changes.at(-1)?.evaluation.missingFields).toEqual([missingField]);
         expect(changes.at(-1)?.evaluation.submission).toEqual(submission);
+        expect(changes.at(-1)?.evaluation.draft).toEqual({
+          formUrl: submission.formUrl,
+          answers: submission.answers,
+        });
         unsub();
       });
 
