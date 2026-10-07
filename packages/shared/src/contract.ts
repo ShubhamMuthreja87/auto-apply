@@ -425,6 +425,14 @@ export type UpdateMeResponse = z.infer<typeof updateMeResponseSchema>;
  * adapter maps increments to `FieldValue.increment`.
  */
 export const runFunnelSchema = z.object({
+  /**
+   * Postings Seen in an earlier Run (D15) that this Run passed over while
+   * taking each board's newest unseen ones: counted here only, never recorded
+   * as Evaluations, and not part of `discovered` or `skipped`. `0` on Runs
+   * from before it.
+   */
+  alreadySeen: z.number().int().nonnegative().default(0),
+  /** Postings this Run took up (unseen, within the per-board cap); each gets an Evaluation once pulled. */
   discovered: z.number().int().nonnegative(),
   evaluated: z.number().int().nonnegative(),
   blocked: z.number().int().nonnegative(),
@@ -437,7 +445,16 @@ export type RunFunnel = z.infer<typeof runFunnelSchema>;
 
 /** A fresh, all-zero funnel for a newly created Run. */
 export function emptyFunnel(): RunFunnel {
-  return { discovered: 0, evaluated: 0, blocked: 0, skipped: 0, held: 0, submitted: 0, failed: 0 };
+  return {
+    alreadySeen: 0,
+    discovered: 0,
+    evaluated: 0,
+    blocked: 0,
+    skipped: 0,
+    held: 0,
+    submitted: 0,
+    failed: 0,
+  };
 }
 
 /**
@@ -475,6 +492,9 @@ export const RUN_INTERRUPTED_REASON = "interrupted";
  * spend; `limit` — the Run's AI-evaluation cap was reached before this Posting
  * got a slot; `stretch` — the Verdict was STRETCH or below. Blocked and other
  * skipped Evaluations carry a free-text reason naming the rule and evidence.
+ * Nothing writes `seen` any more: Seen Postings are passed over without an
+ * Evaluation and counted in `funnel.alreadySeen`. It stays so Evaluations
+ * stored before that still parse and read well.
  */
 export const SKIP_REASONS = {
   seen: "seen",

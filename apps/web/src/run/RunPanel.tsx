@@ -37,6 +37,8 @@ const funnelLabels: [keyof RunFunnel, string][] = [
   ["held", "Held (needs you)"],
   ["submitted", "Submitted (simulated)"],
   ["failed", "Failed"],
+  // Seen in an earlier Run and passed over: counted, never listed (D15).
+  ["alreadySeen", "Already seen"],
 ];
 
 /**
@@ -261,7 +263,7 @@ export function RunPanel() {
               gridTemplateColumns: {
                 xs: "repeat(2, 1fr)",
                 sm: "repeat(4, 1fr)",
-                md: "repeat(7, 1fr)",
+                lg: "repeat(8, 1fr)",
               },
             }}
           >

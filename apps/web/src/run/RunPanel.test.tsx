@@ -249,11 +249,15 @@ describe("<RunPanel />", () => {
 
     act(() => {
       stream.emit("eval", anEvaluation("1"));
-      stream.emit("run", aRun({ status: "evaluating", funnel: funnel({ discovered: 1 }) }));
+      stream.emit(
+        "run",
+        aRun({ status: "evaluating", funnel: funnel({ discovered: 1, alreadySeen: 12 }) }),
+      );
       stream.emit("eval", anEvaluation("1", { status: "skipped", reason: "not a fit" }));
     });
     expect(valueOf("Status")).toBe("Evaluating");
     expect(valueOf("Discovered")).toBe("1");
+    expect(valueOf("Already seen")).toBe("12");
     const [row] = jobRows();
     expect(row).toHaveTextContent("Engineer 1");
     expect(within(row).getByTestId("status-chip")).toHaveTextContent("Skipped");

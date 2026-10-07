@@ -186,6 +186,24 @@ describe("<ScannedJobsPage />", () => {
     );
   });
 
+  it("lists no seen-earlier rows, even ones stored before Seen jobs stopped being recorded", async () => {
+    const legacySeen = anEvaluation("run-old", "3", {
+      status: "skipped",
+      verdict: null,
+      reason: "seen",
+    });
+    fakeApi({ evaluations: { all: [heldApply, legacySeen, blocked] } });
+    render(<ScannedJobsPage />);
+
+    const rows = await jobRows();
+
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Engineering Manager 2"),
+      expect.stringContaining("Engineering Manager 1"),
+    ]);
+    expect(screen.queryByText(/seen in an earlier run/i)).not.toBeInTheDocument();
+  });
+
   it("shows an empty state before anything was scanned", async () => {
     fakeApi({ runs: [], evaluations: {} });
     render(<ScannedJobsPage />);

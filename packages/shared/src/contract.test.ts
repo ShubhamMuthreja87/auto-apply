@@ -12,6 +12,7 @@ import {
   FIT_CAP,
   evaluationSchema,
   runSchema,
+  runFunnelSchema,
   simulatedSubmissionSchema,
 } from "./index.js";
 
@@ -116,6 +117,20 @@ describe("contract", () => {
     expect(runSchema.parse(stored).scoring).toBeUndefined();
     expect(runSchema.parse({ ...stored, scoring: "fallback" }).scoring).toBe("fallback");
     expect(() => runSchema.parse({ ...stored, scoring: "guess" })).toThrow();
+  });
+
+  it("reads a Run stored before alreadySeen with a count of 0", () => {
+    const funnel = {
+      discovered: 3,
+      evaluated: 1,
+      blocked: 1,
+      skipped: 1,
+      held: 0,
+      submitted: 0,
+      failed: 0,
+    };
+    expect(runFunnelSchema.parse(funnel).alreadySeen).toBe(0);
+    expect(runFunnelSchema.parse({ ...funnel, alreadySeen: 7 }).alreadySeen).toBe(7);
   });
 
   it("only ever stores a submission as not sent (D18)", () => {

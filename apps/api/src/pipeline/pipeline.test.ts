@@ -199,6 +199,7 @@ describe("pipeline skeleton", () => {
     expect(statuses).toEqual(["discovering", "evaluating", "applying", "completed"]);
     const run = await repo.getRun(runId);
     expect(run?.funnel).toEqual({
+      alreadySeen: 0,
       discovered: 2,
       evaluated: 2,
       blocked: 0,
@@ -373,7 +374,7 @@ const onsiteAbroad: Partial<Posting> = {
 };
 
 describe("seen-skip (D15)", () => {
-  it("skips Postings evaluated in an earlier Run before any screening or evaluation", async () => {
+  it("passes over Postings seen in an earlier Run without a record, counting them already seen", async () => {
     const repo = new InMemoryRepo();
     const { evaluator, judged } = recordingEvaluator();
     const discovery: Discovery = {
@@ -389,17 +390,16 @@ describe("seen-skip (D15)", () => {
     const firstOutcomes = outcomes(await evaluationsOf(repo, first.runId));
     expect(firstOutcomes["1"]).toBe("skipped: stretch");
     expect(firstOutcomes["2"]).toMatch(/^blocked: Mandatory onsite .*San Francisco, CA/);
-    // The second Run looks visibly different: both were seen, nothing is re-judged.
-    expect(outcomes(await evaluationsOf(repo, second.runId))).toEqual({
-      "1": "skipped: seen",
-      "2": "skipped: seen",
-    });
+    // The second Run looks visibly different: both were seen, so nothing is
+    // re-judged or recorded; the funnel counts them as already seen.
+    expect(await evaluationsOf(repo, second.runId)).toEqual([]);
     expect(judged).toEqual(["1"]);
     const run = await repo.getRun(second.runId);
     expect(run?.funnel).toMatchObject({
-      discovered: 2,
+      alreadySeen: 2,
+      discovered: 0,
       evaluated: 0,
-      skipped: 2,
+      skipped: 0,
       blocked: 0,
     });
   });
@@ -417,13 +417,19 @@ describe("seen-skip (D15)", () => {
       await pipeline.startRun("user-1")
     ).finished;
     const firstRun = [...judged].sort();
-    await (
-      await pipeline.startRun("user-1")
-    ).finished;
+    const second = await pipeline.startRun("user-1");
+    await second.finished;
     const secondRun = judged.slice(firstRun.length).sort();
 
     expect(firstRun).toEqual(ids(1, 10));
     expect(secondRun).toEqual(ids(11, 20));
+    // Run 2 passed over the 10 it had seen: counted, never recorded.
+    expect((await repo.getRun(second.runId))?.funnel).toMatchObject({
+      alreadySeen: 10,
+      discovered: 10,
+    });
+    const recorded = (await evaluationsOf(repo, second.runId)).map((e) => e.posting.jobId);
+    expect(recorded.sort()).toEqual(ids(11, 20));
   });
 
   it("does not mark a Posting seen when it failed, so a later Run tries again", async () => {
@@ -578,22 +584,23 @@ describe("limits (D17)", () => {
     const all = await evaluationsOf(repo, runId);
     const count = (pattern: RegExp) =>
       all.filter((e) => pattern.test(`${e.status}: ${e.reason ?? ""}`)).length;
-    expect(count(/^skipped: seen$/)).toBe(4);
+    expect(count(/^skipped: seen$/)).toBe(0);
     expect(count(/^blocked: /)).toBe(5);
     expect(count(/^skipped: stretch$/)).toBe(MAX_AI_EVALS);
     // A Posting already pulled when the last slot went is skipped for the
     // limit; nothing after that is pulled, so it is never written.
     const limited = count(/^skipped: limit$/);
     expect(limited).toBeLessThan(MAX_IN_FLIGHT);
-    expect(all).toHaveLength(4 + 5 + MAX_AI_EVALS + limited);
-    expect(all.length).toBeLessThan(discovered.length);
+    expect(all).toHaveLength(5 + MAX_AI_EVALS + limited);
+    expect(all.length).toBeLessThan(discovered.length - 4);
     const run = await repo.getRun(runId);
     expect(run?.status).toBe("completed");
     expect(run?.funnel).toMatchObject({
-      discovered: discovered.length,
+      alreadySeen: 4,
+      discovered: discovered.length - 4,
       evaluated: MAX_AI_EVALS,
       blocked: 5,
-      skipped: 4 + MAX_AI_EVALS + limited,
+      skipped: MAX_AI_EVALS + limited,
     });
   });
 
