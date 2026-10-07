@@ -27,7 +27,7 @@ The outcome the rubric assigns a Posting: `APPLY NOW`, `APPLY`, `STRETCH` (and b
 One unattended pass of the pipeline triggered by the Auto-apply button: discover Postings, evaluate them, apply to the qualifying ones. At most one is active per user.
 
 **Seen**:
-A Posting the user has encountered in any previous Run, recorded by its Job Key beside (not inside) Runs, so dedupe spans Runs. Seen Postings are always skipped.
+A Posting the user has encountered in any previous Run, recorded by its Job Key beside (not inside) Runs, so dedupe spans Runs. Seen Postings are always passed over: a Run creates no Evaluation for them and only counts them in its funnel as "already seen".
 _Avoid_: processed, applied, visited
 
 **Namespace**:

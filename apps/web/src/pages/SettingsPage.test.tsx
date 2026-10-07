@@ -112,6 +112,7 @@ const user: User = {
     documents: { resumeUrl: null, coverLetter: null },
     other: { howDidYouHear: "LinkedIn", pronouns: null },
     alwaysUserOnly: ["compensation", "legal agreements"],
+    preferencesPreset: "default",
   },
 };
 
@@ -259,6 +260,31 @@ describe("<SettingsPage />", { timeout: 20_000 }, () => {
     expect(puts[0]?.body).not.toHaveProperty("uid");
     expect(puts[0]?.body).not.toHaveProperty("settings.alwaysUserOnly");
     expect(input("Excluded titles")).toHaveValue("Intern, Architect");
+  });
+
+  it("shows the active preferences preset, explains Demo, and saves a switch to it", async () => {
+    const ui = userEvent.setup();
+    const { puts } = fakeApi(() => json(user));
+    render(<SettingsPage />);
+    await loaded();
+
+    const preset = screen.getByRole("combobox", { name: "Preferences preset" });
+    expect(preset).toHaveValue("default");
+    expect(within(preset).getByRole("option", { name: "My preferences (default)" })).toBeVisible();
+    expect(within(preset).getByRole("option", { name: "Demo (broadened)" })).toBeVisible();
+    expect(screen.getByText("Active: My preferences (default)")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Demo turns the location hard block off; everything else is identical/),
+    ).toBeInTheDocument();
+
+    await ui.selectOptions(preset, "demo");
+    await ui.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(await screen.findByText("Active: Demo (broadened)")).toBeInTheDocument();
+    const body = updateMeRequestSchema.parse(puts[0]?.body);
+    expect(body.settings.preferencesPreset).toBe("demo");
+    // The real preferences go back untouched; the preset only changes how a Run uses them.
+    expect(body.preferences).toEqual(user.preferences);
   });
 
   it("blocks the save and marks the field when the contract rejects an edit", async () => {

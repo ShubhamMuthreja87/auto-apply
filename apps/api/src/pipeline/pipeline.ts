@@ -4,28 +4,32 @@
  * source, and news-up nothing itself (spec, Pipeline). Tests drive it with
  * fakes and an instant `delay`; production passes real timers.
  *
- * A Run: load the user → discover Postings → pull them through a pool of
- * `LIMITS.maxInFlight` workers (D17). Each pulled Posting is persisted as `queued`,
- * moves to `evaluating`, and then, cheapest first:
- *   1. Seen in an earlier Run → `skipped: seen` (D15), before any spend.
- *   2. Screening in code (D7) → `blocked` by a hard block, or `skipped` for a
+ * A Run: load the user, with the preferences of its active preset
+ * (`evaluation/preferences-preset.ts`) → discover Postings → per board, walk them newest
+ * first and take up to `MAX_POSTINGS_PER_BOARD` not yet Seen (D15), so each
+ * Run moves on to the next unseen Postings. Seen ones passed over get no
+ * Evaluation; they are only counted, in `funnel.alreadySeen` → pull the
+ * taken Postings through a pool of `LIMITS.maxInFlight` workers (D17). Each
+ * pulled Posting is persisted as `queued`, moves to `evaluating`, and then,
+ * cheapest first:
+ *   1. Screening in code (D7) → `blocked` by a hard block, or `skipped` for a
  *      title out of target, with a reason; no AI tokens spent.
- *   3. Otherwise it takes one of the Run's `LIMITS.maxAiEvals` evaluation slots and
+ *   2. Otherwise it takes one of the Run's `LIMITS.maxAiEvals` evaluation slots and
  *      goes to the `JobEvaluator`; with no slot left it is `skipped: limit`.
  * Once every slot is taken the pool stops pulling, and Postings never pulled
- * are not persisted. Seen-skips and screening outcomes take no slot.
+ * are not persisted. Screening outcomes take no slot.
  *
- *   4. Scoring in code (D7, D8): the title tier is judged in code, the rest
+ *   3. Scoring in code (D7, D8): the title tier is judged in code, the rest
  *      by the evaluator; `score.ts` sums the weights into a fit score and a
  *      Verdict, then the language gate caps the Verdict of IC titles
  *      (`language-gate.ts`), stored with every criterion's evidence. The Verdict drives
  *      the outcome: APPLY → `held: below_auto_threshold`; STRETCH →
  *      `skipped: stretch`; APPLY NOW → fill the form.
- *   5. Form fill (D5, D9–D12, `forms/fill-form.ts`): the Greenhouse form is
+ *   4. Form fill (D5, D9–D12, `forms/fill-form.ts`): the Greenhouse form is
  *      read and merged and every field resolved. A required field left
  *      unanswered → `held: needs_you` with the fields listed (D11). A
  *      complete form moves the Posting to `applying`.
- *   6. Simulated submit (D18, D19), in the Run's `applying` stage, one
+ *   5. Simulated submit (D18, D19), in the Run's `applying` stage, one
  *      Posting at a time in discovery order: the `ApplicationSubmitter`
  *      builds the real payload from the answered fields and the pipeline
  *      stores it, never sending it. The Run's first submit fails on purpose
@@ -59,6 +63,7 @@ import { aiCriteria, buildRubric, judgeInCode } from "../evaluation/rubric.js";
 import { applyLanguageGate, languageGateQuestions } from "../evaluation/language-gate.js";
 import { scoreJudgements } from "../evaluation/score.js";
 import { screenPosting, type ScreeningOptions } from "../evaluation/screen.js";
+import { withPreferencesPreset } from "../evaluation/preferences-preset.js";
 import { fillForm } from "../forms/fill-form.js";
 import type { FieldResolution } from "../forms/resolve.js";
 import { logger } from "../logger.js";
@@ -110,7 +115,20 @@ export interface PipelineDeps {
    * apply to the next Run.
    */
   loadUser: (uid: string) => Promise<User>;
+  /** Unseen Postings taken per board per Run; {@link MAX_POSTINGS_PER_BOARD} unless a test widens it. */
+  maxPostingsPerBoard?: number;
 }
+
+/**
+ * Unseen Postings taken per board per Run, newest-updated first. A big board
+ * lists hundreds of jobs. The Run's AI-evaluation cap (D17) stops pulling once
+ * its slots are taken, but Seen and hard-blocked Postings take no slot, and
+ * for this user most Postings are blocked by location; without this bound a
+ * Run over 15 boards could write thousands of blocked Evaluations. Seen
+ * Postings are passed over before the cap applies, so the next Run takes the
+ * next unseen ones instead of the same newest few.
+ */
+export const MAX_POSTINGS_PER_BOARD = 10;
 
 export interface StartedRun {
   runId: string;
@@ -195,6 +213,7 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
     delay,
     newRunId,
     loadUser,
+    maxPostingsPerBoard = MAX_POSTINGS_PER_BOARD,
   } = deps;
 
   /** The Run's current status, kept beside the store so every move is checked. */
@@ -212,17 +231,22 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
     };
   }
 
-  async function runStages(runId: string, uid: string, run: ReturnType<typeof runMachine>) {
+  async function runStages(
+    runId: string,
+    loadingUser: Promise<User>,
+    run: ReturnType<typeof runMachine>,
+  ) {
     // A missing or invalid user document fails the Run before any discovery.
-    const user = await loadUser(uid);
+    const user = await loadingUser;
     logger.info("run_user_loaded", {
       runId,
+      preferencesPreset: user.settings.preferencesPreset,
       fitCriteria: user.preferences.fitCriteria.length,
       hardBlocks: user.preferences.hardBlocks.length,
     });
     await delay(STEP_MS);
-    const postings = await discovery.discover();
-    await repo.patchRun(runId, { funnelIncrements: { discovered: postings.length } });
+    const { postings, alreadySeen } = await selectPostings(await discovery.discover());
+    await repo.patchRun(runId, { funnelIncrements: { discovered: postings.length, alreadySeen } });
 
     await run.move("evaluating");
     const ready = await evaluateAll(runId, user, postings);
@@ -231,6 +255,41 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
     await delay(STEP_MS);
     await submitAll(runId, ready);
     await run.move("completed");
+  }
+
+  /**
+   * Per board (discovery lists each board's Postings together, newest first):
+   * walks its Postings, checking Seen only as it goes, until it has
+   * `maxPostingsPerBoard` unseen ones or the board runs out. Returns the
+   * unseen Postings taken, board by board, and how many Seen ones it passed over.
+   */
+  async function selectPostings(
+    discovered: readonly Posting[],
+  ): Promise<{ postings: Posting[]; alreadySeen: number }> {
+    const boards = new Map<string, Posting[]>();
+    for (const posting of discovered) {
+      const board = `${posting.ats}:${posting.board}`;
+      boards.set(board, [...(boards.get(board) ?? []), posting]);
+    }
+    let alreadySeen = 0;
+    const takenPerBoard = await Promise.all(
+      [...boards.values()].map(async (board) => {
+        const taken: Posting[] = [];
+        let walked = 0;
+        while (taken.length < maxPostingsPerBoard && walked < board.length) {
+          // Read only as many Seen keys as could still fill the cap.
+          const chunk = board.slice(walked, walked + maxPostingsPerBoard - taken.length);
+          walked += chunk.length;
+          const flags = await Promise.all(chunk.map((p) => repo.isSeen(jobKey(p))));
+          chunk.forEach((posting, i) => {
+            if (flags[i]) alreadySeen++;
+            else taken.push(posting);
+          });
+        }
+        return taken;
+      }),
+    );
+    return { postings: takenPerBoard.flat(), alreadySeen };
   }
 
   /**
@@ -399,10 +458,6 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
       await move("evaluating");
       await delay(STEP_MS);
 
-      if (await repo.isSeen(key)) {
-        return await finish("skipped", SKIP_REASONS.seen, "skipped", { markSeen: false });
-      }
-
       const screened = screenPosting(posting, user.preferences, screening);
       if (screened.outcome === "blocked") {
         return await finish(
@@ -532,6 +587,12 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
 
   return {
     async startRun(uid) {
+      // Loaded before the Run exists, so the Run records its preferences
+      // preset from the start; a load failure still creates the Run, which
+      // then fails with the reason. The preset decides the preferences the
+      // Run screens and scores with.
+      const loadingUser = loadUser(uid).then(withPreferencesPreset);
+      const loaded = await loadingUser.catch(() => null);
       const now = clock().toISOString();
       const created: Run = {
         runId: newRunId(),
@@ -540,12 +601,13 @@ export function buildPipeline(deps: PipelineDeps): Pipeline {
         funnel: emptyFunnel(),
         reason: null,
         ...(scoringMode ? { scoring: scoringMode } : {}),
+        ...(loaded ? { preferencesPreset: loaded.settings.preferencesPreset } : {}),
         createdAt: now,
         updatedAt: now,
       };
       await repo.createRun(created);
       const run = runMachine(created.runId);
-      const finished = runStages(created.runId, uid, run).catch((err: unknown) =>
+      const finished = runStages(created.runId, loadingUser, run).catch((err: unknown) =>
         fail(created.runId, run, err),
       );
       return { runId: created.runId, finished };

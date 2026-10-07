@@ -92,6 +92,41 @@ describe("PUT /api/me", () => {
     expect(me).toEqual(saved);
   });
 
+  it("saves the preferences preset, leaving the stored preferences as they are", async () => {
+    const repo = await seeded();
+    const me = async () =>
+      meResponseSchema.parse(
+        (await request(appWith(repo)).get("/api/me").set("Cookie", authCookie())).body,
+      );
+    expect((await me()).settings.preferencesPreset).toBe("default");
+
+    const res = await request(appWith(repo))
+      .put("/api/me")
+      .set("Cookie", authCookie())
+      .send(edits((body) => void (body.settings.preferencesPreset = "demo")));
+
+    expect(res.status).toBe(200);
+    const stored = await me();
+    expect(stored.settings.preferencesPreset).toBe("demo");
+    expect(stored.preferences).toEqual(SEED_USER.preferences);
+  });
+
+  it("reads a user document stored before presets as the default preset", async () => {
+    const repo = new InMemoryRepo();
+    const { preferencesPreset: _new, ...olderSettings } = SEED_USER.settings;
+    await repo.seedUserIfMissing(DEMO_UID, {
+      uid: DEMO_UID,
+      profile: SEED_USER.profile,
+      preferences: SEED_USER.preferences,
+      settings: olderSettings,
+    });
+
+    const res = await request(appWith(repo)).get("/api/me").set("Cookie", authCookie());
+
+    expect(res.status).toBe(200);
+    expect(meResponseSchema.parse(res.body).settings.preferencesPreset).toBe("default");
+  });
+
   it("answers 401 without a session and stores nothing (D26)", async () => {
     const repo = await seeded();
 
@@ -232,11 +267,11 @@ describe("edits drive the next Run and form fill", () => {
     source: "live",
   };
 
-  function pipelineOver(repo: InMemoryRepo) {
+  function pipelineOver(repo: InMemoryRepo, posting: Posting = acmeManager) {
     let n = 0;
     return buildPipeline({
       repo,
-      discovery: { discover: async () => [{ ...acmeManager, jobId: String(++n) }] },
+      discovery: { discover: async () => [{ ...posting, jobId: String(++n) }] },
       evaluator: keywordMatcher,
       forms: greenhouseForms({ fetch, timeoutMs: 1_000, mode: "fixtures" }),
       submitter: simulatedSubmitter({ clock: () => new Date(), delay: async () => {} }),
@@ -276,6 +311,27 @@ describe("edits drive the next Run and form fill", () => {
     const after = await runOnce(repo, pipeline);
     expect(after.status).toBe("blocked");
     expect(after.reason).toMatch(/Acme Robotics/);
+  });
+
+  it("the demo preset turns the location block off for the next Run, and labels it", async () => {
+    const repo = await seeded();
+    const onsiteAbroad = { ...acmeManager, location: "San Francisco, CA" };
+    const pipeline = pipelineOver(repo, onsiteAbroad);
+
+    const before = await runOnce(repo, pipeline);
+    expect(before.status).toBe("blocked");
+    expect(before.reason).toMatch(/San Francisco/);
+
+    const res = await request(appWith(repo, pipeline))
+      .put("/api/me")
+      .set("Cookie", authCookie())
+      .send(edits((body) => void (body.settings.preferencesPreset = "demo")));
+    expect(res.status).toBe(200);
+
+    const after = await runOnce(repo, pipeline);
+    expect(after.status).not.toBe("blocked");
+    expect(after.verdict).not.toBeNull();
+    expect((await repo.getRun(after.runId))?.preferencesPreset).toBe("demo");
   });
 
   it("an edited fit criterion weight changes the next Run's score (D6, ticket 17)", async () => {

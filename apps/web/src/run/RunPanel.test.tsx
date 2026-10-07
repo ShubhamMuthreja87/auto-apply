@@ -187,6 +187,23 @@ describe("<RunPanel />", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(/no ai key/i);
   });
 
+  it("labels a Run that uses the demo preferences preset, and only that one", async () => {
+    fakeApi({ active: aRun({ preferencesPreset: "demo" }) });
+    render(<RunPanel />);
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+
+    act(() =>
+      FakeEventSource.latest().emit("snapshot", {
+        run: aRun({ preferencesPreset: "demo" }),
+        evaluations: [],
+      }),
+    );
+    expect(screen.getByText("Demo preferences")).toBeInTheDocument();
+
+    act(() => FakeEventSource.latest().emit("run", aRun({ preferencesPreset: "default" })));
+    expect(screen.queryByText("Demo preferences")).not.toBeInTheDocument();
+  });
+
   it("shows no fallback notice for an AI-scored Run", async () => {
     fakeApi({ active: aRun({ scoring: "ai" }) });
     render(<RunPanel />);
@@ -249,11 +266,15 @@ describe("<RunPanel />", () => {
 
     act(() => {
       stream.emit("eval", anEvaluation("1"));
-      stream.emit("run", aRun({ status: "evaluating", funnel: funnel({ discovered: 1 }) }));
+      stream.emit(
+        "run",
+        aRun({ status: "evaluating", funnel: funnel({ discovered: 1, alreadySeen: 12 }) }),
+      );
       stream.emit("eval", anEvaluation("1", { status: "skipped", reason: "not a fit" }));
     });
     expect(valueOf("Status")).toBe("Evaluating");
     expect(valueOf("Discovered")).toBe("1");
+    expect(valueOf("Already seen")).toBe("12");
     const [row] = jobRows();
     expect(row).toHaveTextContent("Engineer 1");
     expect(within(row).getByTestId("status-chip")).toHaveTextContent("Skipped");
