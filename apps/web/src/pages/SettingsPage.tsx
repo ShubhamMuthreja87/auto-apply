@@ -459,7 +459,7 @@ function PreferencesSection({ form, saved, input }: SectionProps) {
     <Section title="Preferences">
       <SubSection
         title="Preferences preset"
-        note="Demo turns the location hard block off; everything else is identical (other hard blocks, language gate, fit scoring)."
+        note="Demo turns the location hard block off and also applies to APPLY and STRETCH jobs; scoring is identical (other hard blocks, language gate, fit scoring)."
       >
         <Typography variant="body2" sx={{ mb: 1.5 }}>
           {`Active: ${PRESET_LABELS[saved.settings.preferencesPreset]}`}
