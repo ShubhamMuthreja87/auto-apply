@@ -1,0 +1,1406 @@
+=== apps/api/src/pipeline/pipeline.test.ts
+     1	import { describe, expect, it } from "vitest";
+     2	import { ActiveRunExistsError, type Posting, type Run, type RunStatus } from "@auto-apply/shared";
+     3	import { InMemoryRepo } from "../repo/in-memory-repo.js";
+     4	import { buildPipeline, type PipelineDeps } from "./pipeline.js";
+     5	import type { JobSource } from "./ports.js";
+     6	
+     7	function aPosting(jobId: string): Posting {
+     8	  return {
+     9	    ats: "greenhouse",
+    10	    board: "acme",
+    11	    jobId,
+    12	    title: "Engineer",
+    13	    company: "Acme",
+    14	    location: "Remote",
+    15	    descriptionText: "Build things.",
+    16	    applyUrl: `https://boards.greenhouse.io/acme/jobs/${jobId}`,
+    17	  };
+    18	}
+    19	
+    20	const twoPostings: JobSource = { discover: async () => [aPosting("1"), aPosting("2")] };
+    21	
+    22	/** A `delay` that holds every step until the test releases it. */
+    23	function gatedDelay() {
+    24	  let release: () => void = () => {};
+    25	  let gate = new Promise<void>((resolve) => (release = resolve));
+    26	  return {
+    27	    delay: () => gate,
+    28	    open: () => {
+    29	      release();
+    30	      gate = Promise.resolve();
+    31	    },
+    32	  };
+    33	}
+    34	
+    35	function deps(overrides: Partial<PipelineDeps> = {}): PipelineDeps {
+    36	  let n = 0;
+    37	  return {
+    38	    repo: new InMemoryRepo(),
+    39	    jobSource: twoPostings,
+    40	    clock: () => new Date("2026-10-06T12:00:00.000Z"),
+    41	    delay: async () => {},
+    42	    newRunId: () => `run-${++n}`,
+    43	    ...overrides,
+    44	  };
+    45	}
+    46	
+    47	/** Run statuses in the order they were written, repeats (funnel patches) collapsed. */
+    48	function recordStatuses(repo: InMemoryRepo, runId: string) {
+    49	  const statuses: RunStatus[] = [];
+    50	  const unsub = repo.watchRun(
+    51	    runId,
+    52	    (run: Run) => {
+    53	      if (statuses.at(-1) !== run.status) statuses.push(run.status);
+    54	    },
+    55	    (error) => {
+    56	      throw error;
+    57	    },
+    58	  );
+    59	  return { statuses, unsub };
+    60	}
+    61	
+    62	describe("pipeline skeleton", () => {
+    63	  it("creates the Run and returns before the long work finishes", async () => {
+    64	    const gated = gatedDelay();
+    65	    const d = deps({ delay: gated.delay });
+    66	    const pipeline = buildPipeline(d);
+    67	
+    68	    const { runId, finished } = await pipeline.startRun("user-1");
+    69	
+    70	    const run = await d.repo.getRun(runId);
+    71	    expect(run).toMatchObject({ runId: "run-1", uid: "user-1", status: "discovering" });
+    72	    expect(run?.createdAt).toBe("2026-10-06T12:00:00.000Z");
+    73	    gated.open();
+    74	    await finished;
+    75	  });
+    76	
+    77	  it("moves the Run discovering → evaluating → applying → completed with funnel counts", async () => {
+    78	    const gated = gatedDelay();
+    79	    const repo = new InMemoryRepo();
+    80	    const pipeline = buildPipeline(deps({ repo, delay: gated.delay }));
+    81	
+    82	    const { runId, finished } = await pipeline.startRun("user-1");
+    83	    const { statuses, unsub } = recordStatuses(repo, runId);
+    84	    gated.open();
+    85	    await finished;
+    86	    unsub();
+    87	
+    88	    expect(statuses).toEqual(["discovering", "evaluating", "applying", "completed"]);
+    89	    const run = await repo.getRun(runId);
+    90	    expect(run?.funnel).toEqual({
+    91	      discovered: 2,
+    92	      evaluated: 2,
+    93	      blocked: 0,
+    94	      skipped: 2,
+    95	      held: 0,
+    96	      submitted: 0,
+    97	      failed: 0,
+    98	    });
+    99	  });
+   100	
+   101	  it("records an Evaluation per discovered Posting, each ending with a status and reason", async () => {
+   102	    const repo = new InMemoryRepo();
+   103	    const pipeline = buildPipeline(deps({ repo }));
+   104	
+   105	    const { runId, finished } = await pipeline.startRun("user-1");
+   106	    await finished;
+   107	
+   108	    const evaluations = await new Promise<string[]>((resolve) => {
+   109	      const unsub = repo.watchEvaluations(
+   110	        runId,
+   111	        (batch) => {
+   112	          unsub();
+   113	          resolve(batch.map((c) => `${c.evaluation.jobKey} ${c.evaluation.status}`));
+   114	        },
+   115	        () => {},
+   116	      );
+   117	    });
+   118	    expect(evaluations).toEqual(["greenhouse:acme:1 skipped", "greenhouse:acme:2 skipped"]);
+   119	  });
+   120	
+   121	  it("rejects a second Run while one is active (D17)", async () => {
+   122	    const gated = gatedDelay();
+   123	    const pipeline = buildPipeline(deps({ delay: gated.delay }));
+   124	
+   125	    const first = await pipeline.startRun("user-1");
+   126	    await expect(pipeline.startRun("user-1")).rejects.toBeInstanceOf(ActiveRunExistsError);
+   127	    gated.open();
+   128	    await first.finished;
+   129	    // Once the first Run is terminal, a new one may start.
+   130	    const next = await pipeline.startRun("user-1");
+   131	    expect(next.runId).not.toBe(first.runId);
+   132	    await next.finished;
+   133	  });
+   134	
+   135	  it("fails the Run with a reason when discovery throws, instead of crashing", async () => {
+   136	    const repo = new InMemoryRepo();
+   137	    const broken: JobSource = {
+   138	      discover: async () => {
+   139	        throw new Error("board unreachable");
+   140	      },
+   141	    };
+   142	    const pipeline = buildPipeline(deps({ repo, jobSource: broken }));
+   143	
+   144	    const { runId, finished } = await pipeline.startRun("user-1");
+   145	    await finished;
+   146	
+   147	    const run = await repo.getRun(runId);
+   148	    expect(run?.status).toBe("failed");
+   149	    expect(run?.reason).toBe("board unreachable");
+   150	  });
+   151	});
+=== apps/api/src/pipeline/pipeline.ts
+     1	/**
+     2	 * The pipeline: one deep module behind `buildPipeline(deps)`, the composition
+     3	 * root that receives every port plus the injected `clock`, `delay` and id
+     4	 * source, and news-up nothing itself (spec, Pipeline). Tests drive it with
+     5	 * fakes and an instant `delay`; production passes real timers.
+     6	 *
+     7	 * Ticket 05 is the skeleton: it walks the Run through `discovering →
+     8	 * evaluating → applying → completed` over whatever the `JobSource` returns,
+     9	 * marking every Posting `skipped` because there is no evaluator yet. Later
+    10	 * tickets replace the evaluating and applying stages with real work.
+    11	 */
+    12	import { emptyFunnel, jobKey, type Posting, type Repo, type Run } from "@auto-apply/shared";
+    13	import { logger } from "../logger.js";
+    14	import type { JobSource } from "./ports.js";
+    15	
+    16	export interface PipelineDeps {
+    17	  repo: Repo;
+    18	  jobSource: JobSource;
+    19	  clock: () => Date;
+    20	  /** Paces the stages so the live view is watchable; instant in tests. */
+    21	  delay: (ms: number) => Promise<void>;
+    22	  newRunId: () => string;
+    23	}
+    24	
+    25	export interface StartedRun {
+    26	  runId: string;
+    27	  /**
+    28	   * Settles when the background work ends, never rejects (a failure becomes a
+    29	   * `failed` Run). The route ignores it; tests await it.
+    30	   */
+    31	  finished: Promise<void>;
+    32	}
+    33	
+    34	export interface Pipeline {
+    35	  /**
+    36	   * Creates the Run and starts it in the background, resolving as soon as the
+    37	   * Run exists. Rejects with `ActiveRunExistsError` if the user already has an
+    38	   * active Run (D17).
+    39	   */
+    40	  startRun(uid: string): Promise<StartedRun>;
+    41	}
+    42	
+    43	/** Pause between skeleton stages, so a demo can watch the statuses move. */
+    44	const STEP_MS = 500;
+    45	
+    46	const SKELETON_REASON = "skeleton pipeline: no evaluator yet";
+    47	
+    48	export function buildPipeline(deps: PipelineDeps): Pipeline {
+    49	  const { repo, jobSource, clock, delay, newRunId } = deps;
+    50	
+    51	  async function process(runId: string): Promise<void> {
+    52	    await delay(STEP_MS);
+    53	    const postings = await jobSource.discover();
+    54	    for (const posting of postings) await queue(runId, posting);
+    55	    await repo.patchRun(runId, { funnelIncrements: { discovered: postings.length } });
+    56	
+    57	    await repo.patchRun(runId, { status: "evaluating" });
+    58	    for (const posting of postings) {
+    59	      const key = jobKey(posting);
+    60	      await repo.patchEvaluation(runId, key, { status: "evaluating" });
+    61	      await delay(STEP_MS);
+    62	      await repo.patchEvaluation(runId, key, { status: "skipped", reason: SKELETON_REASON });
+    63	      await repo.patchRun(runId, { funnelIncrements: { evaluated: 1, skipped: 1 } });
+    64	    }
+    65	
+    66	    await repo.patchRun(runId, { status: "applying" });
+    67	    await delay(STEP_MS);
+    68	    await repo.patchRun(runId, { status: "completed" });
+    69	  }
+    70	
+    71	  async function queue(runId: string, posting: Posting): Promise<void> {
+    72	    const now = clock().toISOString();
+    73	    await repo.putEvaluation(runId, {
+    74	      jobKey: jobKey(posting),
+    75	      runId,
+    76	      posting,
+    77	      status: "queued",
+    78	      verdict: null,
+    79	      score: null,
+    80	      reason: null,
+    81	      createdAt: now,
+    82	      updatedAt: now,
+    83	    });
+    84	  }
+    85	
+    86	  /** A crash inside the Run fails the Run with its reason; it never escapes. */
+    87	  async function fail(runId: string, err: unknown): Promise<void> {
+    88	    const reason = err instanceof Error ? err.message : String(err);
+    89	    logger.error("run_failed", { runId, reason });
+    90	    try {
+    91	      await repo.patchRun(runId, { status: "failed", reason });
+    92	    } catch (patchErr) {
+    93	      logger.error("run_fail_not_recorded", {
+    94	        runId,
+    95	        error: patchErr instanceof Error ? patchErr.message : String(patchErr),
+    96	      });
+    97	    }
+    98	  }
+    99	
+   100	  return {
+   101	    async startRun(uid) {
+   102	      const now = clock().toISOString();
+   103	      const run: Run = {
+   104	        runId: newRunId(),
+   105	        uid,
+   106	        status: "discovering",
+   107	        funnel: emptyFunnel(),
+   108	        reason: null,
+   109	        createdAt: now,
+   110	        updatedAt: now,
+   111	      };
+   112	      await repo.createRun(run);
+   113	      const finished = process(run.runId).catch((err: unknown) => fail(run.runId, err));
+   114	      return { runId: run.runId, finished };
+   115	    },
+   116	  };
+   117	}
+=== apps/api/src/pipeline/ports.ts
+     1	/**
+     2	 * The pipeline's outward-facing ports (CLAUDE.md, Flow 6). The pipeline depends
+     3	 * only on these and on the `Repo`; adapters and test fakes implement them, and
+     4	 * `buildPipeline` receives them. Ticket 05 needs only discovery; the evaluator
+     5	 * and submitter ports join as their tickets land.
+     6	 */
+     7	import type { Posting } from "@auto-apply/shared";
+     8	
+     9	/** Finds Postings to consider (D2). Ticket 06 backs it with the ATS boards. */
+    10	export interface JobSource {
+    11	  discover(): Promise<Posting[]>;
+    12	}
+=== apps/api/src/pipeline/skeleton-job-source.ts
+     1	/**
+     2	 * Placeholder Postings for the ticket-05 skeleton, until ticket 06 brings real
+     3	 * ATS discovery. Clearly fake (`example.com`, "Skeleton" company) so nobody
+     4	 * mistakes them for real jobs, and never marked Seen.
+     5	 */
+     6	import type { Posting } from "@auto-apply/shared";
+     7	import type { JobSource } from "./ports.js";
+     8	
+     9	const titles = ["Frontend Engineer", "Backend Engineer", "Full-stack Engineer"];
+    10	
+    11	export const skeletonJobSource: JobSource = {
+    12	  async discover(): Promise<Posting[]> {
+    13	    return titles.map((title, i) => ({
+    14	      ats: "greenhouse",
+    15	      board: "skeleton",
+    16	      jobId: String(i + 1),
+    17	      title,
+    18	      company: "Skeleton Co (placeholder data)",
+    19	      location: "Remote",
+    20	      descriptionText: "Placeholder posting used by the pipeline skeleton.",
+    21	      applyUrl: `https://example.com/skeleton/${i + 1}`,
+    22	    }));
+    23	  },
+    24	};
+=== apps/api/src/routes/run-stream.ts
+     1	/**
+     2	 * The live Run stream (D21): one SSE response per connected browser, fed by the
+     3	 * `Repo` subscriptions. Every connect waits for the first `watchRun` callback
+     4	 * and the first `watchEvaluations` batch, sends them as one `snapshot`, then
+     5	 * forwards later states as `run` / `eval` deltas (full documents, ADR-0003).
+     6	 * A terminal Run is followed by `done` and the end of the response. There is no
+     7	 * `Last-Event-ID`: a reconnect simply re-snapshots.
+     8	 */
+     9	import type { Request, Response } from "express";
+    10	import {
+    11	  doneEventSchema,
+    12	  errorEventSchema,
+    13	  evalEventSchema,
+    14	  isRunActive,
+    15	  runEventSchema,
+    16	  snapshotEventSchema,
+    17	  type Evaluation,
+    18	  type EvaluationChange,
+    19	  type Repo,
+    20	  type Run,
+    21	  type SseEventName,
+    22	} from "@auto-apply/shared";
+    23	import { logger } from "../logger.js";
+    24	
+    25	export function streamRun(
+    26	  req: Request,
+    27	  res: Response,
+    28	  repo: Repo,
+    29	  runId: string,
+    30	  heartbeatMs: number,
+    31	): void {
+    32	  res.status(200).set({
+    33	    "Content-Type": "text/event-stream",
+    34	    "Cache-Control": "no-cache",
+    35	    // nginx buffers proxied responses by default; this turns it off per
+    36	    // response (CODING_STANDARDS landmine: SSE buffering).
+    37	    "X-Accel-Buffering": "no",
+    38	    Connection: "keep-alive",
+    39	  });
+    40	  res.flushHeaders();
+    41	
+    42	  let closed = false;
+    43	  // Until the snapshot is sent, callbacks only accumulate the latest state.
+    44	  let run: Run | undefined;
+    45	  let evaluations: Map<string, Evaluation> | undefined;
+    46	  let snapshotSent = false;
+    47	
+    48	  const send = (event: SseEventName, data: unknown) => {
+    49	    if (!closed) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    50	  };
+    51	
+    52	  const finish = () => {
+    53	    if (closed) return;
+    54	    closed = true;
+    55	    unsubscribeRun();
+    56	    unsubscribeEvaluations();
+    57	    clearInterval(heartbeat);
+    58	    res.end();
+    59	  };
+    60	
+    61	  /** A terminal Run ends the stream: the terminal `run` has gone out, so `done`. */
+    62	  const endIfTerminal = (latest: Run) => {
+    63	    if (isRunActive(latest.status)) return;
+    64	    send("done", doneEventSchema.parse({ runId: latest.runId, status: latest.status }));
+    65	    finish();
+    66	  };
+    67	
+    68	  const trySnapshot = () => {
+    69	    if (snapshotSent || !run || !evaluations) return;
+    70	    snapshotSent = true;
+    71	    send("snapshot", snapshotEventSchema.parse({ run, evaluations: [...evaluations.values()] }));
+    72	    endIfTerminal(run);
+    73	  };
+    74	
+    75	  const onRun = (latest: Run) => {
+    76	    run = latest;
+    77	    if (!snapshotSent) return trySnapshot();
+    78	    send("run", runEventSchema.parse(latest));
+    79	    endIfTerminal(latest);
+    80	  };
+    81	
+    82	  const onEvaluations = (changes: EvaluationChange[]) => {
+    83	    if (!snapshotSent) {
+    84	      evaluations ??= new Map();
+    85	      for (const { type, evaluation } of changes) {
+    86	        if (type === "removed") evaluations.delete(evaluation.jobKey);
+    87	        else evaluations.set(evaluation.jobKey, evaluation);
+    88	      }
+    89	      return trySnapshot();
+    90	    }
+    91	    for (const { type, evaluation } of changes) {
+    92	      // Evaluations are never deleted while a Run streams; nothing to show.
+    93	      if (type !== "removed") send("eval", evalEventSchema.parse(evaluation));
+    94	    }
+    95	  };
+    96	
+    97	  // Never silent (ADR-0003): a subscription failure reaches the browser.
+    98	  const onError = (error: Error) => {
+    99	    logger.error("run_stream_subscription_error", { runId, error: error.message });
+   100	    send(
+   101	      "error",
+   102	      errorEventSchema.parse({ error: { code: "subscription_error", message: error.message } }),
+   103	    );
+   104	  };
+   105	
+   106	  const heartbeat = setInterval(() => {
+   107	    if (!closed) res.write(": heartbeat\n\n");
+   108	  }, heartbeatMs);
+   109	
+   110	  const unsubscribeRun = repo.watchRun(runId, onRun, onError);
+   111	  const unsubscribeEvaluations = repo.watchEvaluations(runId, onEvaluations, onError);
+   112	
+   113	  // The browser went away: release the listeners and the timer (landmine:
+   114	  // listener leaks).
+   115	  req.on("close", finish);
+   116	}
+=== apps/api/src/routes/runs.ts
+     1	/**
+     2	 * The Run routes. Thin by design (CODING_STANDARDS, API): parse with zod, call
+     3	 * the pipeline or the repository, map the outcome to HTTP. The Run itself runs
+     4	 * in the background, so `POST` answers `202` straight away.
+     5	 */
+     6	import { Router, type Response } from "express";
+     7	import { z } from "zod";
+     8	import {
+     9	  ActiveRunExistsError,
+    10	  activeRunResponseSchema,
+    11	  createRunResponseSchema,
+    12	  errorResponseSchema,
+    13	  type Repo,
+    14	} from "@auto-apply/shared";
+    15	import type { Pipeline } from "../pipeline/pipeline.js";
+    16	import { DEMO_UID } from "../user.js";
+    17	import { streamRun } from "./run-stream.js";
+    18	
+    19	/** Run ids are UUIDs; anything else never names a Run (and never a Firestore path). */
+    20	const runParamsSchema = z.object({ runId: z.string().regex(/^[A-Za-z0-9-]{1,64}$/) });
+    21	
+    22	function sendError(res: Response, status: number, code: string, message: string): void {
+    23	  res.status(status).json(errorResponseSchema.parse({ error: { code, message } }));
+    24	}
+    25	
+    26	export function runsRouter(repo: Repo, pipeline: Pipeline, heartbeatMs: number): Router {
+    27	  const router = Router();
+    28	
+    29	  router.post("/api/runs", async (_req, res, next) => {
+    30	    try {
+    31	      const { runId } = await pipeline.startRun(DEMO_UID);
+    32	      res.status(202).json(createRunResponseSchema.parse({ runId }));
+    33	    } catch (err) {
+    34	      if (err instanceof ActiveRunExistsError) {
+    35	        sendError(res, 409, "run_active", "A run is already in progress");
+    36	        return;
+    37	      }
+    38	      next(err);
+    39	    }
+    40	  });
+    41	
+    42	  router.get("/api/runs/active", async (_req, res, next) => {
+    43	    try {
+    44	      const run = await repo.getActiveRun(DEMO_UID);
+    45	      res.json(activeRunResponseSchema.parse({ run }));
+    46	    } catch (err) {
+    47	      next(err);
+    48	    }
+    49	  });
+    50	
+    51	  router.get("/api/runs/:runId/events", async (req, res, next) => {
+    52	    const params = runParamsSchema.safeParse(req.params);
+    53	    if (!params.success) {
+    54	      sendError(res, 400, "invalid_request", "Malformed run id");
+    55	      return;
+    56	    }
+    57	    try {
+    58	      const run = await repo.getRun(params.data.runId);
+    59	      if (!run || run.uid !== DEMO_UID) {
+    60	        sendError(res, 404, "run_not_found", "No such run");
+    61	        return;
+    62	      }
+    63	      streamRun(req, res, repo, run.runId, heartbeatMs);
+    64	    } catch (err) {
+    65	      next(err);
+    66	    }
+    67	  });
+    68	
+    69	  return router;
+    70	}
+=== apps/api/src/runs.test.ts
+     1	/**
+     2	 * The HTTP + SSE seam (spec, Testing seam 4): the Express app wired to the
+     3	 * in-memory `Repo` and the skeleton pipeline with a gated `delay`, so each test
+     4	 * decides when the Run moves. The stream is read over a real socket so headers,
+     5	 * event order, heartbeats and disconnects are observed as a browser would.
+     6	 */
+     7	import { afterEach, describe, expect, it, vi } from "vitest";
+     8	import type { AddressInfo } from "node:net";
+     9	import type { Server } from "node:http";
+    10	import request from "supertest";
+    11	import {
+    12	  activeRunResponseSchema,
+    13	  createRunResponseSchema,
+    14	  doneEventSchema,
+    15	  errorResponseSchema,
+    16	  evalEventSchema,
+    17	  runEventSchema,
+    18	  snapshotEventSchema,
+    19	  type EvaluationChange,
+    20	  type Posting,
+    21	  type Repo,
+    22	  type Run,
+    23	  type SubscriptionErrorHandler,
+    24	} from "@auto-apply/shared";
+    25	import { createApp } from "./app.js";
+    26	import type { Config } from "./config.js";
+    27	import { InMemoryRepo } from "./repo/in-memory-repo.js";
+    28	import { buildPipeline } from "./pipeline/pipeline.js";
+    29	import type { JobSource } from "./pipeline/ports.js";
+    30	
+    31	const testConfig: Config = {
+    32	  NODE_ENV: "test",
+    33	  PORT: 3001,
+    34	  FIRESTORE_NAMESPACE: "test-local",
+    35	  REPO: "memory",
+    36	  CORS_ORIGIN: "http://localhost:5173",
+    37	};
+    38	
+    39	function aPosting(jobId: string): Posting {
+    40	  return {
+    41	    ats: "greenhouse",
+    42	    board: "acme",
+    43	    jobId,
+    44	    title: "Engineer",
+    45	    company: "Acme",
+    46	    location: "Remote",
+    47	    descriptionText: "Build things.",
+    48	    applyUrl: `https://boards.greenhouse.io/acme/jobs/${jobId}`,
+    49	  };
+    50	}
+    51	
+    52	const twoPostings: JobSource = { discover: async () => [aPosting("1"), aPosting("2")] };
+    53	
+    54	/**
+    55	 * Wraps the in-memory repo to count live subscriptions, so a test can see the
+    56	 * stream release its listeners on disconnect (landmine: listener leaks).
+    57	 */
+    58	class CountingRepo extends InMemoryRepo {
+    59	  live = 0;
+    60	
+    61	  override watchRun(runId: string, cb: (run: Run) => void, onError: SubscriptionErrorHandler) {
+    62	    return this.counted(super.watchRun(runId, cb, onError));
+    63	  }
+    64	
+    65	  override watchEvaluations(
+    66	    runId: string,
+    67	    cb: (changes: EvaluationChange[]) => void,
+    68	    onError: SubscriptionErrorHandler,
+    69	  ) {
+    70	    return this.counted(super.watchEvaluations(runId, cb, onError));
+    71	  }
+    72	
+    73	  private counted(unsub: () => void) {
+    74	    this.live++;
+    75	    let done = false;
+    76	    return () => {
+    77	      if (!done) this.live--;
+    78	      done = true;
+    79	      unsub();
+    80	    };
+    81	  }
+    82	}
+    83	
+    84	function harness(heartbeatMs = 15_000) {
+    85	  let release: () => void = () => {};
+    86	  let gate = new Promise<void>((resolve) => (release = resolve));
+    87	  const repo = new CountingRepo();
+    88	  let n = 0;
+    89	  const pipeline = buildPipeline({
+    90	    repo,
+    91	    jobSource: twoPostings,
+    92	    clock: () => new Date(),
+    93	    delay: () => gate,
+    94	    newRunId: () => `run-${++n}`,
+    95	  });
+    96	  const app = createApp(testConfig, { repo, kind: "memory", close: async () => {} }, pipeline, {
+    97	    heartbeatMs,
+    98	  });
+    99	  return {
+   100	    app,
+   101	    repo: repo as Repo & { live: number },
+   102	    pipeline,
+   103	    /** Lets every paced step of the Run proceed. */
+   104	    openGate: () => {
+   105	      release();
+   106	      gate = Promise.resolve();
+   107	    },
+   108	  };
+   109	}
+   110	
+   111	type Frame = { event: string; data: unknown } | { comment: string };
+   112	
+   113	/** Reads an SSE response frame by frame, as an `EventSource` would. */
+   114	async function openStream(app: ReturnType<typeof harness>["app"], runId: string) {
+   115	  const server: Server = await new Promise((resolve) => {
+   116	    const s = app.listen(0, () => resolve(s));
+   117	  });
+   118	  servers.push(server);
+   119	  const { port } = server.address() as AddressInfo;
+   120	  const controller = new AbortController();
+   121	  const res = await fetch(`http://127.0.0.1:${port}/api/runs/${runId}/events`, {
+   122	    signal: controller.signal,
+   123	  });
+   124	  const reader = res.body?.pipeThrough(new TextDecoderStream()).getReader();
+   125	  let buffer = "";
+   126	
+   127	  /** The next frame, or `null` once the server has ended the stream. */
+   128	  async function next(): Promise<Frame | null> {
+   129	    for (;;) {
+   130	      const end = buffer.indexOf("\n\n");
+   131	      if (end !== -1) {
+   132	        const block = buffer.slice(0, end);
+   133	        buffer = buffer.slice(end + 2);
+   134	        return parseFrame(block);
+   135	      }
+   136	      const chunk = await reader?.read();
+   137	      if (!chunk || chunk.done) return null;
+   138	      buffer += chunk.value;
+   139	    }
+   140	  }
+   141	
+   142	  async function rest(): Promise<Frame[]> {
+   143	    const frames: Frame[] = [];
+   144	    for (let frame = await next(); frame; frame = await next()) frames.push(frame);
+   145	    return frames;
+   146	  }
+   147	
+   148	  return { res, next, rest, close: () => controller.abort() };
+   149	}
+   150	
+   151	function parseFrame(block: string): Frame {
+   152	  if (block.startsWith(":")) return { comment: block.slice(1).trim() };
+   153	  let event = "message";
+   154	  let data = "";
+   155	  for (const line of block.split("\n")) {
+   156	    if (line.startsWith("event: ")) event = line.slice(7);
+   157	    if (line.startsWith("data: ")) data += line.slice(6);
+   158	  }
+   159	  return { event, data: JSON.parse(data) as unknown };
+   160	}
+   161	
+   162	const servers: Server[] = [];
+   163	afterEach(async () => {
+   164	  await Promise.all(
+   165	    servers.splice(0).map(
+   166	      (s) =>
+   167	        new Promise<void>((resolve) => {
+   168	          s.closeAllConnections();
+   169	          s.close(() => resolve());
+   170	        }),
+   171	    ),
+   172	  );
+   173	});
+   174	
+   175	describe("POST /api/runs", () => {
+   176	  it("creates a Run and returns 202 with its id, before the Run finishes", async () => {
+   177	    const { app } = harness();
+   178	
+   179	    const res = await request(app).post("/api/runs");
+   180	
+   181	    expect(res.status).toBe(202);
+   182	    const { runId } = createRunResponseSchema.parse(res.body);
+   183	    const active = activeRunResponseSchema.parse((await request(app).get("/api/runs/active")).body);
+   184	    expect(active.run).toMatchObject({ runId, status: "discovering" });
+   185	  });
+   186	
+   187	  it("returns 409 in the shared error shape while a Run is active (D17)", async () => {
+   188	    const { app } = harness();
+   189	    await request(app).post("/api/runs");
+   190	
+   191	    const res = await request(app).post("/api/runs");
+   192	
+   193	    expect(res.status).toBe(409);
+   194	    expect(errorResponseSchema.parse(res.body).error.code).toBe("run_active");
+   195	  });
+   196	});
+   197	
+   198	describe("GET /api/runs/active", () => {
+   199	  it("returns null when no Run is active", async () => {
+   200	    const { app } = harness();
+   201	    const res = await request(app).get("/api/runs/active");
+   202	    expect(res.status).toBe(200);
+   203	    expect(activeRunResponseSchema.parse(res.body)).toEqual({ run: null });
+   204	  });
+   205	});
+   206	
+   207	describe("GET /api/runs/:runId/events", () => {
+   208	  it("returns 404 in the shared error shape for an unknown Run", async () => {
+   209	    const { app } = harness();
+   210	    const res = await request(app).get("/api/runs/nope/events");
+   211	    expect(res.status).toBe(404);
+   212	    expect(errorResponseSchema.parse(res.body).error.code).toBe("run_not_found");
+   213	  });
+   214	
+   215	  it("returns 400 for a malformed run id", async () => {
+   216	    const { app } = harness();
+   217	    const res = await request(app).get("/api/runs/bad%20id!/events");
+   218	    expect(res.status).toBe(400);
+   219	    expect(errorResponseSchema.parse(res.body).error.code).toBe("invalid_request");
+   220	  });
+   221	
+   222	  it("sets the SSE headers nginx and browsers need", async () => {
+   223	    const { app } = harness();
+   224	    const { runId } = createRunResponseSchema.parse((await request(app).post("/api/runs")).body);
+   225	
+   226	    const stream = await openStream(app, runId);
+   227	
+   228	    expect(stream.res.headers.get("content-type")).toMatch(/^text\/event-stream/);
+   229	    expect(stream.res.headers.get("cache-control")).toBe("no-cache");
+   230	    expect(stream.res.headers.get("x-accel-buffering")).toBe("no");
+   231	    stream.close();
+   232	  });
+   233	
+   234	  it("streams snapshot → run/eval deltas → terminal run → done, then ends", async () => {
+   235	    const { app, openGate } = harness();
+   236	    const { runId } = createRunResponseSchema.parse((await request(app).post("/api/runs")).body);
+   237	    const stream = await openStream(app, runId);
+   238	
+   239	    const first = await stream.next();
+   240	    expect(first).toMatchObject({ event: "snapshot" });
+   241	    const snapshot = snapshotEventSchema.parse((first as { data: unknown }).data);
+   242	    expect(snapshot.run.status).toBe("discovering");
+   243	    expect(snapshot.evaluations).toEqual([]);
+   244	
+   245	    openGate();
+   246	    const frames = await stream.rest();
+   247	    const events = frames.flatMap((f) => ("event" in f ? [f] : []));
+   248	
+   249	    // Deltas carry full documents (ADR-0003): the Run's statuses arrive in order.
+   250	    const runStatuses = events
+   251	      .filter((e) => e.event === "run")
+   252	      .map((e) => runEventSchema.parse(e.data).status)
+   253	      .filter((status, i, all) => all[i - 1] !== status);
+   254	    expect(runStatuses).toEqual(["discovering", "evaluating", "applying", "completed"]);
+   255	
+   256	    const lastEvalByKey = new Map<string, string>();
+   257	    for (const e of events.filter((ev) => ev.event === "eval")) {
+   258	      const evaluation = evalEventSchema.parse(e.data);
+   259	      lastEvalByKey.set(evaluation.jobKey, evaluation.status);
+   260	    }
+   261	    expect(Object.fromEntries(lastEvalByKey)).toEqual({
+   262	      "greenhouse:acme:1": "skipped",
+   263	      "greenhouse:acme:2": "skipped",
+   264	    });
+   265	
+   266	    const [penultimate, last] = events.slice(-2);
+   267	    expect(penultimate?.event).toBe("run");
+   268	    expect(runEventSchema.parse(penultimate?.data).funnel).toMatchObject({
+   269	      discovered: 2,
+   270	      evaluated: 2,
+   271	      skipped: 2,
+   272	    });
+   273	    expect(last?.event).toBe("done");
+   274	    expect(doneEventSchema.parse(last?.data)).toEqual({ runId, status: "completed" });
+   275	  });
+   276	
+   277	  it("re-snapshots the full state on every connect, then ends a finished Run with done", async () => {
+   278	    const { app, pipeline, openGate } = harness();
+   279	    openGate();
+   280	    const { runId, finished } = await pipeline.startRun("demo-user");
+   281	    await finished;
+   282	
+   283	    const frames = await (await openStream(app, runId)).rest();
+   284	
+   285	    expect(frames.map((f) => ("event" in f ? f.event : "comment"))).toEqual(["snapshot", "done"]);
+   286	    const snapshot = snapshotEventSchema.parse((frames[0] as { data: unknown }).data);
+   287	    expect(snapshot.run.status).toBe("completed");
+   288	    expect(snapshot.run.funnel.discovered).toBe(2);
+   289	    expect(snapshot.evaluations.map((e) => e.status)).toEqual(["skipped", "skipped"]);
+   290	  });
+   291	
+   292	  it("sends a heartbeat comment while the Run is quiet", async () => {
+   293	    const { app } = harness(10);
+   294	    const { runId } = createRunResponseSchema.parse((await request(app).post("/api/runs")).body);
+   295	    const stream = await openStream(app, runId);
+   296	
+   297	    expect(await stream.next()).toMatchObject({ event: "snapshot" });
+   298	    expect(await stream.next()).toEqual({ comment: "heartbeat" });
+   299	    stream.close();
+   300	  });
+   301	
+   302	  it("releases its repository listeners when the client disconnects", async () => {
+   303	    const { app, repo } = harness();
+   304	    const { runId } = createRunResponseSchema.parse((await request(app).post("/api/runs")).body);
+   305	    const stream = await openStream(app, runId);
+   306	    await stream.next();
+   307	    expect(repo.live).toBe(2);
+   308	
+   309	    stream.close();
+   310	
+   311	    await vi.waitFor(() => expect(repo.live).toBe(0));
+   312	  });
+   313	});
+=== apps/api/src/user.ts
+     1	/**
+     2	 * The single user's id (D13, D26). Until login lands (ticket 15) every request
+     3	 * acts as this user; after it, the JWT's `sub` carries the same fixed id.
+     4	 */
+     5	export const DEMO_UID = "demo-user";
+=== apps/web/src/api.ts
+     1	/**
+     2	 * The browser's calls to the API, each response parsed with the shared
+     3	 * contract. Credentials ride every call so the auth cookie (ticket 15) works
+     4	 * cross-origin in dev.
+     5	 */
+     6	import {
+     7	  activeRunResponseSchema,
+     8	  createRunResponseSchema,
+     9	  errorResponseSchema,
+    10	  type Run,
+    11	} from "@auto-apply/shared";
+    12	
+    13	// In dev the web app (5173) calls the API (3001) cross-origin; in production the
+    14	// same origin serves both and nginx proxies /api, so VITE_API_URL is "".
+    15	export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
+    16	
+    17	/** A non-2xx answer, carrying the contract's error code when there is one. */
+    18	export class ApiError extends Error {
+    19	  constructor(
+    20	    readonly status: number,
+    21	    readonly code: string | null,
+    22	    message: string,
+    23	  ) {
+    24	    super(message);
+    25	    this.name = "ApiError";
+    26	  }
+    27	}
+    28	
+    29	async function readJson(res: Response): Promise<unknown> {
+    30	  if (res.ok) return res.json();
+    31	  const body = errorResponseSchema.safeParse(await res.json().catch(() => null));
+    32	  throw new ApiError(
+    33	    res.status,
+    34	    body.success ? body.data.error.code : null,
+    35	    body.success ? body.data.error.message : `API responded ${res.status}`,
+    36	  );
+    37	}
+    38	
+    39	/** `POST /api/runs`: starts a Run; an `ApiError` with code `run_active` on 409. */
+    40	export async function startRun(): Promise<string> {
+    41	  const res = await fetch(`${API_URL}/api/runs`, { method: "POST", credentials: "include" });
+    42	  return createRunResponseSchema.parse(await readJson(res)).runId;
+    43	}
+    44	
+    45	/** `GET /api/runs/active`: the Run to reattach to after a refresh, if any. */
+    46	export async function getActiveRun(): Promise<Run | null> {
+    47	  const res = await fetch(`${API_URL}/api/runs/active`, { credentials: "include" });
+    48	  return activeRunResponseSchema.parse(await readJson(res)).run;
+    49	}
+    50	
+    51	export function runEventsUrl(runId: string): string {
+    52	  return `${API_URL}/api/runs/${encodeURIComponent(runId)}/events`;
+    53	}
+=== apps/web/src/run/RunPanel.test.tsx
+     1	import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+     2	import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+     3	import userEvent from "@testing-library/user-event";
+     4	import { emptyFunnel, type Evaluation, type Run, type RunFunnel } from "@auto-apply/shared";
+     5	import { FakeEventSource } from "../test/fake-event-source";
+     6	import { RunPanel } from "./RunPanel";
+     7	
+     8	function aRun(overrides: Partial<Run> = {}): Run {
+     9	  return {
+    10	    runId: "run-1",
+    11	    uid: "demo-user",
+    12	    status: "discovering",
+    13	    funnel: emptyFunnel(),
+    14	    reason: null,
+    15	    createdAt: "2026-10-06T12:00:00.000Z",
+    16	    updatedAt: "2026-10-06T12:00:00.000Z",
+    17	    ...overrides,
+    18	  };
+    19	}
+    20	
+    21	function anEvaluation(jobId: string, overrides: Partial<Evaluation> = {}): Evaluation {
+    22	  return {
+    23	    jobKey: `greenhouse:acme:${jobId}`,
+    24	    runId: "run-1",
+    25	    posting: {
+    26	      ats: "greenhouse",
+    27	      board: "acme",
+    28	      jobId,
+    29	      title: `Engineer ${jobId}`,
+    30	      company: "Acme",
+    31	      location: "Remote",
+    32	      descriptionText: "Build things.",
+    33	      applyUrl: `https://boards.greenhouse.io/acme/jobs/${jobId}`,
+    34	    },
+    35	    status: "queued",
+    36	    verdict: null,
+    37	    score: null,
+    38	    reason: null,
+    39	    createdAt: "2026-10-06T12:00:00.000Z",
+    40	    updatedAt: "2026-10-06T12:00:00.000Z",
+    41	    ...overrides,
+    42	  };
+    43	}
+    44	
+    45	function funnel(counts: Partial<RunFunnel>): RunFunnel {
+    46	  return { ...emptyFunnel(), ...counts };
+    47	}
+    48	
+    49	/** A fake API: the active Run on load, and what `POST /api/runs` answers. */
+    50	function fakeApi({
+    51	  active = null,
+    52	  post = new Response(JSON.stringify({ runId: "run-1" }), { status: 202 }),
+    53	}: { active?: Run | null; post?: Response } = {}) {
+    54	  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    55	    const url = String(input);
+    56	    if (url.endsWith("/api/runs/active")) {
+    57	      return new Response(JSON.stringify({ run: active }), { status: 200 });
+    58	    }
+    59	    if (url.endsWith("/api/runs") && init?.method === "POST") return post;
+    60	    return new Response("not found", { status: 404 });
+    61	  });
+    62	  vi.stubGlobal("fetch", fetchMock);
+    63	  return fetchMock;
+    64	}
+    65	
+    66	/** The value shown for a funnel count or status, found by its label. */
+    67	function valueOf(label: string | RegExp): string | null {
+    68	  const term = screen.getByText(label, { selector: "dt" });
+    69	  return term.nextElementSibling?.textContent ?? null;
+    70	}
+    71	
+    72	beforeEach(() => {
+    73	  FakeEventSource.instances = [];
+    74	  vi.stubGlobal("EventSource", FakeEventSource);
+    75	});
+    76	
+    77	afterEach(() => {
+    78	  cleanup();
+    79	  vi.unstubAllGlobals();
+    80	});
+    81	
+    82	describe("<RunPanel />", () => {
+    83	  it("starts a Run on click and opens its stream with credentials", async () => {
+    84	    const fetchMock = fakeApi();
+    85	    render(<RunPanel />);
+    86	
+    87	    await userEvent.click(await screen.findByRole("button", { name: /auto-apply/i }));
+    88	
+    89	    expect(fetchMock).toHaveBeenCalledWith(
+    90	      expect.stringMatching(/\/api\/runs$/),
+    91	      expect.objectContaining({ method: "POST" }),
+    92	    );
+    93	    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    94	    expect(FakeEventSource.latest().url).toMatch(/\/api\/runs\/run-1\/events$/);
+    95	    expect(FakeEventSource.latest().withCredentials).toBe(true);
+    96	    expect(screen.getByText(/connecting/i)).toBeInTheDocument();
+    97	  });
+    98	
+    99	  it("renders the live Run status and funnel counts as events arrive", async () => {
+   100	    fakeApi();
+   101	    render(<RunPanel />);
+   102	    await userEvent.click(await screen.findByRole("button", { name: /auto-apply/i }));
+   103	    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+   104	    const stream = FakeEventSource.latest();
+   105	
+   106	    act(() => stream.emit("snapshot", { run: aRun(), evaluations: [] }));
+   107	    expect(valueOf("Status")).toBe("Discovering");
+   108	    expect(screen.getByText(/live/i)).toBeInTheDocument();
+   109	
+   110	    act(() => {
+   111	      stream.emit("eval", anEvaluation("1"));
+   112	      stream.emit("run", aRun({ status: "evaluating", funnel: funnel({ discovered: 1 }) }));
+   113	      stream.emit("eval", anEvaluation("1", { status: "skipped", reason: "not a fit" }));
+   114	    });
+   115	    expect(valueOf("Status")).toBe("Evaluating");
+   116	    expect(valueOf("Discovered")).toBe("1");
+   117	    expect(screen.getByText("Engineer 1")).toBeInTheDocument();
+   118	    expect(screen.getByText(/skipped/i, { selector: "li *" })).toBeInTheDocument();
+   119	    expect(screen.getByText(/not a fit/)).toBeInTheDocument();
+   120	  });
+   121	
+   122	  it("keeps the button disabled while the Run is active, and closes the stream on done", async () => {
+   123	    fakeApi();
+   124	    render(<RunPanel />);
+   125	    const button = await screen.findByRole("button", { name: /auto-apply/i });
+   126	    await userEvent.click(button);
+   127	    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+   128	    const stream = FakeEventSource.latest();
+   129	
+   130	    act(() => stream.emit("snapshot", { run: aRun(), evaluations: [] }));
+   131	    expect(button).toBeDisabled();
+   132	
+   133	    act(() => {
+   134	      stream.emit("run", aRun({ status: "completed", funnel: funnel({ submitted: 2 }) }));
+   135	      stream.emit("done", { runId: "run-1", status: "completed" });
+   136	    });
+   137	    expect(valueOf("Status")).toBe("Completed");
+   138	    expect(valueOf(/submitted \(simulated\)/i)).toBe("2");
+   139	    expect(stream.readyState).toBe(FakeEventSource.CLOSED);
+   140	    expect(button).toBeEnabled();
+   141	  });
+   142	
+   143	  it("reattaches to the active Run after a page refresh, from a full snapshot", async () => {
+   144	    fakeApi({ active: aRun({ status: "evaluating" }) });
+   145	    render(<RunPanel />);
+   146	
+   147	    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+   148	    expect(FakeEventSource.latest().url).toMatch(/\/api\/runs\/run-1\/events$/);
+   149	    act(() =>
+   150	      FakeEventSource.latest().emit("snapshot", {
+   151	        run: aRun({ status: "evaluating", funnel: funnel({ discovered: 2, evaluated: 1 }) }),
+   152	        evaluations: [anEvaluation("1", { status: "skipped" }), anEvaluation("2")],
+   153	      }),
+   154	    );
+   155	
+   156	    expect(valueOf("Status")).toBe("Evaluating");
+   157	    expect(valueOf("Evaluated")).toBe("1");
+   158	    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+   159	  });
+   160	
+   161	  it("shows reconnecting when the connection drops, and re-renders from the next snapshot", async () => {
+   162	    fakeApi({ active: aRun() });
+   163	    render(<RunPanel />);
+   164	    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+   165	    const stream = FakeEventSource.latest();
+   166	    act(() => stream.emit("snapshot", { run: aRun(), evaluations: [anEvaluation("1")] }));
+   167	
+   168	    act(() => stream.drop());
+   169	    expect(screen.getByText(/reconnecting/i)).toBeInTheDocument();
+   170	
+   171	    act(() =>
+   172	      stream.emit("snapshot", {
+   173	        run: aRun({ status: "applying" }),
+   174	        evaluations: [anEvaluation("1", { status: "skipped" }), anEvaluation("2")],
+   175	      }),
+   176	    );
+   177	    expect(valueOf("Status")).toBe("Applying");
+   178	    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+   179	  });
+   180	
+   181	  it("attaches to the already-active Run when the API answers 409", async () => {
+   182	    fakeApi({
+   183	      post: new Response(
+   184	        JSON.stringify({ error: { code: "run_active", message: "A run is already in progress" } }),
+   185	        { status: 409 },
+   186	      ),
+   187	    });
+   188	    render(<RunPanel />);
+   189	    const button = await screen.findByRole("button", { name: /auto-apply/i });
+   190	    // The Run started elsewhere (another tab) after this page loaded.
+   191	    fakeApi({
+   192	      active: aRun({ runId: "run-9" }),
+   193	      post: new Response(
+   194	        JSON.stringify({ error: { code: "run_active", message: "A run is already in progress" } }),
+   195	        { status: 409 },
+   196	      ),
+   197	    });
+   198	
+   199	    await userEvent.click(button);
+   200	
+   201	    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+   202	    expect(FakeEventSource.latest().url).toMatch(/\/api\/runs\/run-9\/events$/);
+   203	  });
+   204	
+   205	  it("shows an error when the Run cannot be started", async () => {
+   206	    fakeApi({ post: new Response("boom", { status: 500 }) });
+   207	    render(<RunPanel />);
+   208	
+   209	    await userEvent.click(await screen.findByRole("button", { name: /auto-apply/i }));
+   210	
+   211	    expect(await screen.findByRole("alert")).toHaveTextContent(/500/);
+   212	    expect(FakeEventSource.instances).toHaveLength(0);
+   213	  });
+   214	
+   215	  it("surfaces a server error event", async () => {
+   216	    fakeApi({ active: aRun() });
+   217	    render(<RunPanel />);
+   218	    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+   219	
+   220	    act(() =>
+   221	      FakeEventSource.latest().emit("error", {
+   222	        error: { code: "subscription_error", message: "listener failed" },
+   223	      }),
+   224	    );
+   225	
+   226	    expect(screen.getByRole("alert")).toHaveTextContent(/listener failed/);
+   227	  });
+   228	});
+=== apps/web/src/run/RunPanel.tsx
+     1	/**
+     2	 * The Auto-apply button and the live Run view (D20). On load it reattaches to
+     3	 * the user's active Run, so a refresh mid-Run loses nothing; the button starts
+     4	 * a new Run and stays disabled while one is active (the API's 409 backs it up).
+     5	 */
+     6	import { useEffect, useState } from "react";
+     7	import { isRunActive, type RunFunnel, type RunStatus } from "@auto-apply/shared";
+     8	import { ApiError, getActiveRun, startRun } from "../api";
+     9	import { useRunStream, type Connection } from "./useRunStream";
+    10	
+    11	const statusLabels: Record<RunStatus, string> = {
+    12	  discovering: "Discovering",
+    13	  evaluating: "Evaluating",
+    14	  applying: "Applying",
+    15	  completed: "Completed",
+    16	  failed: "Failed",
+    17	};
+    18	
+    19	const connectionLabels: Record<Connection, string> = {
+    20	  connecting: "Connecting…",
+    21	  live: "Live",
+    22	  reconnecting: "Reconnecting…",
+    23	  closed: "Closed",
+    24	};
+    25	
+    26	const funnelLabels: [keyof RunFunnel, string][] = [
+    27	  ["discovered", "Discovered"],
+    28	  ["evaluated", "Evaluated"],
+    29	  ["blocked", "Blocked"],
+    30	  ["skipped", "Skipped"],
+    31	  ["held", "Held (needs you)"],
+    32	  ["submitted", "Submitted (simulated)"],
+    33	  ["failed", "Failed"],
+    34	];
+    35	
+    36	function messageOf(err: unknown): string {
+    37	  return err instanceof Error ? err.message : "Unknown error";
+    38	}
+    39	
+    40	export function RunPanel() {
+    41	  const [runId, setRunId] = useState<string | null>(null);
+    42	  const [checking, setChecking] = useState(true);
+    43	  const [starting, setStarting] = useState(false);
+    44	  const [startError, setStartError] = useState<string | null>(null);
+    45	  const stream = useRunStream(runId);
+    46	
+    47	  useEffect(() => {
+    48	    let cancelled = false;
+    49	    getActiveRun()
+    50	      .then((run) => {
+    51	        if (!cancelled && run) setRunId(run.runId);
+    52	      })
+    53	      .catch((err: unknown) => {
+    54	        if (!cancelled) setStartError(`Could not load the active run: ${messageOf(err)}`);
+    55	      })
+    56	      .finally(() => {
+    57	        if (!cancelled) setChecking(false);
+    58	      });
+    59	    return () => {
+    60	      cancelled = true;
+    61	    };
+    62	  }, []);
+    63	
+    64	  async function onAutoApply() {
+    65	    setStarting(true);
+    66	    setStartError(null);
+    67	    try {
+    68	      setRunId(await startRun());
+    69	    } catch (err) {
+    70	      if (err instanceof ApiError && err.code === "run_active") {
+    71	        // Started elsewhere (another tab): follow that Run instead.
+    72	        try {
+    73	          const active = await getActiveRun();
+    74	          if (active) setRunId(active.runId);
+    75	        } catch (lookupErr) {
+    76	          setStartError(`Could not load the active run: ${messageOf(lookupErr)}`);
+    77	        }
+    78	      } else {
+    79	        setStartError(`Could not start a run: ${messageOf(err)}`);
+    80	      }
+    81	    } finally {
+    82	      setStarting(false);
+    83	    }
+    84	  }
+    85	
+    86	  const { run } = stream;
+    87	  // Waiting for the first snapshot counts as active, so a double click cannot
+    88	  // slip in between POST and stream.
+    89	  const runActive = run ? isRunActive(run.status) : runId !== null;
+    90	
+    91	  return (
+    92	    <section aria-label="Auto-apply">
+    93	      <button type="button" onClick={onAutoApply} disabled={checking || starting || runActive}>
+    94	        {starting ? "Starting…" : "Auto-apply"}
+    95	      </button>
+    96	      <p>Submissions are simulated: payloads are built and stored, never sent.</p>
+    97	
+    98	      {startError && <p role="alert">{startError}</p>}
+    99	      {stream.error && <p role="alert">Stream error: {stream.error}</p>}
+   100	
+   101	      {runId && (
+   102	        <div>
+   103	          <p>Connection: {connectionLabels[stream.connection]}</p>
+   104	          {!run ? (
+   105	            <p role="status">Loading run…</p>
+   106	          ) : (
+   107	            <>
+   108	              <dl>
+   109	                <dt>Status</dt>
+   110	                <dd>{statusLabels[run.status]}</dd>
+   111	                {run.reason && (
+   112	                  <>
+   113	                    <dt>Reason</dt>
+   114	                    <dd>{run.reason}</dd>
+   115	                  </>
+   116	                )}
+   117	                {funnelLabels.map(([key, label]) => (
+   118	                  <div key={key}>
+   119	                    <dt>{label}</dt>
+   120	                    <dd>{run.funnel[key]}</dd>
+   121	                  </div>
+   122	                ))}
+   123	              </dl>
+   124	              {stream.evaluations.length === 0 ? (
+   125	                <p>No jobs yet.</p>
+   126	              ) : (
+   127	                <ul>
+   128	                  {stream.evaluations.map((evaluation) => (
+   129	                    <li key={evaluation.jobKey}>
+   130	                      <strong>{evaluation.posting.title}</strong> at {evaluation.posting.company}:{" "}
+   131	                      <span>{evaluation.status}</span>
+   132	                      {evaluation.reason && <span> ({evaluation.reason})</span>}
+   133	                    </li>
+   134	                  ))}
+   135	                </ul>
+   136	              )}
+   137	            </>
+   138	          )}
+   139	        </div>
+   140	      )}
+   141	    </section>
+   142	  );
+   143	}
+=== apps/web/src/run/useRunStream.ts
+     1	/**
+     2	 * The one place the browser holds a Run's live stream (CODING_STANDARDS, Web).
+     3	 * It opens an `EventSource` with credentials, parses every event with the
+     4	 * contract's schemas, and closes on `done`, on unmount, or when the run id
+     5	 * changes. State is always the latest the server sent (ADR-0003): a `snapshot`
+     6	 * replaces everything, so a reconnect re-renders from scratch and loses nothing.
+     7	 */
+     8	import { useEffect, useState } from "react";
+     9	import {
+    10	  doneEventSchema,
+    11	  errorEventSchema,
+    12	  evalEventSchema,
+    13	  runEventSchema,
+    14	  snapshotEventSchema,
+    15	  type Evaluation,
+    16	  type Run,
+    17	} from "@auto-apply/shared";
+    18	import { runEventsUrl } from "../api";
+    19	
+    20	export type Connection = "connecting" | "live" | "reconnecting" | "closed";
+    21	
+    22	export interface RunStreamState {
+    23	  connection: Connection;
+    24	  run: Run | null;
+    25	  /** The latest Evaluation per Job Key, in the order they first appeared. */
+    26	  evaluations: Evaluation[];
+    27	  error: string | null;
+    28	}
+    29	
+    30	const initial: RunStreamState = {
+    31	  connection: "connecting",
+    32	  run: null,
+    33	  evaluations: [],
+    34	  error: null,
+    35	};
+    36	
+    37	function upsert(evaluations: Evaluation[], next: Evaluation): Evaluation[] {
+    38	  const i = evaluations.findIndex((e) => e.jobKey === next.jobKey);
+    39	  if (i === -1) return [...evaluations, next];
+    40	  return evaluations.map((e, j) => (j === i ? next : e));
+    41	}
+    42	
+    43	export function useRunStream(runId: string | null): RunStreamState {
+    44	  const [state, setState] = useState<RunStreamState>(initial);
+    45	
+    46	  useEffect(() => {
+    47	    setState(initial);
+    48	    if (!runId) return;
+    49	
+    50	    const source = new EventSource(runEventsUrl(runId), { withCredentials: true });
+    51	
+    52	    /** Parses one event's JSON; a malformed one is reported, never trusted. */
+    53	    const handle =
+    54	      <T>(parse: (data: unknown) => T, apply: (prev: RunStreamState, data: T) => RunStreamState) =>
+    55	      (event: Event) => {
+    56	        let data: T;
+    57	        try {
+    58	          data = parse(JSON.parse((event as MessageEvent<string>).data));
+    59	        } catch {
+    60	          setState((prev) => ({ ...prev, error: `Malformed ${event.type} event from the server` }));
+    61	          return;
+    62	        }
+    63	        setState((prev) => apply(prev, data));
+    64	      };
+    65	
+    66	    source.addEventListener(
+    67	      "snapshot",
+    68	      handle(snapshotEventSchema.parse, (_prev, { run, evaluations }) => ({
+    69	        connection: "live",
+    70	        run,
+    71	        evaluations,
+    72	        error: null,
+    73	      })),
+    74	    );
+    75	    source.addEventListener(
+    76	      "run",
+    77	      handle(runEventSchema.parse, (prev, run) => ({ ...prev, run })),
+    78	    );
+    79	    source.addEventListener(
+    80	      "eval",
+    81	      handle(evalEventSchema.parse, (prev, evaluation) => ({
+    82	        ...prev,
+    83	        evaluations: upsert(prev.evaluations, evaluation),
+    84	      })),
+    85	    );
+    86	    const onDone = handle(doneEventSchema.parse, (prev) => ({
+    87	      ...prev,
+    88	      connection: "closed" as const,
+    89	    }));
+    90	    source.addEventListener("done", (event) => {
+    91	      // The server ends the response next; without close() the browser would
+    92	      // reconnect and stream the finished Run again.
+    93	      source.close();
+    94	      onDone(event);
+    95	    });
+    96	    // `error` is both the server's named event (it carries data) and the
+    97	    // browser's own connection-error signal (it does not).
+    98	    source.addEventListener("error", (event) => {
+    99	      if (event instanceof MessageEvent) {
+   100	        handle(errorEventSchema.parse, (prev, { error }) => ({ ...prev, error: error.message }))(
+   101	          event,
+   102	        );
+   103	        return;
+   104	      }
+   105	      setState((prev) => ({
+   106	        ...prev,
+   107	        connection: source.readyState === EventSource.CLOSED ? "closed" : "reconnecting",
+   108	      }));
+   109	    });
+   110	
+   111	    return () => source.close();
+   112	  }, [runId]);
+   113	
+   114	  return state;
+   115	}
+=== apps/web/src/test/fake-event-source.ts
+     1	/**
+     2	 * A stand-in for the browser's `EventSource` (spec, UI seam): tests push
+     3	 * contract-shaped server events into it and inspect how it was opened and
+     4	 * whether it was closed.
+     5	 */
+     6	export class FakeEventSource extends EventTarget {
+     7	  static readonly CONNECTING = 0;
+     8	  static readonly OPEN = 1;
+     9	  static readonly CLOSED = 2;
+    10	  static instances: FakeEventSource[] = [];
+    11	
+    12	  readyState = FakeEventSource.CONNECTING;
+    13	  readonly withCredentials: boolean;
+    14	
+    15	  constructor(
+    16	    readonly url: string,
+    17	    init?: EventSourceInit,
+    18	  ) {
+    19	    super();
+    20	    this.withCredentials = init?.withCredentials ?? false;
+    21	    FakeEventSource.instances.push(this);
+    22	  }
+    23	
+    24	  /** The most recently opened stream. */
+    25	  static latest(): FakeEventSource {
+    26	    const latest = FakeEventSource.instances.at(-1);
+    27	    if (!latest) throw new Error("no EventSource was opened");
+    28	    return latest;
+    29	  }
+    30	
+    31	  /** The server sends a named event with a JSON payload. */
+    32	  emit(event: string, data: unknown): void {
+    33	    this.readyState = FakeEventSource.OPEN;
+    34	    this.dispatchEvent(new MessageEvent(event, { data: JSON.stringify(data) }));
+    35	  }
+    36	
+    37	  /** The connection drops; the browser will retry (`reconnecting`) unless closed. */
+    38	  drop(): void {
+    39	    this.readyState = FakeEventSource.CONNECTING;
+    40	    this.dispatchEvent(new Event("error"));
+    41	  }
+    42	
+    43	  close(): void {
+    44	    this.readyState = FakeEventSource.CLOSED;
+    45	  }
+    46	}

@@ -1,0 +1,844 @@
+# Coding standards
+
+Read by the `code-review` skill. Keep it short; add a rule when the same problem shows up twice.
+
+## General
+- TypeScript strict. No `any`; use `unknown` and narrow. No non-null `!` assertions outside tests.
+- Name things with the vocabulary in `GLOSSARY.md`.
+- Deep modules: a small public interface with the logic behind it. The pipeline is one module with ports, not a pile of helpers.
+- Validate every external input with zod: HTTP bodies, Firestore reads, ATS API responses, AI responses, fixture files, environment variables (parse `process.env` once at startup and fail fast).
+- Never swallow errors. A failed job becomes `status: "failed"` with a reason; it does not crash the run. A failed job source falls back to that board's fixtures, labelled as fallback (D3).
+- No stray `console.log`; use the small logger in `apps/api`.
+
+## API (Express)
+- Routes are thin: parse with zod, call the pipeline or service, map the result to HTTP.
+- Long work never blocks a request. Start the run and return `202`.
+- `app.set("trust proxy", 1)`; request body size capped; errors return a JSON shape from `contract.ts`, never a stack trace.
+- SSE endpoint: send current state on connect, then changes; heartbeat comment every 15 s; unsubscribe the Firestore listener and clear the heartbeat when the client disconnects (`req.on("close")`).
+- AI calls go through one module in `apps/api/src/ai/` that uses plain `fetch` against `AI_BASE_URL`, sets a timeout with `AbortController`, asks for JSON output and validates it with zod. On a timeout or invalid output it retries once, then scores that job with the keyword fallback matcher, labelled "fallback scoring" (D24).
+- ATS adapters use plain `fetch` with a timeout, GET only, and normalise every posting into one shared job shape keyed `ats:board:jobId` (D14).
+
+## Web (React)
+- Function components and hooks. The SSE connection lives in one custom hook (for example `useRunStream(runId)`) that parses events with the contract's zod schemas and closes the `EventSource` on unmount or when the run id changes.
+- Show connection state: connecting, live, reconnecting, closed.
+- Components render loading, empty and error states, not just the happy path.
+- No global state library; React state and hooks are enough.
+
+## Tests
+- Test behaviour at the agreed seams: the pipeline (with fake ports), the HTTP API including the SSE stream (Supertest + the in-memory repository), the Firestore repository adapter (a small integration suite against the real project in a unique `test-*` namespace, deleted afterwards), and the UI (React Testing Library with a fake `EventSource`). One Playwright happy path.
+- Scoring, hard blocks, verdicts and field resolution are pure code: unit-test them directly with table-driven cases.
+- No snapshot tests. No tests of private functions.
+
+## Landmines (check these in every review)
+- **Lost updates**: each job evaluation is its own Firestore document, never an array inside the run document that concurrent steps overwrite. Funnel counts are updated with `FieldValue.increment` or derived, never read-modify-write.
+- **Status transitions** only move forward along the state machines in `contract.ts` (D16). One function owns transitions and rejects illegal ones. The only backward edge is Retry on a simulated failure (D19), and it is explicit.
+- **LLM JSON**: strip Markdown code fences before parsing, then validate with zod. Never trust the shape.
+- **Prompt injection**: job descriptions are untrusted data. Delimit them in the prompt, tell the model they are data, and never act on instructions inside them.
+- **Namespace isolation**: every Firestore path goes through the one namespacing function. Tests use a unique `test-*` namespace and delete it afterwards; code refuses to start with `FIRESTORE_NAMESPACE=prod` unless `NODE_ENV=production`.
+- **No writes to the outside world**: ATS and employer endpoints get GET requests only. The submitter builds and stores the payload; it never sends it (D18).
+- **No PII to the model** (D23): prompts never contain the name, email, phone or address. Free-text answers must trace to profile or settings fields (D12).
+- **Never auto-answer** legal agreements, AI-policy acknowledgements, consent or demographic questions (D10); they resolve to user-only, which holds the job as `needs_you` when required (D11).
+- **Double click**: the button is disabled while a run is active, and the API rejects a second concurrent run for the same user with `409`.
+- **Seen jobs**: a job already evaluated in an earlier run is skipped before any AI call (D15).
+- **SSE buffering**: nginx buffers by default, so live updates arrive all at once in production while working locally. The API sends `X-Accel-Buffering: no`; nginx has `proxy_buffering off` on `/api`. Test the deployed stream with `curl -N`.
+- **Listener leaks**: every Firestore `onSnapshot` on the server and every `EventSource` in the browser is closed on disconnect or unmount.
+- **Interrupted runs**: a restart (deploy, crash) kills in-process runs. On startup, the API marks runs still `running` from before the boot as `failed` with reason `interrupted`, so the UI never shows a run stuck forever.
+- **Real IPs**: without `trust proxy`, every request appears to come from nginx, which breaks any per-IP limit.
+- **Cost**: at most 15 AI evaluations per run and 3 jobs in flight (D17); cap tokens per call; hard blocks run before the AI (D7); the AI step never runs more than once per job per run (plus the single retry).
+ .gitignore                            |   3 +
+ apps/web/package.json                 |   8 +-
+ apps/web/src/App.test.tsx             |  76 +++++++---
+ apps/web/src/App.tsx                  | 105 ++++++-------
+ apps/web/src/main.tsx                 |  10 +-
+ apps/web/src/run/RunPanel.test.tsx    |  98 +++++++++++--
+ apps/web/src/run/RunPanel.tsx         | 268 ++++++++++++++++++++++++++--------
+ docs/adr/0002-allowed-dependencies.md |   8 +
+ 8 files changed, 424 insertions(+), 152 deletions(-)
+diff --git a/.gitignore b/.gitignore
+index a584d8a..2174190 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -10,3 +10,6 @@ test-results/
+ .secrets/
+ *-firebase-adminsdk-*.json
+ *service-account*.json
++
++# Playwright MCP screenshots and snapshots
++.playwright-mcp/
+diff --git a/apps/web/package.json b/apps/web/package.json
+index bf7058f..b0de684 100644
+--- a/apps/web/package.json
++++ b/apps/web/package.json
+@@ -12,7 +12,13 @@
+   },
+   "dependencies": {
+     "@auto-apply/shared": "*",
++    "@emotion/react": "^11.14.0",
++    "@emotion/styled": "^11.14.1",
++    "@fontsource/inter": "^5.3.0",
++    "@mui/icons-material": "^9.4.0",
++    "@mui/material": "^9.4.0",
+     "react": "^18.3.1",
+-    "react-dom": "^18.3.1"
++    "react-dom": "^18.3.1",
++    "react-router-dom": "^7.18.4"
+   }
+ }
+diff --git a/apps/web/src/App.test.tsx b/apps/web/src/App.test.tsx
+index 9bfc5c7..88f2cb4 100644
+--- a/apps/web/src/App.test.tsx
++++ b/apps/web/src/App.test.tsx
+@@ -1,5 +1,7 @@
+ import { describe, it, expect, vi, afterEach } from "vitest";
+ import { render, screen, waitFor, cleanup } from "@testing-library/react";
++import userEvent from "@testing-library/user-event";
++import { MemoryRouter } from "react-router-dom";
+ import { App } from "./App";
+ 
+ /** Answers `/api/health` with `response`; the Run panel sees no active Run. */
+@@ -14,39 +16,77 @@ function mockFetch(response: Response) {
+   );
+ }
+ 
++function healthy() {
++  return new Response(
++    JSON.stringify({
++      status: "ok",
++      service: "auto-apply-api",
++      namespace: "dev",
++      repo: "memory",
++      time: new Date().toISOString(),
++    }),
++    { status: 200, headers: { "Content-Type": "application/json" } },
++  );
++}
++
++function renderAt(path: string) {
++  return render(
++    <MemoryRouter initialEntries={[path]}>
++      <App />
++    </MemoryRouter>,
++  );
++}
++
+ afterEach(() => {
+   cleanup();
+   vi.unstubAllGlobals();
+ });
+ 
+ describe("<App />", () => {
+-  it("shows a loading state, then the health data on success", async () => {
+-    mockFetch(
+-      new Response(
+-        JSON.stringify({
+-          status: "ok",
+-          service: "auto-apply-api",
+-          namespace: "dev",
+-          repo: "memory",
+-          time: new Date().toISOString(),
+-        }),
+-        { status: 200, headers: { "Content-Type": "application/json" } },
+-      ),
++  it("frames every page in the shell: product name, prototype badge, nav and simulated-submit footer", async () => {
++    mockFetch(healthy());
++    renderAt("/");
++
++    expect(screen.getByRole("banner")).toHaveTextContent("AI Auto-apply");
++    expect(screen.getByRole("banner")).toHaveTextContent("Prototype");
++    for (const name of ["Run", "Applied jobs", "Scanned jobs", "Settings"]) {
++      expect(screen.getByRole("tab", { name })).toBeInTheDocument();
++    }
++    expect(screen.getByRole("contentinfo")).toHaveTextContent(
++      "Submissions are simulated · payloads are built and stored, never sent",
+     );
++    expect(await screen.findByRole("button", { name: /auto-apply/i })).toBeInTheDocument();
++  });
++
++  it("navigates between the views from the tabs", async () => {
++    mockFetch(healthy());
++    renderAt("/");
+ 
+-    render(<App />);
+-    expect(screen.getByRole("status")).toBeInTheDocument();
++    expect(screen.getByRole("tab", { name: "Run" })).toHaveAttribute("aria-selected", "true");
++    await userEvent.click(screen.getByRole("tab", { name: "Applied jobs" }));
+ 
+-    await waitFor(() => expect(screen.getByText("dev")).toBeInTheDocument());
+-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
++    expect(screen.getByRole("heading", { name: "Applied jobs" })).toBeInTheDocument();
++    expect(screen.getByRole("tab", { name: "Applied jobs" })).toHaveAttribute(
++      "aria-selected",
++      "true",
++    );
++    expect(screen.queryByRole("button", { name: /auto-apply/i })).not.toBeInTheDocument();
++  });
++
++  it("shows a loading state, then the API health in the footer", async () => {
++    mockFetch(healthy());
++    renderAt("/");
++    expect(screen.getByText(/checking api/i)).toBeInTheDocument();
++
++    await waitFor(() => expect(screen.getByText(/namespace dev/i)).toBeInTheDocument());
++    expect(screen.queryByText(/checking api/i)).not.toBeInTheDocument();
+     // ADR-0004: an in-memory store is called out, never mistaken for persistence.
+     expect(screen.getByText(/in-memory \(not persisted\)/i)).toBeInTheDocument();
+   });
+ 
+   it("shows an error state when the API responds with a failure", async () => {
+     mockFetch(new Response("boom", { status: 500 }));
+-
+-    render(<App />);
++    renderAt("/settings");
+ 
+     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+     expect(screen.getByRole("alert")).toHaveTextContent("500");
+diff --git a/apps/web/src/App.tsx b/apps/web/src/App.tsx
+index 90a324e..477b1dd 100644
+--- a/apps/web/src/App.tsx
++++ b/apps/web/src/App.tsx
+@@ -1,65 +1,52 @@
+-import { useEffect, useState } from "react";
+-import { healthResponseSchema, type HealthResponse } from "@auto-apply/shared";
+-import { API_URL } from "./api";
++/**
++ * The themed shell and the routed views (D20). The router itself is provided
++ * by the caller (`BrowserRouter` in `main.tsx`, `MemoryRouter` in tests).
++ */
++import { Navigate, Route, Routes } from "react-router-dom";
++import CssBaseline from "@mui/material/CssBaseline";
++import { ThemeProvider } from "@mui/material/styles";
++import { theme } from "./theme";
++import { AppShell } from "./shell/AppShell";
+ import { RunPanel } from "./run/RunPanel";
+-
+-type State =
+-  | { kind: "loading" }
+-  | { kind: "error"; message: string }
+-  | { kind: "ready"; health: HealthResponse };
++import { PlaceholderPage } from "./pages/PlaceholderPage";
+ 
+ export function App() {
+-  const [state, setState] = useState<State>({ kind: "loading" });
+-
+-  useEffect(() => {
+-    let cancelled = false;
+-
+-    fetch(`${API_URL}/api/health`)
+-      .then(async (res) => {
+-        if (!res.ok) {
+-          throw new Error(`API responded ${res.status}`);
+-        }
+-        return healthResponseSchema.parse(await res.json());
+-      })
+-      .then((health) => {
+-        if (!cancelled) {
+-          setState({ kind: "ready", health });
+-        }
+-      })
+-      .catch((err: unknown) => {
+-        if (!cancelled) {
+-          setState({
+-            kind: "error",
+-            message: err instanceof Error ? err.message : "Unknown error",
+-          });
+-        }
+-      });
+-
+-    return () => {
+-      cancelled = true;
+-    };
+-  }, []);
+-
+   return (
+-    <main>
+-      <h1>AI Auto-Apply</h1>
+-      <RunPanel />
+-      {state.kind === "loading" && <p role="status">Checking API…</p>}
+-      {state.kind === "error" && <p role="alert">Could not reach the API: {state.message}</p>}
+-      {state.kind === "ready" && (
+-        <dl>
+-          <dt>API status</dt>
+-          <dd>{state.health.status}</dd>
+-          <dt>Service</dt>
+-          <dd>{state.health.service}</dd>
+-          <dt>Namespace</dt>
+-          <dd>{state.health.namespace}</dd>
+-          <dt>Storage</dt>
+-          <dd>
+-            {state.health.repo === "memory" ? "In-memory (not persisted)" : "Firestore"}
+-          </dd>
+-        </dl>
+-      )}
+-    </main>
++    <ThemeProvider theme={theme}>
++      <CssBaseline />
++      <AppShell>
++        <Routes>
++          <Route path="/" element={<RunPanel />} />
++          <Route
++            path="/applied"
++            element={
++              <PlaceholderPage
++                title="Applied jobs"
++                description="Each simulated submission and the payload built for it will be listed here."
++              />
++            }
++          />
++          <Route
++            path="/scanned"
++            element={
++              <PlaceholderPage
++                title="Scanned jobs"
++                description="Every job evaluated across runs, with its verdict and reason, will be listed here."
++              />
++            }
++          />
++          <Route
++            path="/settings"
++            element={
++              <PlaceholderPage
++                title="Settings"
++                description="The profile, preferences and settings that drive matching will be shown here."
++              />
++            }
++          />
++          <Route path="*" element={<Navigate to="/" replace />} />
++        </Routes>
++      </AppShell>
++    </ThemeProvider>
+   );
+ }
+diff --git a/apps/web/src/main.tsx b/apps/web/src/main.tsx
+index 62b768d..80368bd 100644
+--- a/apps/web/src/main.tsx
++++ b/apps/web/src/main.tsx
+@@ -1,5 +1,11 @@
+ import { StrictMode } from "react";
+ import { createRoot } from "react-dom/client";
++import { BrowserRouter } from "react-router-dom";
++// Inter is bundled by Vite: no request to a font CDN.
++import "@fontsource/inter/400.css";
++import "@fontsource/inter/500.css";
++import "@fontsource/inter/600.css";
++import "@fontsource/inter/700.css";
+ import { App } from "./App";
+ 
+ const rootElement = document.getElementById("root");
+@@ -9,6 +15,8 @@ if (!rootElement) {
+ 
+ createRoot(rootElement).render(
+   <StrictMode>
+-    <App />
++    <BrowserRouter>
++      <App />
++    </BrowserRouter>
+   </StrictMode>,
+ );
+diff --git a/apps/web/src/run/RunPanel.test.tsx b/apps/web/src/run/RunPanel.test.tsx
+index d03ca45..f9a3cd4 100644
+--- a/apps/web/src/run/RunPanel.test.tsx
++++ b/apps/web/src/run/RunPanel.test.tsx
+@@ -1,5 +1,5 @@
+ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
++import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+ import userEvent from "@testing-library/user-event";
+ import { emptyFunnel, type Evaluation, type Run, type RunFunnel } from "@auto-apply/shared";
+ import { FakeEventSource } from "../test/fake-event-source";
+@@ -69,6 +69,16 @@ function valueOf(label: string | RegExp): string | null {
+   return term.nextElementSibling?.textContent ?? null;
+ }
+ 
++/** The body rows of the jobs table. */
++function jobRows(): HTMLElement[] {
++  const table = screen.getByRole("table", { name: /jobs/i });
++  return within(table).getAllByRole("row").slice(1);
++}
++
++function connection(): string | null {
++  return screen.getByTestId("connection").textContent;
++}
++
+ beforeEach(() => {
+   FakeEventSource.instances = [];
+   vi.stubGlobal("EventSource", FakeEventSource);
+@@ -80,6 +90,74 @@ afterEach(() => {
+ });
+ 
+ describe("<RunPanel />", () => {
++  it("shows an empty state before the first Run", async () => {
++    fakeApi();
++    render(<RunPanel />);
++
++    expect(await screen.findByText(/no runs yet/i)).toBeInTheDocument();
++    expect(screen.getByRole("button", { name: /auto-apply/i })).toBeEnabled();
++    expect(screen.queryByTestId("connection")).not.toBeInTheDocument();
++  });
++
++  it("lists each job with company, role, source, verdict, score, status and reason", async () => {
++    fakeApi({ active: aRun({ status: "applying" }) });
++    render(<RunPanel />);
++    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
++
++    act(() =>
++      FakeEventSource.latest().emit("snapshot", {
++        run: aRun({ status: "applying" }),
++        evaluations: [
++          anEvaluation("1", {
++            status: "submitted",
++            verdict: "APPLY_NOW",
++            score: 87,
++            reason: "strong match",
++          }),
++        ],
++      }),
++    );
++
++    const table = screen.getByRole("table", { name: /jobs/i });
++    const headers = within(table)
++      .getAllByRole("columnheader")
++      .map((th) => th.textContent);
++    expect(headers).toEqual(["Company", "Role", "Source", "Verdict", "Score", "Status", "Reason"]);
++    const cells = within(jobRows()[0])
++      .getAllByRole("cell")
++      .map((td) => td.textContent);
++    expect(cells).toEqual([
++      "Acme",
++      "Engineer 1",
++      expect.stringMatching(/greenhouse/i),
++      "APPLY NOW",
++      "87",
++      expect.stringMatching(/submitted.*simulated/i),
++      "strong match",
++    ]);
++  });
++
++  it("shows progress through the Run's jobs", async () => {
++    fakeApi({ active: aRun() });
++    render(<RunPanel />);
++    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
++
++    act(() =>
++      FakeEventSource.latest().emit("snapshot", {
++        run: aRun({
++          status: "evaluating",
++          funnel: funnel({ discovered: 4, skipped: 1, blocked: 1 }),
++        }),
++        evaluations: [],
++      }),
++    );
++
++    expect(screen.getByRole("progressbar", { name: /run progress/i })).toHaveAttribute(
++      "aria-valuenow",
++      "50",
++    );
++  });
++
+   it("starts a Run on click and opens its stream with credentials", async () => {
+     const fetchMock = fakeApi();
+     render(<RunPanel />);
+@@ -93,7 +171,7 @@ describe("<RunPanel />", () => {
+     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+     expect(FakeEventSource.latest().url).toMatch(/\/api\/runs\/run-1\/events$/);
+     expect(FakeEventSource.latest().withCredentials).toBe(true);
+-    expect(screen.getByText(/connecting/i)).toBeInTheDocument();
++    expect(connection()).toMatch(/^connecting/i);
+   });
+ 
+   it("renders the live Run status and funnel counts as events arrive", async () => {
+@@ -105,7 +183,7 @@ describe("<RunPanel />", () => {
+ 
+     act(() => stream.emit("snapshot", { run: aRun(), evaluations: [] }));
+     expect(valueOf("Status")).toBe("Discovering");
+-    expect(screen.getByText(/live/i)).toBeInTheDocument();
++    expect(connection()).toMatch(/live/i);
+ 
+     act(() => {
+       stream.emit("eval", anEvaluation("1"));
+@@ -114,9 +192,10 @@ describe("<RunPanel />", () => {
+     });
+     expect(valueOf("Status")).toBe("Evaluating");
+     expect(valueOf("Discovered")).toBe("1");
+-    expect(screen.getByText("Engineer 1")).toBeInTheDocument();
+-    expect(screen.getByText(/skipped/i, { selector: "li *" })).toBeInTheDocument();
+-    expect(screen.getByText(/not a fit/)).toBeInTheDocument();
++    const [row] = jobRows();
++    expect(row).toHaveTextContent("Engineer 1");
++    expect(within(row).getByTestId("status-chip")).toHaveTextContent("Skipped");
++    expect(row).toHaveTextContent(/not a fit/);
+   });
+ 
+   it("keeps the button disabled while the Run is active, and closes the stream on done", async () => {
+@@ -137,6 +216,7 @@ describe("<RunPanel />", () => {
+     expect(valueOf("Status")).toBe("Completed");
+     expect(valueOf(/submitted \(simulated\)/i)).toBe("2");
+     expect(stream.readyState).toBe(FakeEventSource.CLOSED);
++    expect(connection()).toMatch(/closed/i);
+     expect(button).toBeEnabled();
+   });
+ 
+@@ -155,7 +235,7 @@ describe("<RunPanel />", () => {
+ 
+     expect(valueOf("Status")).toBe("Evaluating");
+     expect(valueOf("Evaluated")).toBe("1");
+-    expect(screen.getAllByRole("listitem")).toHaveLength(2);
++    expect(jobRows()).toHaveLength(2);
+   });
+ 
+   it("shows reconnecting when the connection drops, and re-renders from the next snapshot", async () => {
+@@ -166,7 +246,7 @@ describe("<RunPanel />", () => {
+     act(() => stream.emit("snapshot", { run: aRun(), evaluations: [anEvaluation("1")] }));
+ 
+     act(() => stream.drop());
+-    expect(screen.getByText(/reconnecting/i)).toBeInTheDocument();
++    expect(connection()).toMatch(/reconnecting/i);
+ 
+     act(() =>
+       stream.emit("snapshot", {
+@@ -175,7 +255,7 @@ describe("<RunPanel />", () => {
+       }),
+     );
+     expect(valueOf("Status")).toBe("Applying");
+-    expect(screen.getAllByRole("listitem")).toHaveLength(2);
++    expect(jobRows()).toHaveLength(2);
+   });
+ 
+   it("attaches to the already-active Run when the API answers 409", async () => {
+diff --git a/apps/web/src/run/RunPanel.tsx b/apps/web/src/run/RunPanel.tsx
+index 44b49a2..a70aae3 100644
+--- a/apps/web/src/run/RunPanel.tsx
++++ b/apps/web/src/run/RunPanel.tsx
+@@ -4,24 +4,23 @@
+  * a new Run and stays disabled while one is active (the API's 409 backs it up).
+  */
+ import { useEffect, useState } from "react";
+-import { isRunActive, type RunFunnel, type RunStatus } from "@auto-apply/shared";
++import Alert from "@mui/material/Alert";
++import Box from "@mui/material/Box";
++import Button from "@mui/material/Button";
++import Card from "@mui/material/Card";
++import CardContent from "@mui/material/CardContent";
++import CircularProgress from "@mui/material/CircularProgress";
++import LinearProgress from "@mui/material/LinearProgress";
++import Stack from "@mui/material/Stack";
++import Typography from "@mui/material/Typography";
++import BoltIcon from "@mui/icons-material/Bolt";
++import TravelExploreIcon from "@mui/icons-material/TravelExplore";
++import { isRunActive, type Run, type RunFunnel } from "@auto-apply/shared";
+ import { ApiError, getActiveRun, startRun } from "../api";
+-import { useRunStream, type Connection } from "./useRunStream";
+-
+-const statusLabels: Record<RunStatus, string> = {
+-  discovering: "Discovering",
+-  evaluating: "Evaluating",
+-  applying: "Applying",
+-  completed: "Completed",
+-  failed: "Failed",
+-};
+-
+-const connectionLabels: Record<Connection, string> = {
+-  connecting: "Connecting…",
+-  live: "Live",
+-  reconnecting: "Reconnecting…",
+-  closed: "Closed",
+-};
++import { ConnectionIndicator } from "../ui/ConnectionIndicator";
++import { StatusChip } from "../ui/StatusChip";
++import { JobsTable } from "./JobsTable";
++import { useRunStream } from "./useRunStream";
+ 
+ const funnelLabels: [keyof RunFunnel, string][] = [
+   ["discovered", "Discovered"],
+@@ -33,6 +32,21 @@ const funnelLabels: [keyof RunFunnel, string][] = [
+   ["failed", "Failed"],
+ ];
+ 
++/**
++ * How far through its discovered jobs the Run is, as a percentage; `null`
++ * while discovering, when the total is not known yet.
++ */
++function progressOf(run: Run): number | null {
++  if (!isRunActive(run.status)) return 100;
++  if (run.status === "discovering") return null;
++  const { discovered, blocked, skipped, held, submitted, failed } = run.funnel;
++  if (discovered === 0) return 0;
++  return Math.min(
++    100,
++    Math.round(((blocked + skipped + held + submitted + failed) / discovered) * 100),
++  );
++}
++
+ function messageOf(err: unknown): string {
+   return err instanceof Error ? err.message : "Unknown error";
+ }
+@@ -88,57 +102,183 @@ export function RunPanel() {
+   // Waiting for the first snapshot counts as active, so a double click cannot
+   // slip in between POST and stream.
+   const runActive = run ? isRunActive(run.status) : runId !== null;
++  const progress = run ? progressOf(run) : null;
+ 
+   return (
+-    <section aria-label="Auto-apply">
+-      <button type="button" onClick={onAutoApply} disabled={checking || starting || runActive}>
+-        {starting ? "Starting…" : "Auto-apply"}
+-      </button>
+-      <p>Submissions are simulated: payloads are built and stored, never sent.</p>
++    <Stack component="section" aria-label="Auto-apply" spacing={3}>
++      <Card>
++        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
++          <Stack
++            direction={{ xs: "column", sm: "row" }}
++            spacing={2}
++            sx={{ justifyContent: "space-between", alignItems: { sm: "center" } }}
++          >
++            <Box>
++              <Typography variant="h1" gutterBottom>
++                Auto-apply
++              </Typography>
++              <Typography color="text.secondary">
++                Find matching jobs, score them against your profile and prepare applications.
++              </Typography>
++            </Box>
++            <Button
++              variant="contained"
++              size="large"
++              onClick={onAutoApply}
++              disabled={checking || starting || runActive}
++              startIcon={
++                starting ? (
++                  <CircularProgress size={16} color="inherit" aria-hidden="true" />
++                ) : (
++                  <BoltIcon />
++                )
++              }
++              sx={{ flexShrink: 0, px: 3 }}
++            >
++              {starting ? "Starting…" : "Auto-apply"}
++            </Button>
++          </Stack>
+ 
+-      {startError && <p role="alert">{startError}</p>}
+-      {stream.error && <p role="alert">Stream error: {stream.error}</p>}
+-
+-      {runId && (
+-        <div>
+-          <p>Connection: {connectionLabels[stream.connection]}</p>
+-          {!run ? (
+-            <p role="status">Loading run…</p>
+-          ) : (
+-            <>
+-              <dl>
+-                <dt>Status</dt>
+-                <dd>{statusLabels[run.status]}</dd>
+-                {run.reason && (
+-                  <>
+-                    <dt>Reason</dt>
+-                    <dd>{run.reason}</dd>
+-                  </>
+-                )}
+-                {funnelLabels.map(([key, label]) => (
+-                  <div key={key}>
+-                    <dt>{label}</dt>
+-                    <dd>{run.funnel[key]}</dd>
+-                  </div>
+-                ))}
+-              </dl>
+-              {stream.evaluations.length === 0 ? (
+-                <p>No jobs yet.</p>
+-              ) : (
+-                <ul>
+-                  {stream.evaluations.map((evaluation) => (
+-                    <li key={evaluation.jobKey}>
+-                      <strong>{evaluation.posting.title}</strong> at {evaluation.posting.company}:{" "}
+-                      <span>{evaluation.status}</span>
+-                      {evaluation.reason && <span> ({evaluation.reason})</span>}
+-                    </li>
+-                  ))}
+-                </ul>
+-              )}
+-            </>
++          {runId && (
++            <Box sx={{ mt: 3 }}>
++              <Stack
++                direction="row"
++                spacing={2}
++                sx={{ justifyContent: "space-between", alignItems: "center", mb: 1.5 }}
++              >
++                <Box component="dl" sx={{ display: "flex", alignItems: "center", gap: 1, m: 0 }}>
++                  <Typography component="dt" variant="body2" color="text.secondary">
++                    Status
++                  </Typography>
++                  <Box component="dd" sx={{ m: 0 }}>
++                    {run ? <StatusChip status={run.status} /> : "—"}
++                  </Box>
++                </Box>
++                <ConnectionIndicator connection={stream.connection} />
++              </Stack>
++              <LinearProgress
++                aria-label="Run progress"
++                variant={progress === null ? "indeterminate" : "determinate"}
++                value={progress ?? undefined}
++                color={
++                  run?.status === "failed"
++                    ? "error"
++                    : run?.status === "completed"
++                      ? "success"
++                      : "primary"
++                }
++                sx={{ height: 6, borderRadius: 3 }}
++              />
++            </Box>
+           )}
+-        </div>
++        </CardContent>
++      </Card>
++
++      {startError && (
++        <Alert severity="error" role="alert">
++          {startError}
++        </Alert>
++      )}
++      {stream.error && (
++        <Alert severity="error" role="alert">
++          Stream error: {stream.error}
++        </Alert>
++      )}
++      {run?.reason && (
++        <Alert severity={run.status === "failed" ? "error" : "info"}>{run.reason}</Alert>
++      )}
++
++      {!runId ? (
++        checking ? (
++          <Stack
++            direction="row"
++            spacing={1.5}
++            sx={{ alignItems: "center", color: "text.secondary" }}
++          >
++            <CircularProgress size={16} color="inherit" aria-hidden="true" />
++            <Typography variant="body2">Checking for an active run…</Typography>
++          </Stack>
++        ) : (
++          <Card>
++            <CardContent sx={{ py: 7, textAlign: "center" }}>
++              <TravelExploreIcon
++                sx={{ fontSize: 40, color: "text.disabled", mb: 1 }}
++                aria-hidden="true"
++              />
++              <Typography variant="h3" gutterBottom>
++                No runs yet
++              </Typography>
++              <Typography color="text.secondary" sx={{ maxWidth: 460, mx: "auto" }}>
++                Press Auto-apply to discover jobs, score each one against your profile and build the
++                applications. Nothing is ever sent to an employer.
++              </Typography>
++            </CardContent>
++          </Card>
++        )
++      ) : !run ? (
++        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", color: "text.secondary" }}>
++          <CircularProgress size={16} color="inherit" aria-hidden="true" />
++          <Typography variant="body2">Loading run…</Typography>
++        </Stack>
++      ) : (
++        <>
++          <Box
++            component="dl"
++            aria-label="Funnel"
++            sx={{
++              m: 0,
++              display: "grid",
++              gap: 1.5,
++              gridTemplateColumns: {
++                xs: "repeat(2, 1fr)",
++                sm: "repeat(4, 1fr)",
++                md: "repeat(7, 1fr)",
++              },
++            }}
++          >
++            {funnelLabels.map(([key, label]) => (
++              <Card
++                key={key}
++                sx={{
++                  px: 2,
++                  py: 1.5,
++                  display: "flex",
++                  flexDirection: "column",
++                  justifyContent: "space-between",
++                }}
++              >
++                <Typography component="dt" variant="caption" color="text.secondary">
++                  {label}
++                </Typography>
++                <Typography
++                  component="dd"
++                  sx={{
++                    m: 0,
++                    fontSize: "1.5rem",
++                    fontWeight: 600,
++                    fontVariantNumeric: "tabular-nums",
++                  }}
++                >
++                  {run.funnel[key]}
++                </Typography>
++              </Card>
++            ))}
++          </Box>
++
++          <Card>
++            <Box sx={{ px: { xs: 2, sm: 3 }, pt: 2, pb: 1 }}>
++              <Typography variant="h2">Jobs</Typography>
++            </Box>
++            {stream.evaluations.length === 0 ? (
++              <Typography color="text.secondary" sx={{ px: { xs: 2, sm: 3 }, pb: 3 }}>
++                No jobs yet.
++              </Typography>
++            ) : (
++              <JobsTable evaluations={stream.evaluations} />
++            )}
++          </Card>
++        </>
+       )}
+-    </section>
++    </Stack>
+   );
+ }
+diff --git a/docs/adr/0002-allowed-dependencies.md b/docs/adr/0002-allowed-dependencies.md
+index c9138f3..18a4427 100644
+--- a/docs/adr/0002-allowed-dependencies.md
++++ b/docs/adr/0002-allowed-dependencies.md
+@@ -5,9 +5,11 @@ This is the up-front allow-list the grilling produced. Anything on it may be ins
+ ## Runtime
+ 
+ ### `packages/shared`
++
+ - **zod** — the contract: API payloads, SSE event payloads, Firestore document shapes, the status+reason unions, rubric constants.
+ 
+ ### `apps/api`
++
+ - **express** — HTTP server.
+ - **firebase-admin** — Firestore access (Admin SDK only; browsers never touch Firebase).
+ - **zod** — boundary validation (shared).
+@@ -18,10 +20,15 @@ This is the up-front allow-list the grilling produced. Anything on it may be ins
+ - **express-rate-limit** — rate-limit `POST /api/login` and `POST /api/runs` (D26, D28).
+ 
+ ### `apps/web`
++
+ - **react**, **react-dom** — UI.
+ - **react-router-dom** — the routed pages: login, live run, Applied jobs, Scanned jobs, Settings (D20, D26).
++- **@mui/material**, **@emotion/react**, **@emotion/styled** — the UI kit and its styling engine (ticket 05b, human-approved): one theme, plus accessible Table, Chip, Card and progress components, so a minimal UI looks designed without hand-rolled CSS.
++- **@mui/icons-material** — the handful of icons in the shell and status chips.
++- **@fontsource/inter** — Inter, self-hosted and bundled by Vite, so the page makes no requests to a font CDN.
+ 
+ ## Dev / build / test
++
+ - **typescript** — strict everywhere; also the api/shared production build (`tsc`).
+ - **vite**, **@vitejs/plugin-react** — web dev server and production build.
+ - **vitest** — unit/integration tests across all workspaces.
+@@ -37,6 +44,7 @@ This is the up-front allow-list the grilling produced. Anything on it may be ins
+ - **Types**: `@types/node`, `@types/express`, `@types/cors`, `@types/cookie-parser`, `@types/jsonwebtoken`, `@types/supertest`, `@types/react`, `@types/react-dom`. (`bcryptjs` and `express-rate-limit` ship their own types.)
+ 
+ ## Deliberately excluded (would need an ADR to add)
++
+ - **No AI SDK and no agent/RAG framework** — the AI is two schema-bound `fetch` calls to an OpenAI-compatible endpoint from `apps/api/src/ai/` (D22, D25); LangChain/LlamaIndex/vector stores are hook-blocked.
+ - **No state-machine library** (xstate) — the run/job machines are a centralised transition table of pure functions (D16).
+ - **No concurrency library** (p-limit) — the 3-in-flight pool is a tiny inline semaphore (D17).
