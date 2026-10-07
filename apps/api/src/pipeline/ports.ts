@@ -33,8 +33,9 @@ export interface JobSource {
 
 /**
  * What the pipeline asks for: every Posting to consider in this Run, across
- * all boards. Never throws for a single failed board; that board falls back to
- * its recorded fixtures, labelled (D3).
+ * all boards, each board's Postings together and newest first (the pipeline
+ * takes the newest unseen ones per board). Never throws for a single failed
+ * board; that board falls back to its recorded fixtures, labelled (D3).
  */
 export interface Discovery {
   discover(): Promise<Posting[]>;

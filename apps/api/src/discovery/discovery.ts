@@ -3,7 +3,9 @@
  * through its ATS's `JobSource`; a board that fails (network, HTTP error,
  * timeout, unexpected shape) falls back to its recorded fixtures, labelled
  * `fallback`, and the Run continues. In `fixtures` mode no network is used at
- * all and every Posting is labelled `fixture` (spec, Testing seam 6).
+ * all and every Posting is labelled `fixture` (spec, Testing seam 6). Every
+ * Posting is returned, each board's together and newest first; the pipeline
+ * decides how many unseen ones to take per board (`MAX_POSTINGS_PER_BOARD`).
  */
 import type { Ats, Posting, PostingSource } from "@auto-apply/shared";
 import { logger } from "../logger.js";
@@ -13,22 +15,11 @@ import { messageOf } from "../errors.js";
 
 export type DiscoveryMode = "live" | "fixtures";
 
-/**
- * Postings kept per board, newest-updated first. A big board lists hundreds of
- * jobs. The Run's AI-evaluation cap (D17) stops pulling once its slots are
- * taken, but Seen and hard-blocked Postings take no slot, and for this user
- * most Postings are blocked by location; without this bound a Run over 15
- * boards could write thousands of blocked Evaluations. It bounds Firestore
- * writes and Run length.
- */
-export const MAX_POSTINGS_PER_BOARD = 10;
-
 export interface DiscoveryOptions {
   sources: readonly JobSource[];
   boards: readonly BoardRef[];
   readFixture: FixtureReader;
   mode: DiscoveryMode;
-  maxPerBoard?: number;
 }
 
 /** What one board contributed, and whether it came live or from fixtures. */
@@ -41,7 +32,7 @@ export interface BoardDiscovery {
 export function createDiscovery(
   options: DiscoveryOptions,
 ): Discovery & { discoverBoards(): Promise<BoardDiscovery[]> } {
-  const { boards, readFixture, mode, maxPerBoard = MAX_POSTINGS_PER_BOARD } = options;
+  const { boards, readFixture, mode } = options;
   const sources = new Map<Ats, JobSource>(options.sources.map((s) => [s.ats, s]));
 
   async function fromFixtures(
@@ -72,16 +63,14 @@ export function createDiscovery(
 
   async function discoverBoards(): Promise<BoardDiscovery[]> {
     const results = await Promise.all(boards.map(discoverBoard));
-    return results.map((result) => {
-      const postings = result.postings.slice(0, maxPerBoard);
+    for (const result of results) {
       logger.info("board_discovered", {
         ...result.ref,
         source: result.source,
         found: result.postings.length,
-        kept: postings.length,
       });
-      return { ...result, postings };
-    });
+    }
+    return results;
   }
 
   return {

@@ -76,19 +76,6 @@ describe("discovery", () => {
     expect(results[0]?.postings.length).toBeGreaterThan(0);
   });
 
-  it("caps the Postings kept per board", async () => {
-    const recorded = recordedFetch();
-    const discovery = createDiscovery({
-      sources: [greenhouseJobSource({ fetch: recorded.fetch, timeoutMs: 1000 })],
-      boards,
-      readFixture: readBoardFixture,
-      mode: "live",
-      maxPerBoard: 2,
-    });
-
-    expect(await discovery.discover()).toHaveLength(4);
-  });
-
   it("in fixtures mode never fetches and labels every Posting fixture", async () => {
     const { discovery, calls } = discoveryWith({ mode: "fixtures" });
 

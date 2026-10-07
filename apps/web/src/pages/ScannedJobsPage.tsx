@@ -26,7 +26,13 @@ import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
-import type { CriterionEvidence, Evaluation, Run, ScoredBy } from "@auto-apply/shared";
+import {
+  SKIP_REASONS,
+  type CriterionEvidence,
+  type Evaluation,
+  type Run,
+  type ScoredBy,
+} from "@auto-apply/shared";
 import { listEvaluations, listRuns } from "../api";
 import { useLoad, type LoadState } from "../useLoad";
 import { formatDate } from "../ui/formatDate";
@@ -41,6 +47,15 @@ import {
 
 const ALL_RUNS = "all";
 const COLUMNS = 8;
+
+/**
+ * Seen Postings are no longer recorded (they only count in the Run's
+ * `alreadySeen`), but Runs from before that stored them as `skipped: seen`;
+ * they are not jobs that Run scanned, so they are left out.
+ */
+function isLegacySeenSkip({ status, reason }: Evaluation): boolean {
+  return status === "skipped" && reason === SKIP_REASONS.seen;
+}
 
 export function ScannedJobsPage() {
   const [selected, setSelected] = useState<string>(ALL_RUNS);
@@ -97,6 +112,7 @@ function RunSelect({
         {runs.map((run) => (
           <MenuItem key={run.runId} value={run.runId}>
             {formatDate(run.createdAt)} · {run.status}
+            {run.preferencesPreset === "demo" && " · Demo preferences"}
           </MenuItem>
         ))}
       </Select>
@@ -128,7 +144,8 @@ function ScannedBody({
       </CardContent>
     );
   }
-  if (evaluations.data.length === 0) {
+  const scanned = evaluations.data.filter((evaluation) => !isLegacySeenSkip(evaluation));
+  if (scanned.length === 0) {
     return (
       <CardContent sx={{ py: 6, textAlign: "center" }}>
         <Typography variant="h3" gutterBottom>
@@ -137,12 +154,12 @@ function ScannedBody({
         <Typography color="text.secondary">
           {allRuns
             ? "Start a run from the Run tab; every job it evaluates is listed here."
-            : "This run ended before it evaluated any job."}
+            : "This run found no new jobs: they were all seen in earlier runs, or it ended first."}
         </Typography>
       </CardContent>
     );
   }
-  return <ScannedTable evaluations={evaluations.data} />;
+  return <ScannedTable evaluations={scanned} />;
 }
 
 function ScannedTable({ evaluations }: { evaluations: Evaluation[] }) {

@@ -20,7 +20,12 @@ import { createChatClient } from "../ai/chat-client.js";
 import { cannedEvaluation, completion, scriptedFetch } from "../ai/scripted-fetch.js";
 import { InMemoryRepo } from "../repo/in-memory-repo.js";
 import { greenhouseForms } from "../forms/greenhouse-forms.js";
-import { EvaluationNotFoundError, buildPipeline, type PipelineDeps } from "./pipeline.js";
+import {
+  EvaluationNotFoundError,
+  MAX_POSTINGS_PER_BOARD,
+  buildPipeline,
+  type PipelineDeps,
+} from "./pipeline.js";
 import { IllegalTransitionError } from "./transitions.js";
 import { simulatedSubmitter } from "../submit/simulated-submitter.js";
 import { boardsFor } from "../discovery/boards.js";
@@ -194,6 +199,7 @@ describe("pipeline skeleton", () => {
     expect(statuses).toEqual(["discovering", "evaluating", "applying", "completed"]);
     const run = await repo.getRun(runId);
     expect(run?.funnel).toEqual({
+      alreadySeen: 0,
       discovered: 2,
       evaluated: 2,
       blocked: 0,
@@ -368,7 +374,7 @@ const onsiteAbroad: Partial<Posting> = {
 };
 
 describe("seen-skip (D15)", () => {
-  it("skips Postings evaluated in an earlier Run before any screening or evaluation", async () => {
+  it("passes over Postings seen in an earlier Run without a record, counting them already seen", async () => {
     const repo = new InMemoryRepo();
     const { evaluator, judged } = recordingEvaluator();
     const discovery: Discovery = {
@@ -384,19 +390,46 @@ describe("seen-skip (D15)", () => {
     const firstOutcomes = outcomes(await evaluationsOf(repo, first.runId));
     expect(firstOutcomes["1"]).toBe("skipped: stretch");
     expect(firstOutcomes["2"]).toMatch(/^blocked: Mandatory onsite .*San Francisco, CA/);
-    // The second Run looks visibly different: both were seen, nothing is re-judged.
-    expect(outcomes(await evaluationsOf(repo, second.runId))).toEqual({
-      "1": "skipped: seen",
-      "2": "skipped: seen",
-    });
+    // The second Run looks visibly different: both were seen, so nothing is
+    // re-judged or recorded; the funnel counts them as already seen.
+    expect(await evaluationsOf(repo, second.runId)).toEqual([]);
     expect(judged).toEqual(["1"]);
     const run = await repo.getRun(second.runId);
     expect(run?.funnel).toMatchObject({
-      discovered: 2,
+      alreadySeen: 2,
+      discovered: 0,
       evaluated: 0,
-      skipped: 2,
+      skipped: 0,
       blocked: 0,
     });
+  });
+
+  it(`takes the newest ${MAX_POSTINGS_PER_BOARD} unseen Postings per board, so each Run moves on to the next ones`, async () => {
+    const repo = new InMemoryRepo();
+    const { evaluator, judged } = recordingEvaluator();
+    // One board listing 25 Postings, newest first.
+    const discovery: Discovery = { discover: async () => postings(25) };
+    const pipeline = buildPipeline(deps({ repo, evaluator, discovery }));
+    const ids = (from: number, to: number) =>
+      Array.from({ length: to - from + 1 }, (_, i) => String(from + i)).sort();
+
+    await (
+      await pipeline.startRun("user-1")
+    ).finished;
+    const firstRun = [...judged].sort();
+    const second = await pipeline.startRun("user-1");
+    await second.finished;
+    const secondRun = judged.slice(firstRun.length).sort();
+
+    expect(firstRun).toEqual(ids(1, 10));
+    expect(secondRun).toEqual(ids(11, 20));
+    // Run 2 passed over the 10 it had seen: counted, never recorded.
+    expect((await repo.getRun(second.runId))?.funnel).toMatchObject({
+      alreadySeen: 10,
+      discovered: 10,
+    });
+    const recorded = (await evaluationsOf(repo, second.runId)).map((e) => e.posting.jobId);
+    expect(recorded.sort()).toEqual(ids(11, 20));
   });
 
   it("does not mark a Posting seen when it failed, so a later Run tries again", async () => {
@@ -485,6 +518,78 @@ describe("screening before evaluation (D7)", () => {
   });
 });
 
+describe("preferences preset", () => {
+  const demoUser: User = {
+    ...theUser,
+    settings: { ...theUser.settings, preferencesPreset: "demo" },
+  };
+
+  /** One Run over the Postings as `user`, with every AI-side criterion in `met` met. */
+  async function runAs(user: User, discovered: Posting[], met: Record<string, string[]> = {}) {
+    const repo = new InMemoryRepo();
+    const pipeline = buildPipeline(
+      deps({
+        repo,
+        discovery: { discover: async () => discovered },
+        evaluator: cannedEvaluator(met),
+        loadUser: async () => user,
+      }),
+    );
+    const { runId, finished } = await pipeline.startRun("user-1");
+    await finished;
+    const byJob = new Map((await evaluationsOf(repo, runId)).map((e) => [e.posting.jobId, e]));
+    return { run: await repo.getRun(runId), byJob };
+  }
+
+  it("lets a Posting blocked on location under the default preset through screening under demo", async () => {
+    const abroad = { ...aPosting("abroad"), ...onsiteAbroad, title: "Engineering Manager" };
+
+    const real = await runAs(theUser, [abroad]);
+    const demo = await runAs(demoUser, [abroad]);
+
+    expect(real.byJob.get("abroad")?.status).toBe("blocked");
+    expect(real.byJob.get("abroad")?.reason).toMatch(/^Mandatory onsite .*San Francisco, CA/);
+    expect(demo.byJob.get("abroad")).toMatchObject({ verdict: "STRETCH", status: "skipped" });
+  });
+
+  it("still applies every other hard block under demo", async () => {
+    const bank = { ...aPosting("bank"), ...onsiteAbroad, company: "Barclays" };
+
+    const demo = await runAs(demoUser, [bank]);
+
+    expect(demo.byJob.get("bank")).toMatchObject({ verdict: "BLOCKED", status: "blocked" });
+    expect(demo.byJob.get("bank")?.reason).toMatch(/Barclays/);
+  });
+
+  it("gives a Posting no location rule touches the same Verdict and score under both presets", async () => {
+    const fit = { ...aPosting("fit"), location: "Bengaluru, India", remote: false };
+    const postingsFor = () => [{ ...fit, title: "Engineering Manager" }];
+    // Manager title (+3, code) + primary stack = 6: APPLY.
+    const met = { fit: ["stack_primary"] };
+
+    const real = await runAs(theUser, postingsFor(), met);
+    const demo = await runAs(demoUser, postingsFor(), met);
+
+    const pick = (e: Evaluation | undefined) => ({
+      verdict: e?.verdict,
+      score: e?.score,
+      status: e?.status,
+      reason: e?.reason,
+      evidence: e?.evidence,
+    });
+    expect(pick(demo.byJob.get("fit"))).toEqual(pick(real.byJob.get("fit")));
+    expect(real.byJob.get("fit")?.verdict).toBe("APPLY");
+  });
+
+  it("records the preset on the Run, so a demo Run stays labelled", async () => {
+    const real = await runAs(theUser, [aPosting("1")]);
+    const demo = await runAs(demoUser, [aPosting("1")]);
+
+    expect(real.run?.preferencesPreset).toBe("default");
+    expect(demo.run?.preferencesPreset).toBe("demo");
+  });
+});
+
 describe("limits (D17)", () => {
   it(`keeps at most ${MAX_IN_FLIGHT} Postings in flight and persists only what it has pulled`, async () => {
     const gated = gatedDelay();
@@ -539,7 +644,10 @@ describe("limits (D17)", () => {
       ...postings(25, {}, "fit-"),
     ];
     const discovery: Discovery = { discover: async () => discovered };
-    const pipeline = buildPipeline(deps({ repo, evaluator, discovery }));
+    // One board here, so lift the per-board cap to reach the AI cap.
+    const pipeline = buildPipeline(
+      deps({ repo, evaluator, discovery, maxPostingsPerBoard: Infinity }),
+    );
 
     const { runId, finished } = await pipeline.startRun("user-1");
     await finished;
@@ -548,22 +656,23 @@ describe("limits (D17)", () => {
     const all = await evaluationsOf(repo, runId);
     const count = (pattern: RegExp) =>
       all.filter((e) => pattern.test(`${e.status}: ${e.reason ?? ""}`)).length;
-    expect(count(/^skipped: seen$/)).toBe(4);
+    expect(count(/^skipped: seen$/)).toBe(0);
     expect(count(/^blocked: /)).toBe(5);
     expect(count(/^skipped: stretch$/)).toBe(MAX_AI_EVALS);
     // A Posting already pulled when the last slot went is skipped for the
     // limit; nothing after that is pulled, so it is never written.
     const limited = count(/^skipped: limit$/);
     expect(limited).toBeLessThan(MAX_IN_FLIGHT);
-    expect(all).toHaveLength(4 + 5 + MAX_AI_EVALS + limited);
-    expect(all.length).toBeLessThan(discovered.length);
+    expect(all).toHaveLength(5 + MAX_AI_EVALS + limited);
+    expect(all.length).toBeLessThan(discovered.length - 4);
     const run = await repo.getRun(runId);
     expect(run?.status).toBe("completed");
     expect(run?.funnel).toMatchObject({
-      discovered: discovered.length,
+      alreadySeen: 4,
+      discovered: discovered.length - 4,
       evaluated: MAX_AI_EVALS,
       blocked: 5,
-      skipped: 4 + MAX_AI_EVALS + limited,
+      skipped: MAX_AI_EVALS + limited,
     });
   });
 
@@ -572,7 +681,10 @@ describe("limits (D17)", () => {
     const { evaluator, judged } = recordingEvaluator();
     const discovered = postings(MAX_AI_EVALS + 5);
     const discovery: Discovery = { discover: async () => discovered };
-    const pipeline = buildPipeline(deps({ repo, evaluator, discovery }));
+    // One board here, so lift the per-board cap to reach the AI cap.
+    const pipeline = buildPipeline(
+      deps({ repo, evaluator, discovery, maxPostingsPerBoard: Infinity }),
+    );
 
     await (
       await pipeline.startRun("user-1")

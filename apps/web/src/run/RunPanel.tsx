@@ -10,6 +10,7 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
+import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import LinearProgress from "@mui/material/LinearProgress";
 import Stack from "@mui/material/Stack";
@@ -37,6 +38,8 @@ const funnelLabels: [keyof RunFunnel, string][] = [
   ["held", "Held (needs you)"],
   ["submitted", "Submitted (simulated)"],
   ["failed", "Failed"],
+  // Seen in an earlier Run and passed over: counted, never listed (D15).
+  ["alreadySeen", "Already seen"],
 ];
 
 /**
@@ -203,14 +206,25 @@ export function RunPanel() {
                 spacing={2}
                 sx={{ justifyContent: "space-between", alignItems: "center", mb: 1.5 }}
               >
-                <Box component="dl" sx={{ display: "flex", alignItems: "center", gap: 1, m: 0 }}>
-                  <Typography component="dt" variant="body2" color="text.secondary">
-                    Status
-                  </Typography>
-                  <Box component="dd" sx={{ m: 0 }}>
-                    {run ? <StatusChip status={run.status} /> : "—"}
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                  <Box component="dl" sx={{ display: "flex", alignItems: "center", gap: 1, m: 0 }}>
+                    <Typography component="dt" variant="body2" color="text.secondary">
+                      Status
+                    </Typography>
+                    <Box component="dd" sx={{ m: 0 }}>
+                      {run ? <StatusChip status={run.status} /> : "—"}
+                    </Box>
                   </Box>
-                </Box>
+                  {run?.preferencesPreset === "demo" && (
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      color="info"
+                      label="Demo preferences"
+                      title="This run uses the Demo (broadened) preset: the location hard block is off."
+                    />
+                  )}
+                </Stack>
                 <ConnectionIndicator connection={stream.connection} />
               </Stack>
               <LinearProgress
@@ -261,7 +275,7 @@ export function RunPanel() {
               gridTemplateColumns: {
                 xs: "repeat(2, 1fr)",
                 sm: "repeat(4, 1fr)",
-                md: "repeat(7, 1fr)",
+                lg: "repeat(8, 1fr)",
               },
             }}
           >
