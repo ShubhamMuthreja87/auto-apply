@@ -44,6 +44,7 @@ import {
   reasonText,
   scoreText,
 } from "../run/evaluationCells";
+import { AnswerAndSubmit } from "../run/AnswerAndSubmit";
 
 const ALL_RUNS = "all";
 const COLUMNS = 8;
@@ -162,7 +163,14 @@ function ScannedBody({
   return <ScannedTable evaluations={scanned} />;
 }
 
+const idOf = (e: Pick<Evaluation, "runId" | "jobKey">) => `${e.runId}/${e.jobKey}`;
+
 function ScannedTable({ evaluations }: { evaluations: Evaluation[] }) {
+  /** Evaluations Answer & submit has updated since the list loaded, by run and Job Key. */
+  const [answered, setAnswered] = useState<ReadonlyMap<string, Evaluation>>(new Map());
+  const onAnswered = (done: Evaluation) =>
+    setAnswered((current) => new Map(current).set(idOf(done), done));
+
   return (
     <TableContainer>
       <Table size="small" aria-label="Scanned jobs">
@@ -180,7 +188,11 @@ function ScannedTable({ evaluations }: { evaluations: Evaluation[] }) {
         </TableHead>
         <TableBody>
           {evaluations.map((evaluation) => (
-            <ScannedRow key={`${evaluation.runId}/${evaluation.jobKey}`} evaluation={evaluation} />
+            <ScannedRow
+              key={idOf(evaluation)}
+              evaluation={answered.get(idOf(evaluation)) ?? evaluation}
+              onAnswered={onAnswered}
+            />
           ))}
         </TableBody>
       </Table>
@@ -188,7 +200,13 @@ function ScannedTable({ evaluations }: { evaluations: Evaluation[] }) {
   );
 }
 
-function ScannedRow({ evaluation }: { evaluation: Evaluation }) {
+function ScannedRow({
+  evaluation,
+  onAnswered,
+}: {
+  evaluation: Evaluation;
+  onAnswered: (evaluation: Evaluation) => void;
+}) {
   const [open, setOpen] = useState(false);
   const { posting, verdict, score, scoredBy, status, reason, missingFields, evidence, createdAt } =
     evaluation;
@@ -229,6 +247,7 @@ function ScannedRow({ evaluation }: { evaluation: Evaluation }) {
         <TableCell sx={{ color: "text.secondary", minWidth: 200 }}>
           {reasonText({ status, reason })}
           <MissingFieldsList fields={missingFields} />
+          <AnswerAndSubmit evaluation={evaluation} onSubmitted={onAnswered} />
         </TableCell>
       </TableRow>
       <TableRow>

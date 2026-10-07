@@ -41,6 +41,7 @@ const sourceText: Record<SubmittedAnswer["source"], string> = {
   profile: "Profile",
   settings: "Settings",
   ai: "AI",
+  user: "You",
 };
 
 function answerText({ value }: SubmittedAnswer): string {
@@ -227,7 +228,7 @@ function AppliedRow({
   );
 }
 
-function PayloadDialog({
+export function PayloadDialog({
   title,
   submission,
   onClose,

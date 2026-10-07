@@ -368,5 +368,11 @@ export function resolveFields(fields: readonly FormField[], user: User): FieldRe
 export function missingRequired(resolutions: readonly FieldResolution[]): MissingField[] {
   return resolutions
     .filter((r) => r.field.required && (r.value === undefined || r.value.length === 0))
-    .map((r) => ({ id: r.field.id, label: r.field.label, why: r.why }));
+    .map((r) => ({
+      id: r.field.id,
+      label: r.field.label,
+      why: r.why,
+      type: r.field.type,
+      options: r.field.options ?? [],
+    }));
 }

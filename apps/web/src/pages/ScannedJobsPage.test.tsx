@@ -49,6 +49,7 @@ function anEvaluation(
     scoredBy: null,
     missingFields: [],
     submission: null,
+    draft: null,
     createdAt: "2026-10-06T12:00:00.000Z",
     updatedAt: "2026-10-06T12:00:00.000Z",
     ...overrides,
@@ -239,5 +240,73 @@ describe("<ScannedJobsPage />", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Internal server error");
     expect(screen.queryByText(/no jobs scanned yet/i)).not.toBeInTheDocument();
+  });
+
+  it("finishes a needs_you job with Answer and submit, then shows it submitted with its payload", async () => {
+    const needsYou = anEvaluation("run-new", "3", {
+      status: "held",
+      verdict: "APPLY_NOW",
+      reason: "needs_you",
+      missingFields: [
+        {
+          id: "question_5",
+          label: "Do you live within 35 miles of New York City?",
+          why: "Only you can answer this",
+          type: "select",
+          options: [
+            { label: "Yes", value: 1 },
+            { label: "No", value: 0 },
+          ],
+        },
+      ],
+      draft: { formUrl: "https://job-boards.greenhouse.io/acme/jobs/3", answers: [] },
+    });
+    const submitted: Evaluation = {
+      ...needsYou,
+      status: "submitted",
+      reason: null,
+      missingFields: [],
+      submission: {
+        ats: "greenhouse",
+        endpoint: "https://boards-api.greenhouse.io/v1/boards/acme/jobs/3",
+        method: "POST",
+        sent: false,
+        formUrl: "https://job-boards.greenhouse.io/acme/jobs/3",
+        payload: { question_5: 0 },
+        answers: [
+          {
+            id: "question_5",
+            label: "Do you live within 35 miles of New York City?",
+            type: "select",
+            source: "user",
+            value: [{ label: "No", value: 0 }],
+          },
+        ],
+        attempt: 1,
+        builtAt: "2026-10-06T12:00:00.000Z",
+      },
+    };
+    const fetchMock = fakeApi({ evaluations: { all: [needsYou] } });
+    const listOnly = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) =>
+      String(input).endsWith("/answers")
+        ? json({ evaluation: submitted })
+        : (listOnly?.(input) ?? json({}, 500)),
+    );
+    const user = userEvent.setup();
+    render(<ScannedJobsPage />);
+    const [row] = await jobRows();
+    if (!row) throw new Error("no row");
+
+    await user.click(within(row).getByRole("button", { name: "Answer and submit" }));
+    const dialog = await screen.findByRole("dialog", { name: /Answer and submit/ });
+    await user.selectOptions(within(dialog).getByRole("combobox", { name: /35 miles/ }), "No");
+    await user.click(within(dialog).getByRole("button", { name: "Submit (simulated)" }));
+
+    const payload = await screen.findByRole("dialog", { name: /Payload/ });
+    expect(payload).toHaveTextContent("question_5");
+    expect(payload).toHaveTextContent("You");
+    await user.click(within(payload).getByRole("button", { name: "Close" }));
+    expect((await jobRows())[0]).toHaveTextContent(/Submitted.*simulated/);
   });
 });

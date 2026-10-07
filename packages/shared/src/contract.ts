@@ -585,16 +585,37 @@ export const criterionEvidenceSchema = z.object({
 });
 export type CriterionEvidence = z.infer<typeof criterionEvidenceSchema>;
 
+/** The normalised type of an application-form field (spec, Greenhouse form merge). */
+export const formFieldTypeSchema = z.enum([
+  "text",
+  "textarea",
+  "select",
+  "multiselect",
+  "file",
+  "boolean",
+]);
+export type FormFieldTypeName = z.infer<typeof formFieldTypeSchema>;
+
+/** One choice of a select field; `value` is what the ATS expects back in the payload. */
+export const formOptionSchema = z.object({
+  label: z.string(),
+  value: z.union([z.string(), z.number()]),
+});
+
 /**
  * A required application-form field nobody but the user can answer (D11),
  * listed on a `held: needs_you` Evaluation. `id` is the ATS's own field name
  * (e.g. Greenhouse `question_18610029008`); `why` says why it was not filled,
- * e.g. "Legal agreement; never auto-answered (D10)".
+ * e.g. "Legal agreement; never auto-answered (D10)". `type` and `options` let
+ * the user answer it later (Answer & submit); they default for documents
+ * stored before them.
  */
 export const missingFieldSchema = z.object({
   id: z.string(),
   label: z.string(),
   why: z.string(),
+  type: formFieldTypeSchema.default("text"),
+  options: z.array(formOptionSchema).default([]),
 });
 export type MissingField = z.infer<typeof missingFieldSchema>;
 
@@ -616,34 +637,18 @@ export const payloadValueSchema = z.union([
 ]);
 export type PayloadValue = z.infer<typeof payloadValueSchema>;
 
-/** The normalised type of an application-form field (spec, Greenhouse form merge). */
-export const formFieldTypeSchema = z.enum([
-  "text",
-  "textarea",
-  "select",
-  "multiselect",
-  "file",
-  "boolean",
-]);
-export type FormFieldTypeName = z.infer<typeof formFieldTypeSchema>;
-
-/** One choice of a select field; `value` is what the ATS expects back in the payload. */
-export const formOptionSchema = z.object({
-  label: z.string(),
-  value: z.union([z.string(), z.number()]),
-});
-
 /**
  * One answered form field behind a submission (D9): the ATS's field id, its
  * label and type, which source answered it, and the answer — text, or the
  * chosen options of a select. "View payload" shows these, and Retry rebuilds
- * the payload from them (D19).
+ * the payload from them (D19). `user` is a field the user answered
+ * themselves through Answer & submit.
  */
 export const submittedAnswerSchema = z.object({
   id: z.string(),
   label: z.string(),
   type: formFieldTypeSchema,
-  source: z.enum(["profile", "settings", "ai"]),
+  source: z.enum(["profile", "settings", "ai", "user"]),
   value: z.union([z.string(), z.array(formOptionSchema)]),
 });
 export type SubmittedAnswer = z.infer<typeof submittedAnswerSchema>;
@@ -668,6 +673,18 @@ export const simulatedSubmissionSchema = z.object({
 export type SimulatedSubmission = z.infer<typeof simulatedSubmissionSchema>;
 
 /**
+ * What a `held: needs_you` Evaluation keeps so the user can finish it later
+ * (Answer & submit): the form's URL and the fields already answered, in form
+ * order. Finishing merges the user's answers in, without reading the form or
+ * calling the AI again.
+ */
+export const applicationDraftSchema = z.object({
+  formUrl: z.string().url(),
+  answers: z.array(submittedAnswerSchema),
+});
+export type ApplicationDraft = z.infer<typeof applicationDraftSchema>;
+
+/**
  * The per-run record of what we decided about one Posting (GLOSSARY:
  * Evaluation), stored as one document under its Run.
  */
@@ -687,6 +704,8 @@ export const evaluationSchema = z.object({
   missingFields: z.array(missingFieldSchema).default([]),
   /** The built, never-sent payload once a submit was attempted (D18); else `null`. */
   submission: simulatedSubmissionSchema.nullable().default(null),
+  /** The answered fields kept while `held: needs_you`, to finish it later; else `null`. */
+  draft: applicationDraftSchema.nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -743,6 +762,31 @@ export type SnapshotEvent = z.infer<typeof snapshotEventSchema>;
  */
 export const retrySubmitResponseSchema = z.object({ evaluation: evaluationSchema });
 export type RetrySubmitResponse = z.infer<typeof retrySubmitResponseSchema>;
+
+/**
+ * One answer the user gives a missing field: text (a file field takes a URL),
+ * or an option's value — a list of them for a multi-select. Bounded so a huge
+ * body never reaches storage.
+ */
+export const userAnswerValueSchema = z.union([
+  z.string().max(10_000),
+  z.number(),
+  z.array(z.union([z.string().max(1_000), z.number()])).max(100),
+]);
+export type UserAnswerValue = z.infer<typeof userAnswerValueSchema>;
+
+/**
+ * `POST /api/runs/:runId/jobs/:jobKey/answers` (Answer & submit): the user's
+ * answers to a `held: needs_you` job's missing fields, by field id.
+ */
+export const submitAnswersRequestSchema = z.object({
+  answers: z.record(z.string().max(200), userAnswerValueSchema),
+});
+export type SubmitAnswersRequest = z.infer<typeof submitAnswersRequestSchema>;
+
+/** `→ 200`: the job is now submitted (simulated), with its payload. */
+export const submitAnswersResponseSchema = z.object({ evaluation: evaluationSchema });
+export type SubmitAnswersResponse = z.infer<typeof submitAnswersResponseSchema>;
 
 /** The latest Run document. */
 export const runEventSchema = runSchema;

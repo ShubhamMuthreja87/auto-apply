@@ -2,11 +2,17 @@
  * The one place that owns status transitions (D16; CODING_STANDARDS landmine:
  * status transitions). Each machine is a table of the moves it allows; every
  * Run and Evaluation status change in the API is checked here first and an
- * illegal move throws. Statuses only move forward, with one exception kept
- * out of the forward table on purpose: Retry on a simulated failure
- * (failed → applying, D19), checked by its own function.
+ * illegal move throws. Statuses only move forward, with two named edges kept
+ * out of the forward table on purpose, each checked by its own function:
+ * Retry on a simulated failure (failed → applying, D19), and Answer & submit
+ * on a job held for the user (held: needs_you → applying).
  */
-import { FAILED_REASONS, type EvaluationStatus, type RunStatus } from "@auto-apply/shared";
+import {
+  FAILED_REASONS,
+  HELD_REASONS,
+  type EvaluationStatus,
+  type RunStatus,
+} from "@auto-apply/shared";
 
 export class IllegalTransitionError extends Error {
   constructor(
@@ -72,6 +78,30 @@ export function assertRetryTransition(from: {
       "evaluation",
       `${from.status}${from.reason ? ` (${from.reason})` : ""}`,
       `${RETRY_EDGE.to} (retry)`,
+    );
+  }
+}
+
+/**
+ * Answer & submit: the user answers a `held: needs_you` job's missing fields
+ * and it moves on to `applying` for a simulated submit. Any other held reason,
+ * or any other status, cannot be answered.
+ */
+export const ANSWER_EDGE = {
+  from: "held",
+  reason: HELD_REASONS.needsYou,
+  to: "applying",
+} as const satisfies { from: EvaluationStatus; reason: string; to: EvaluationStatus };
+
+export function assertAnswerTransition(from: {
+  status: EvaluationStatus;
+  reason: string | null;
+}): void {
+  if (from.status !== ANSWER_EDGE.from || from.reason !== ANSWER_EDGE.reason) {
+    throw new IllegalTransitionError(
+      "evaluation",
+      `${from.status}${from.reason ? ` (${from.reason})` : ""}`,
+      `${ANSWER_EDGE.to} (answer)`,
     );
   }
 }

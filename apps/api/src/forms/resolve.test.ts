@@ -346,7 +346,13 @@ describe("field resolution (D9, D10)", () => {
       user,
     );
     expect(missingRequired(resolutions)).toEqual([
-      { id: "q_ai", label: "AI Policy for Application", why: expect.stringMatching(/AI-policy/) },
+      {
+        id: "q_ai",
+        label: "AI Policy for Application",
+        why: expect.stringMatching(/AI-policy/),
+        type: "select",
+        options: yesNo,
+      },
     ]);
   });
 });
